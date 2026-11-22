@@ -203,6 +203,8 @@ FocusScope {
                             width: cardsArea.cardWidth
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
                             onPlayRequested: page.consoles.play(consoleCard.key)
+                            onWakeRequested: page.consoles.wake(consoleCard.key)
+                            onCancelWakeRequested: page.consoles.cancelWake(consoleCard.key)
                             onPairRequested: pairingDialog.openFor(consoleCard.key, consoleCard.name)
                             onRefreshRequested: page.consoles.refresh(consoleCard.key)
                             onMenuRequested: anchor => cardMenu.openFor(consoleCard, anchor)
@@ -235,15 +237,24 @@ FocusScope {
         property string consoleKey
         property string consoleName
         property bool consoleSaved
+        property bool consolePaired
 
         function openFor(card, anchor) {
             cardMenu.consoleKey = card.key;
             cardMenu.consoleName = card.name;
             cardMenu.consoleSaved = card.saved;
+            cardMenu.consolePaired = card.paired;
             cardMenu.parent = anchor;
             cardMenu.x = anchor.width - cardMenu.width;
             cardMenu.y = anchor.height + Theme.space1;
             cardMenu.open();
+        }
+
+        MenuRow {
+            text: "Parear"
+            iconName: "link-2"
+            enabled: !cardMenu.consolePaired
+            onTriggered: pairingDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
         }
 
         MenuRow {

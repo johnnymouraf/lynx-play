@@ -14,6 +14,7 @@ Item {
     required property string status
     required property string activity
     required property bool saved
+    required property bool paired
     required property bool searching
     property bool focused: false
     property real wakeProgress: 0

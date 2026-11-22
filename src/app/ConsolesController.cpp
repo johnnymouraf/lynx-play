@@ -2,6 +2,7 @@
 
 #include "app/ConsolePresentation.h"
 #include "remoteplay/ConsoleDiscovery.h"
+#include "remoteplay/ConsoleWake.h"
 #include "remoteplay/HostAddress.h"
 
 #include <algorithm>
@@ -25,6 +26,7 @@ using remoteplay::SavedConsole;
 
 constexpr auto kSearchDuration = std::chrono::seconds(6);
 constexpr auto kClockInterval = std::chrono::seconds(30);
+constexpr auto kWakeTimeout = std::chrono::seconds(45);
 
 std::string_view stateName(HostState state)
 {
@@ -63,6 +65,19 @@ bool isAt(const ConsoleEntry& entry, const SavedConsole* saved, const std::strin
         saved != nullptr && (saved->manualHost == address || saved->address == address);
 
     return answersThere || savedThere;
+}
+
+std::expected<void, std::string> sendWakeupTo(const SavedConsole& console,
+                                              const std::string& address)
+{
+    const auto credential = remoteplay::wakeCredential(console.credentials->registKey);
+
+    if (!credential)
+    {
+        return std::unexpected(credential.error());
+    }
+
+    return remoteplay::sendWakeup(address, *credential, console.ps5);
 }
 
 } // namespace
@@ -260,6 +275,47 @@ void ConsolesController::play(const QString& key)
                 u"Esta versão encontra, pareia e liga o PS5. Jogar chega na próxima versão."_s);
 }
 
+void ConsolesController::wake(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr || !console->credentials)
+    {
+        spdlog::warn("Cannot wake {}: it isn't paired", key.toStdString());
+        return;
+    }
+
+    const DiscoveredHost* host = findDiscovered(key);
+    const std::string& address = host != nullptr ? host->address : console->address;
+    const QString name = consoleName({.saved = console, .discovered = host});
+    const auto sent = sendWakeupTo(*console, address);
+
+    if (!sent)
+    {
+        spdlog::error("Cannot wake {}: {}", key.toStdString(), sent.error());
+        emit notice(u"danger"_s, u"Não foi possível ligar o %1"_s.arg(name),
+                    u"Veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."_s);
+        return;
+    }
+
+    spdlog::info("Wake-up sent to {} at {}", key.toStdString(), address);
+    const std::string wakingKey = key.toStdString();
+    wakingUntil_[wakingKey] = SteadyClock::now() + kWakeTimeout;
+    QTimer::singleShot(kWakeTimeout, this, [this, wakingKey] { expireWake(wakingKey); });
+    refreshModel();
+}
+
+void ConsolesController::cancelWake(const QString& key)
+{
+    if (wakingUntil_.erase(key.toStdString()) == 0)
+    {
+        return;
+    }
+
+    spdlog::info("Stopped waiting for {} to turn on", key.toStdString());
+    refreshModel();
+}
+
 QString ConsolesController::addressError(const QString& text) const
 {
     const auto address = remoteplay::normalizeHostAddress(text.toStdString());
@@ -364,6 +420,7 @@ void ConsolesController::onHostsDiscovered(std::vector<DiscoveredHost> hosts)
 
     logChanges(hosts);
     discovered_ = std::move(hosts);
+    finishWakes();
     refreshModel();
 }
 
@@ -424,7 +481,7 @@ ConsoleRow ConsolesController::rowFor(const ConsoleEntry& entry, const QDateTime
     const ConsoleFacts facts{
         .saved = entry.savedIndex ? &file_.consoles.at(*entry.savedIndex) : nullptr,
         .discovered = entry.discovered ? &*entry.discovered : nullptr,
-        .waking = false,
+        .waking = wakingUntil_.contains(entry.key),
         .searching = isSearching,
     };
 
@@ -435,6 +492,7 @@ ConsoleRow ConsolesController::rowFor(const ConsoleEntry& entry, const QDateTime
         .status = consoleStatus(facts),
         .activity = consoleActivity(facts, now),
         .saved = facts.saved != nullptr,
+        .paired = facts.saved != nullptr && facts.saved->credentials.has_value(),
         .searching = isSearching && facts.discovered == nullptr,
     };
 }
@@ -483,6 +541,44 @@ void ConsolesController::expireSearch(const std::string& key)
 
     searchingUntil_.erase(searching);
     refreshModel();
+}
+
+void ConsolesController::expireWake(const std::string& key)
+{
+    const auto waking = wakingUntil_.find(key);
+
+    if (waking == wakingUntil_.end() || waking->second > SteadyClock::now())
+    {
+        return;
+    }
+
+    wakingUntil_.erase(waking);
+    spdlog::warn("{} didn't turn on in time", key);
+
+    const ConsoleRow* row = model_.find(fromUtf8(key));
+    const QString name = row != nullptr ? row->name : fromUtf8(key);
+    emit notice(u"danger"_s, u"O %1 não ligou"_s.arg(name),
+                u"Confira se ele pode ser ligado pela rede: Configurações › Sistema › Economia de "
+                u"energia › Recursos disponíveis no modo de repouso."_s);
+    refreshModel();
+}
+
+void ConsolesController::finishWakes()
+{
+    for (auto waking = wakingUntil_.begin(); waking != wakingUntil_.end();)
+    {
+        const auto host = std::ranges::find(discovered_, waking->first, &DiscoveredHost::hostId);
+        const bool ready = host != discovered_.end() && host->state == HostState::Ready;
+
+        if (!ready)
+        {
+            ++waking;
+            continue;
+        }
+
+        spdlog::info("{} turned on", waking->first);
+        waking = wakingUntil_.erase(waking);
+    }
 }
 
 SavedConsole* ConsolesController::findSaved(const QString& key)

@@ -82,6 +82,11 @@ public:
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
     Q_INVOKABLE void play(const QString& key);
+    // Sends the wake-up packet to a paired console in rest mode; its card shows
+    // it turning on until it answers ready or the wait runs out.
+    Q_INVOKABLE void wake(const QString& key);
+    // Stops waiting for a console being turned on.
+    Q_INVOKABLE void cancelWake(const QString& key);
     // The message to show under the address field, or empty when it is valid.
     Q_INVOKABLE QString addressError(const QString& text) const;
     // Saves a console by its address and queries that address directly.
@@ -110,6 +115,10 @@ private:
     void markSearching(const std::string& key);
     // Ends a search unless it was started again since.
     void expireSearch(const std::string& key);
+    // Gives up on a console that didn't turn on in time.
+    void expireWake(const std::string& key);
+    // Ends the wait for the consoles that now answer ready.
+    void finishWakes();
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
@@ -129,6 +138,7 @@ private:
     std::vector<remoteplay::ConsoleEntry> entries_;
     std::vector<std::string> queriedHosts_;
     std::map<std::string, SteadyClock::time_point> searchingUntil_;
+    std::map<std::string, SteadyClock::time_point> wakingUntil_;
     QTimer clockTimer_;
     DiscoveryStatus discoveryStatus_ = DiscoveryStatus::Unavailable;
     bool remotePlayReady_ = false;

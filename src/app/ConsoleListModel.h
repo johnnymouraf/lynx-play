@@ -20,6 +20,7 @@ struct ConsoleRow
     // The card's last line: when it was played, found or last seen.
     QString activity;
     bool saved = false;
+    bool paired = false;
     // A direct query of its address is in progress.
     bool searching = false;
 
@@ -43,6 +44,7 @@ public:
         StatusRole,
         ActivityRole,
         SavedRole,
+        PairedRole,
         SearchingRole,
     };
 
