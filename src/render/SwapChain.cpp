@@ -10,7 +10,6 @@ namespace
 
 using core::describeFailure;
 
-constexpr DXGI_FORMAT kBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 constexpr UINT kMaxQueuedFrames = 1;
 
 } // namespace
@@ -26,7 +25,7 @@ std::expected<SwapChain, std::string> SwapChain::create(const GpuDevice& gpu, HW
     const DXGI_SWAP_CHAIN_DESC1 description{
         .Width = size.width,
         .Height = size.height,
-        .Format = kBackBufferFormat,
+        .Format = kFormat,
         .SampleDesc = {.Count = 1, .Quality = 0},
         .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
         .BufferCount = kBufferCount,

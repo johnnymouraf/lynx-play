@@ -2,7 +2,9 @@
 
 #include "core/Windows.h"
 
+#include <algorithm>
 #include <mutex>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -17,6 +19,9 @@ constexpr LONG kInitialClientWidth = 1280;
 constexpr LONG kInitialClientHeight = 720;
 constexpr DWORD kWindowedStyle = WS_OVERLAPPEDWINDOW;
 constexpr DWORD kFullscreenStyle = WS_POPUP;
+
+// Posted by the renderer's thread when it stops for good.
+constexpr UINT kRenderFailedMessage = WM_APP + 1;
 
 // Bit 29 of a key message's lParam: the Alt key was down.
 constexpr LPARAM kAltDownFlag = LPARAM{1} << 29;
@@ -51,22 +56,45 @@ SurfaceSize clientSize(HWND window)
     };
 }
 
+RECT workAreaOf(HWND anchor)
+{
+    const HMONITOR monitor = anchor != nullptr
+                                 ? MonitorFromWindow(anchor, MONITOR_DEFAULTTOPRIMARY)
+                                 : MonitorFromPoint({.x = 0, .y = 0}, MONITOR_DEFAULTTOPRIMARY);
+
+    MONITORINFO info{.cbSize = sizeof(MONITORINFO)};
+    GetMonitorInfoW(monitor, &info);
+
+    return info.rcWork;
+}
+
+// The window's frame for the initial client size, centered in the work area.
+RECT initialFrame(const RECT& workArea)
+{
+    RECT frame{.left = 0, .top = 0, .right = kInitialClientWidth, .bottom = kInitialClientHeight};
+    AdjustWindowRectEx(&frame, kWindowedStyle, FALSE, 0);
+
+    const LONG width = frame.right - frame.left;
+    const LONG height = frame.bottom - frame.top;
+    const LONG left = workArea.left + std::max(0L, (workArea.right - workArea.left - width) / 2);
+    const LONG top = workArea.top + std::max(0L, (workArea.bottom - workArea.top - height) / 2);
+
+    return {.left = left, .top = top, .right = left + width, .bottom = top + height};
+}
+
 } // namespace
 
 std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
-    std::wstring_view title)
+    const GpuDevice& gpu, std::shared_ptr<FrameMailbox> mailbox, StreamWindowOptions options)
 {
     registerWindowClassOnce(&StreamWindow::windowProc);
 
     // The constructor is private, out of make_unique's reach.
-    std::unique_ptr<StreamWindow> stream(new StreamWindow());
+    std::unique_ptr<StreamWindow> stream(new StreamWindow(std::move(options.onClosed)));
 
-    RECT frame{0, 0, kInitialClientWidth, kInitialClientHeight};
-    AdjustWindowRectEx(&frame, kWindowedStyle, FALSE, 0);
-
-    const std::wstring titleText(title);
-    const HWND window = CreateWindowExW(0, kWindowClassName, titleText.c_str(), kWindowedStyle,
-                                       CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left,
+    const RECT frame = initialFrame(workAreaOf(options.monitorOf));
+    const HWND window = CreateWindowExW(0, kWindowClassName, options.title.c_str(), kWindowedStyle,
+                                       frame.left, frame.top, frame.right - frame.left,
                                        frame.bottom - frame.top, nullptr, nullptr,
                                        GetModuleHandleW(nullptr), stream.get());
 
@@ -76,23 +104,41 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
             core::describeFailure("CreateWindowExW", HRESULT_FROM_WIN32(GetLastError())));
     }
 
-    auto renderer = FrameRenderer::start(window, clientSize(window));
+    if (options.mode == WindowMode::Fullscreen)
+    {
+        stream->enterFullscreen();
+    }
+
+    FrameRenderer::Options rendererOptions{
+        .timing = options.timing,
+        .onFailure = [window] { PostMessageW(window, kRenderFailedMessage, 0, 0); },
+    };
+    auto renderer = FrameRenderer::start(gpu, window, clientSize(window), std::move(mailbox),
+                                         std::move(rendererOptions));
 
     if (!renderer)
     {
-        stream->close();
+        stream->onClosed_ = nullptr;
+        stream->close(CloseReason::RenderFailed);
         return std::unexpected(renderer.error());
     }
 
     stream->renderer_ = std::move(*renderer);
-    ShowWindow(window, SW_SHOWNORMAL);
+    ShowWindow(window, SW_SHOW);
+    SetForegroundWindow(window);
 
     return stream;
 }
 
+StreamWindow::StreamWindow(std::function<void(CloseReason)> onClosed)
+    : onClosed_(std::move(onClosed))
+{
+}
+
 StreamWindow::~StreamWindow()
 {
-    close();
+    onClosed_ = nullptr;
+    close(CloseReason::User);
 }
 
 bool StreamWindow::isOpen() const
@@ -166,7 +212,11 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         return 1;
 
     case WM_CLOSE:
-        close();
+        close(CloseReason::User);
+        return 0;
+
+    case kRenderFailedMessage:
+        close(CloseReason::RenderFailed);
         return 0;
 
     default:
@@ -181,7 +231,7 @@ void StreamWindow::handleKey(WPARAM key)
     switch (key)
     {
     case VK_ESCAPE:
-        close();
+        close(CloseReason::User);
         break;
 
     case VK_F11:
@@ -215,8 +265,16 @@ void StreamWindow::enterFullscreen()
         return;
     }
 
+    const LONG_PTR visible = GetWindowLongPtrW(window_, GWL_STYLE) & WS_VISIBLE;
+
+    // A window still hidden (opening in fullscreen) must come back shown.
+    if (visible == 0)
+    {
+        windowedPlacement_.showCmd = SW_SHOWNORMAL;
+    }
+
     const RECT& area = monitor.rcMonitor;
-    SetWindowLongPtrW(window_, GWL_STYLE, kFullscreenStyle | WS_VISIBLE);
+    SetWindowLongPtrW(window_, GWL_STYLE, kFullscreenStyle | visible);
     SetWindowPos(window_, HWND_TOP, area.left, area.top, area.right - area.left,
                  area.bottom - area.top, SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
     fullscreen_ = true;
@@ -224,7 +282,8 @@ void StreamWindow::enterFullscreen()
 
 void StreamWindow::leaveFullscreen()
 {
-    SetWindowLongPtrW(window_, GWL_STYLE, kWindowedStyle | WS_VISIBLE);
+    const LONG_PTR visible = GetWindowLongPtrW(window_, GWL_STYLE) & WS_VISIBLE;
+    SetWindowLongPtrW(window_, GWL_STYLE, kWindowedStyle | visible);
     SetWindowPlacement(window_, &windowedPlacement_);
     SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                  SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
@@ -233,13 +292,19 @@ void StreamWindow::leaveFullscreen()
 
 // The renderer goes first: its thread must stop presenting before the window
 // it presents to is destroyed.
-void StreamWindow::close()
+void StreamWindow::close(CloseReason reason)
 {
     renderer_.reset();
 
     if (window_ != nullptr)
     {
         DestroyWindow(window_);
+    }
+
+    if (onClosed_)
+    {
+        const auto onClosed = std::exchange(onClosed_, nullptr);
+        onClosed(reason);
     }
 }
 

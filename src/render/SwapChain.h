@@ -2,6 +2,7 @@
 
 #include "core/Windows.h"
 #include "render/GpuDevice.h"
+#include "render/Layout.h"
 
 #include <array>
 #include <chrono>
@@ -11,14 +12,6 @@
 
 namespace lynx::render
 {
-
-struct SurfaceSize
-{
-    std::uint32_t width = 0;
-    std::uint32_t height = 0;
-
-    bool operator==(const SurfaceSize&) const = default;
-};
 
 enum class PresentTiming
 {
@@ -34,6 +27,7 @@ class SwapChain
 {
 public:
     static constexpr UINT kBufferCount = 3;
+    static constexpr DXGI_FORMAT kFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 
     [[nodiscard]] static std::expected<SwapChain, std::string> create(const GpuDevice& gpu,
                                                                       HWND window,

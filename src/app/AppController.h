@@ -4,11 +4,14 @@
 #include <QString>
 #include <QtQmlIntegration>
 
+#include <expected>
 #include <memory>
+#include <string>
 
 namespace lynx::render
 {
 class StreamWindow;
+class TestPatternSource;
 }
 
 namespace lynx::app
@@ -46,8 +49,12 @@ public:
     Q_INVOKABLE bool openVideoTest();
 
 private:
+    [[nodiscard]] std::expected<void, std::string> startVideoTest();
+    void closeVideoTest();
+
     StartupState state_;
-    std::unique_ptr<render::StreamWindow> videoTest_;
+    std::unique_ptr<render::TestPatternSource> videoTestSource_;
+    std::unique_ptr<render::StreamWindow> videoTestWindow_;
 };
 
 } // namespace lynx::app

@@ -1,7 +1,10 @@
 #include "app/AppController.h"
 
 #include "app/Version.h"
+#include "render/FrameMailbox.h"
+#include "render/GpuDevice.h"
 #include "render/StreamWindow.h"
+#include "render/TestPatternSource.h"
 
 #include <utility>
 
@@ -41,22 +44,68 @@ QString AppController::gpuName() const
 
 bool AppController::openVideoTest()
 {
-    if (videoTest_ != nullptr && videoTest_->isOpen())
+    if (videoTestWindow_ != nullptr && videoTestWindow_->isOpen())
     {
-        videoTest_->bringToFront();
+        videoTestWindow_->bringToFront();
         return true;
     }
 
-    auto window = render::StreamWindow::open(kVideoTestTitle);
+    closeVideoTest();
 
-    if (!window)
+    if (const auto started = startVideoTest(); !started)
     {
-        spdlog::error("Video test unavailable: {}", window.error());
+        spdlog::error("Video test unavailable: {}", started.error());
         return false;
     }
 
-    videoTest_ = std::move(*window);
     return true;
+}
+
+std::expected<void, std::string> AppController::startVideoTest()
+{
+    const auto gpu = render::createGpuDevice();
+
+    if (!gpu)
+    {
+        return std::unexpected(gpu.error());
+    }
+
+    auto mailbox = render::FrameMailbox::create();
+
+    if (!mailbox)
+    {
+        return std::unexpected(mailbox.error());
+    }
+
+    auto source = render::TestPatternSource::start(*gpu, *mailbox);
+
+    if (!source)
+    {
+        return std::unexpected(source.error());
+    }
+
+    // The window is gone by then; the source and the window object go on the
+    // next turn of the event loop.
+    const auto closeLater = [this](render::CloseReason)
+    { QMetaObject::invokeMethod(this, &AppController::closeVideoTest, Qt::QueuedConnection); };
+
+    auto window = render::StreamWindow::open(*gpu, std::move(*mailbox),
+                                             {.title = kVideoTestTitle, .onClosed = closeLater});
+
+    if (!window)
+    {
+        return std::unexpected(window.error());
+    }
+
+    videoTestSource_ = std::move(*source);
+    videoTestWindow_ = std::move(*window);
+    return {};
+}
+
+void AppController::closeVideoTest()
+{
+    videoTestWindow_.reset();
+    videoTestSource_.reset();
 }
 
 } // namespace lynx::app

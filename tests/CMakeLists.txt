@@ -1,6 +1,7 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(lynx_tests
+    core/RateCounterTests.cpp
     remoteplay/AccountIdTests.cpp
     remoteplay/ChiakiRuntimeTests.cpp
     remoteplay/ConsoleMergeTests.cpp
@@ -9,7 +10,11 @@ add_executable(lynx_tests
     remoteplay/HostAddressTests.cpp
     remoteplay/PairingFailureTests.cpp
     remoteplay/PinTests.cpp
-    render/AdapterSelectionTests.cpp)
+    render/AdapterSelectionTests.cpp
+    render/ColorConversionTests.cpp
+    render/FrameMailboxTests.cpp
+    render/LayoutTests.cpp
+    render/TestPatternTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE
     Lynx::remoteplay

@@ -1,10 +1,14 @@
 find_package(spdlog CONFIG REQUIRED)
 
 add_library(lynx_core STATIC
+    FramePacer.cpp
+    FramePacer.h
     Log.cpp
     Log.h
     Paths.cpp
     Paths.h
+    RateCounter.cpp
+    RateCounter.h
     Text.cpp
     Text.h
     Windows.cpp
