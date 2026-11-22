@@ -22,6 +22,28 @@ ColumnLayout {
 
     SettingRow {
         Layout.fillWidth: true
+        label: "RTX Video Super Resolution"
+        description: section.settings.videoSuperResolutionAvailable
+                     ? "Remove artefatos de compressão e amplia a imagem para a resolução da "
+                       + "tela. Também requer Super Resolution ligado no NVIDIA App "
+                       + "(Sistema › Vídeo › RTX Video Enhancements)."
+                     : "Indisponível: " + section.settings.videoSuperResolutionUnavailableReason
+
+        Toggle {
+            checked: section.settings.videoSuperResolution
+            enabled: section.settings.videoSuperResolutionAvailable
+            opacity: enabled ? 1 : 0.5
+            Accessible.name: "RTX Video Super Resolution"
+            onCheckedChanged: {
+                if (checked !== section.settings.videoSuperResolution) {
+                    section.settings.videoSuperResolution = checked;
+                }
+            }
+        }
+    }
+
+    SettingRow {
+        Layout.fillWidth: true
         label: "NVIDIA Reflex"
         description: section.settings.reflexAvailable
                      ? "Reduz a fila da GPU para baixar a latência. Boost mantém o clock alto."

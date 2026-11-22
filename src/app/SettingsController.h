@@ -3,6 +3,7 @@
 #include "core/Settings.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
+#include "render/VideoSuperResolution.h"
 
 #include <QObject>
 #include <QString>
@@ -46,6 +47,9 @@ class SettingsController : public QObject
     Q_PROPERTY(QString reflexUnavailableReason READ reflexUnavailableReason CONSTANT)
     Q_PROPERTY(bool videoSuperResolution READ videoSuperResolution WRITE setVideoSuperResolution
                    NOTIFY rtxChanged)
+    Q_PROPERTY(bool videoSuperResolutionAvailable READ videoSuperResolutionAvailable CONSTANT)
+    Q_PROPERTY(QString videoSuperResolutionUnavailableReason READ
+                   videoSuperResolutionUnavailableReason CONSTANT)
 
 public:
     // Without a store, changes last until the app closes.
@@ -108,6 +112,11 @@ public:
     [[nodiscard]] bool videoSuperResolution() const;
     void setVideoSuperResolution(bool enabled);
 
+    // False without an NVIDIA stream GPU or a driver that accepts the
+    // extension; the stream then scales with the shader.
+    [[nodiscard]] bool videoSuperResolutionAvailable() const;
+    [[nodiscard]] QString videoSuperResolutionUnavailableReason() const;
+
     // False without an NVIDIA stream GPU or a working NVAPI.
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
@@ -131,6 +140,7 @@ private:
     std::optional<core::SettingsStore> store_;
     core::Settings settings_;
     render::ReflexAvailability reflexAvailability_;
+    render::VsrAvailability videoSuperResolutionAvailability_;
     QStringList outputDevices_;
     QStringList microphoneDevices_;
     bool devicesLogged_ = false;

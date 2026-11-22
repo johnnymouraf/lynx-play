@@ -68,6 +68,17 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     {
         spdlog::info("Reflex is unavailable: {}", reflexAvailability_.detail);
     }
+
+    videoSuperResolutionAvailability_ = render::VideoSuperResolution::probe();
+
+    if (videoSuperResolutionAvailability_.available)
+    {
+        spdlog::info("VSR is available ({})", videoSuperResolutionAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("VSR is unavailable: {}", videoSuperResolutionAvailability_.detail);
+    }
 }
 
 const core::VideoSettings& SettingsController::video() const
@@ -371,6 +382,32 @@ void SettingsController::setVideoSuperResolution(bool enabled)
     core::RtxSettings rtx = settings_.rtx;
     rtx.videoSuperResolution = enabled;
     applyRtx(rtx);
+}
+
+bool SettingsController::videoSuperResolutionAvailable() const
+{
+    return videoSuperResolutionAvailability_.available;
+}
+
+QString SettingsController::videoSuperResolutionUnavailableReason() const
+{
+    switch (videoSuperResolutionAvailability_.reason)
+    {
+    case render::VsrUnavailable::NoNvidiaGpu:
+        return u"A GPU usada para o vídeo não é NVIDIA."_s;
+    case render::VsrUnavailable::NoD3D11:
+        return u"O driver de vídeo não expôs a interface D3D11 necessária."_s;
+    case render::VsrUnavailable::FormatUnsupported:
+        return u"O driver não converte o vídeo NV12 para RGB."_s;
+    case render::VsrUnavailable::ProcessorFailed:
+        return u"O driver não criou o processador de vídeo."_s;
+    case render::VsrUnavailable::ExtensionRejected:
+        return u"O driver não aceitou a extensão do RTX Video Super Resolution."_s;
+    case render::VsrUnavailable::None:
+        break;
+    }
+
+    return {};
 }
 
 void SettingsController::apply(const core::VideoSettings& video)
