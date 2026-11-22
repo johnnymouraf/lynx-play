@@ -149,6 +149,15 @@ std::expected<VideoDevice, VsrFailure> openVideoDevice(IDXGIAdapter4& adapter)
             VsrFailure{VsrUnavailable::NoD3D11, describeFailure("ID3D11VideoContext1", result)});
     }
 
+    D3D11_FEATURE_DATA_FORMAT_SUPPORT support{};
+    support.InFormat = DXGI_FORMAT_NV12;
+    const HRESULT supportResult = video.device->CheckFeatureSupport(
+        D3D11_FEATURE_FORMAT_SUPPORT, &support, sizeof(support));
+    spdlog::info("VSR diagnostics: D3D11 NV12 format support 0x{:X}/0x{:X} (0x{:08X})",
+                 static_cast<unsigned>(support.OutFormatSupport),
+                 static_cast<unsigned>(support.OutFormatSupport2),
+                 static_cast<unsigned>(supportResult));
+
     return video;
 }
 
@@ -335,7 +344,8 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
                      static_cast<unsigned>(unsharedResult),
                      static_cast<unsigned>(simultaneousResult));
 
-        return std::unexpected(describeFailure(what, result));
+        return std::unexpected(describeFailure(
+            std::format("CreateCommittedResource ({})", what), result));
     }
 
     HANDLE handle = nullptr;
@@ -344,7 +354,8 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
                                                            GENERIC_ALL, nullptr, &handle);
         FAILED(result))
     {
-        return std::unexpected(describeFailure(what, result));
+        return std::unexpected(
+            describeFailure(std::format("CreateSharedHandle ({})", what), result));
     }
 
     const HRESULT opened =
@@ -353,7 +364,8 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
 
     if (FAILED(opened))
     {
-        return std::unexpected(describeFailure(what, opened));
+        return std::unexpected(
+            describeFailure(std::format("OpenSharedResource1 ({})", what), opened));
     }
 
     return texture;
@@ -570,8 +582,8 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
     Slot slot;
 
     auto input = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.input,
-                                      inputFormatOf(picture.format), D3D12_RESOURCE_FLAG_NONE,
-                                      "CreateCommittedResource (VSR input)");
+                                      inputFormatOf(picture.format),
+                                      D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, "VSR input");
 
     if (!input)
     {
@@ -619,7 +631,7 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
 
     auto output = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.output,
                                       kOutputFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-                                      "CreateCommittedResource (VSR output)");
+                                      "VSR output");
 
     if (!output)
     {
