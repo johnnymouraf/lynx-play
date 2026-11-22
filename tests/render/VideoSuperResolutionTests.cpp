@@ -6,6 +6,7 @@
 
 using lynx::render::fitPicture;
 using lynx::render::kNvidiaVendorId;
+using lynx::render::PixelRect;
 using lynx::render::SurfaceSize;
 using lynx::render::videoSuperResolutionEligible;
 
