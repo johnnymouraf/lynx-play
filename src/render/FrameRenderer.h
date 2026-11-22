@@ -319,6 +319,10 @@ private:
     ComPtr<ID3D12GraphicsCommandList> flowCommandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> flowAllocators_;
     std::array<UINT64, SwapChain::kBufferCount> flowAllocatorFenceValues_{};
+    // The source ring advances once per decoded picture, independently of the
+    // presents: with Frame Generation a source frame can present twice, so
+    // the swap chain's current index no longer marks the previous source.
+    UINT sourceSlot_ = 0;
     // Whether the frame each back buffer last showed was a new source frame;
     // the statistics report the video pipeline, not an overlay redraw.
     std::array<bool, SwapChain::kBufferCount> bufferShowedNewFrame_{};

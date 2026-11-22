@@ -693,24 +693,35 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         }
     }
 
-    // A buffer's command allocator can be reset only once the GPU has finished
-    // the frame that last used it; so can the picture that frame read.
-    const UINT bufferIndex = swapChain_.currentIndex();
-    waitForFence(allocatorFenceValues_.at(bufferIndex));
-    waitForFence(copyAllocatorFenceValues_.at(bufferIndex));
-    waitForFence(flowAllocatorFenceValues_.at(bufferIndex));
-    framesInFlight_.at(bufferIndex).reset();
+    // The swap chain's current index is the present target; the source ring
+    // advances once per decoded picture, since Frame Generation can present
+    // twice for the same one.
+    const UINT presentBufferIndex = swapChain_.currentIndex();
 
-    if (auto times = timer_->take(bufferIndex); times && bufferShowedNewFrame_.at(bufferIndex))
+    if (showsNewFrame)
+    {
+        sourceSlot_ = (sourceSlot_ + 1) % SwapChain::kBufferCount;
+    }
+
+    const UINT sourceIndex = sourceSlot_;
+
+    // A source slot's command allocator can be reset only once the GPU has
+    // finished the frame that last used it; so can the picture it read.
+    waitForFence(allocatorFenceValues_.at(sourceIndex));
+    waitForFence(copyAllocatorFenceValues_.at(sourceIndex));
+    waitForFence(flowAllocatorFenceValues_.at(sourceIndex));
+    framesInFlight_.at(sourceIndex).reset();
+
+    if (auto times = timer_->take(sourceIndex); times && bufferShowedNewFrame_.at(sourceIndex))
     {
         lastGpuTimes_ = *times;
     }
 
     const bool flowReady = prepareOpticalFlow();
-    const bool offscreen = prepareFrameGeneration(bufferIndex);
+    const bool offscreen = prepareFrameGeneration(sourceIndex);
 
     const UINT previousIndex =
-        (bufferIndex + SwapChain::kBufferCount - 1) % SwapChain::kBufferCount;
+        (sourceIndex + SwapChain::kBufferCount - 1) % SwapChain::kBufferCount;
     const std::optional<VideoFrame>& previousFrame = framesInFlight_.at(previousIndex);
 
     FramePlan plan;
@@ -735,11 +746,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
     }
 
-    const FrameTarget target = frameTarget(bufferIndex, offscreen);
+    const FrameTarget target = frameTarget(presentBufferIndex, offscreen);
 
     if (prepareVideoSuperResolution())
     {
-        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, plan, target);
+        const auto recorded = recordVideoSuperResolutionFrame(sourceIndex, plan, target);
 
         if (!recorded)
         {
@@ -754,10 +765,10 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     }
     else
     {
-        auto& allocator = allocators_.at(bufferIndex);
+        auto& allocator = allocators_.at(sourceIndex);
         allocator->Reset();
         commandList_->Reset(allocator.Get(), nullptr);
-        recordShaderFrame(bufferIndex, plan, target);
+        recordShaderFrame(sourceIndex, plan, target);
 
         if (const HRESULT result = commandList_->Close(); FAILED(result))
         {
@@ -782,7 +793,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         const std::uint64_t inputValue = opticalFlow_->nextInputValue();
         gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
 
-        const auto output = opticalFlow_->execute(bufferIndex, inputValue);
+        const auto output = opticalFlow_->execute(sourceIndex, inputValue);
 
         if (output)
         {
@@ -847,7 +858,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         if (showsNewFrame && generation.generate && flowSubmitted)
         {
             const auto presented =
-                presentGenerated(bufferIndex, reflexFrameId, flowOutput, true, generation.reset,
+                presentGenerated(sourceIndex, reflexFrameId, flowOutput, true, generation.reset,
                                  generation.presentReal);
 
             if (!presented)
@@ -898,17 +909,17 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     if (plan.opticalFlow)
     {
-        if (auto watched = recordFlowWatch(bufferIndex, flowSubmitted, flowOutput); !watched)
+        if (auto watched = recordFlowWatch(sourceIndex, flowSubmitted, flowOutput); !watched)
         {
             return watched;
         }
     }
 
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
-    allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
-    flowAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
-    bufferShowedNewFrame_.at(bufferIndex) = showsNewFrame;
-    framesInFlight_.at(bufferIndex) = shownFrame_;
+    allocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
+    flowAllocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
+    bufferShowedNewFrame_.at(sourceIndex) = showsNewFrame;
+    framesInFlight_.at(sourceIndex) = shownFrame_;
 
     if (shownFrame_)
     {
