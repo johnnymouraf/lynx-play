@@ -146,7 +146,11 @@ MergeResult mergeConsoles(std::vector<SavedConsole> saved,
     for (std::size_t i = 0; i < saved.size(); ++i)
     {
         const DiscoveredHost* host = findById(discovered, saved[i].hostId);
-        ConsoleEntry entry{.key = consoleKey(saved[i]), .savedIndex = i, .discovered = std::nullopt};
+        ConsoleEntry entry{
+            .key = consoleKey(saved[i]),
+            .savedIndex = i,
+            .discovered = std::nullopt,
+        };
 
         if (!saved[i].hostId.empty() && host != nullptr)
         {

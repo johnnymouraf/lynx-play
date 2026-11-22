@@ -5,6 +5,8 @@ add_library(lynx_core STATIC
     Log.h
     Paths.cpp
     Paths.h
+    Text.cpp
+    Text.h
     Windows.cpp
     Windows.h)
 add_library(Lynx::core ALIAS lynx_core)

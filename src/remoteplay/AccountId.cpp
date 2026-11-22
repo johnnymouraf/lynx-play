@@ -1,9 +1,9 @@
 #include "remoteplay/AccountId.h"
 
+#include "core/Text.h"
 #include "remoteplay/Base64.h"
 
 #include <algorithm>
-#include <cctype>
 #include <charconv>
 
 namespace lynx::remoteplay
@@ -11,30 +11,6 @@ namespace lynx::remoteplay
 
 namespace
 {
-
-std::string_view trim(std::string_view text)
-{
-    const auto isSpace = [](unsigned char character) { return std::isspace(character) != 0; };
-
-    while (!text.empty() && isSpace(static_cast<unsigned char>(text.front())))
-    {
-        text.remove_prefix(1);
-    }
-
-    while (!text.empty() && isSpace(static_cast<unsigned char>(text.back())))
-    {
-        text.remove_suffix(1);
-    }
-
-    return text;
-}
-
-bool isAllDigits(std::string_view text)
-{
-    return std::ranges::all_of(text, [](char character) {
-        return std::isdigit(static_cast<unsigned char>(character)) != 0;
-    });
-}
 
 std::expected<AccountId, AccountIdError> fromNumber(std::string_view digits)
 {
@@ -74,14 +50,14 @@ std::expected<AccountId, AccountIdError> fromBase64(std::string_view text)
 
 std::expected<AccountId, AccountIdError> parseAccountId(std::string_view text)
 {
-    const std::string_view trimmed = trim(text);
+    const std::string_view trimmed = core::trimmed(text);
 
     if (trimmed.empty())
     {
         return std::unexpected(AccountIdError::Empty);
     }
 
-    if (isAllDigits(trimmed))
+    if (core::isDigits(trimmed))
     {
         return fromNumber(trimmed);
     }

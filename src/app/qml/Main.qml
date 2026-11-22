@@ -52,6 +52,7 @@ ApplicationWindow {
                 id: consolesPage
 
                 consoles: window.consoles
+                onToastRequested: (tone, title, message) => toast.show(tone, title, message)
             }
 
             SettingsPage {

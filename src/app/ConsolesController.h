@@ -1,8 +1,10 @@
 #pragma once
 
 #include "app/ConsoleListModel.h"
+#include "app/PairingController.h"
 #include "remoteplay/Console.h"
 #include "remoteplay/ConsoleMerge.h"
+#include "remoteplay/ConsoleRegistration.h"
 #include "remoteplay/ConsoleStore.h"
 
 #include <QDateTime>
@@ -36,6 +38,8 @@ class ConsolesController : public QObject
 
     Q_PROPERTY(ConsoleListModel* model READ model CONSTANT)
     Q_PROPERTY(DiscoveryStatus discoveryStatus READ discoveryStatus NOTIFY discoveryStatusChanged)
+    Q_PROPERTY(PairingController* pairing READ pairing CONSTANT)
+    Q_PROPERTY(QString savedAccountId READ savedAccountId NOTIFY savedAccountIdChanged)
 
 public:
     enum class DiscoveryStatus
@@ -54,6 +58,20 @@ public:
 
     [[nodiscard]] ConsoleListModel* model();
     [[nodiscard]] DiscoveryStatus discoveryStatus() const;
+    [[nodiscard]] PairingController* pairing();
+    // The account ID last used to pair, in Base64, to offer it again.
+    [[nodiscard]] QString savedAccountId() const;
+
+    // Where and how to pair the console of a card.
+    struct PairingTarget
+    {
+        std::string address;
+        int target = 0;
+    };
+    [[nodiscard]] std::optional<PairingTarget> pairingTarget(const QString& key) const;
+    // Saves what pairing gave and returns the console's card key from now on.
+    QString storePairing(const QString& key, const remoteplay::PairedConsole& paired,
+                         const remoteplay::AccountId& accountId);
 
     // Starts the network search again, after a failure or a network change.
     Q_INVOKABLE void retryDiscovery();
@@ -64,9 +82,15 @@ public:
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
     Q_INVOKABLE void play(const QString& key);
+    // The message to show under the address field, or empty when it is valid.
+    Q_INVOKABLE QString addressError(const QString& text) const;
+    // Saves a console by its address and queries that address directly.
+    // Returns the key of its card, which already existed for a known address.
+    Q_INVOKABLE QString addByAddress(const QString& text);
 
 signals:
     void discoveryStatusChanged();
+    void savedAccountIdChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 
@@ -89,11 +113,15 @@ private:
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
+    [[nodiscard]] const remoteplay::ConsoleEntry* findEntry(const QString& key) const;
+    [[nodiscard]] const remoteplay::ConsoleEntry* findEntryByAddress(
+        const std::string& address) const;
     remoteplay::SavedConsole* saveDiscovered(const QString& key);
     [[nodiscard]] bool persist() const;
     void saveFile();
 
     ConsoleListModel model_;
+    PairingController pairing_;
     std::optional<remoteplay::ConsoleStore> store_;
     remoteplay::ConsoleFile file_;
     std::unique_ptr<remoteplay::ConsoleDiscovery> discovery_;

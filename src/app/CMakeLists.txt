@@ -20,6 +20,8 @@ qt_add_executable(lynx-play WIN32
     Fonts.h
     IconProvider.cpp
     IconProvider.h
+    PairingController.cpp
+    PairingController.h
     QtLogBridge.cpp
     QtLogBridge.h
     main.cpp)
@@ -47,11 +49,13 @@ qt_add_qml_module(lynx-play
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
+        qml/consoles/AddByAddressDialog.qml
         qml/consoles/ConsoleCard.qml
         qml/consoles/ConsolesPage.qml
         qml/consoles/DiscoveryBanner.qml
         qml/consoles/EmptyState.qml
         qml/consoles/ForgetDialog.qml
+        qml/consoles/PairingDialog.qml
         qml/consoles/RenameDialog.qml
         qml/controls/ActionButton.qml
         qml/controls/AppRail.qml

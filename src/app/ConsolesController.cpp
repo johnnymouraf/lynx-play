@@ -2,6 +2,7 @@
 
 #include "app/ConsolePresentation.h"
 #include "remoteplay/ConsoleDiscovery.h"
+#include "remoteplay/HostAddress.h"
 
 #include <algorithm>
 #include <utility>
@@ -18,6 +19,7 @@ using namespace Qt::StringLiterals;
 using remoteplay::Clock;
 using remoteplay::ConsoleEntry;
 using remoteplay::DiscoveredHost;
+using remoteplay::HostAddressError;
 using remoteplay::HostState;
 using remoteplay::SavedConsole;
 
@@ -52,12 +54,27 @@ SavedConsole savedFrom(const DiscoveredHost& host)
     return console;
 }
 
+// Whether the card's console answers at, was saved with, or was added by
+// that address.
+bool isAt(const ConsoleEntry& entry, const SavedConsole* saved, const std::string& address)
+{
+    const bool answersThere = entry.discovered && entry.discovered->address == address;
+    const bool savedThere =
+        saved != nullptr && (saved->manualHost == address || saved->address == address);
+
+    return answersThere || savedThere;
+}
+
 } // namespace
 
 ConsolesController::ConsolesController(bool remotePlayReady,
                                        std::optional<remoteplay::ConsoleStore> store,
                                        QObject* parent)
-    : QObject(parent), model_(this), store_(std::move(store)), remotePlayReady_(remotePlayReady)
+    : QObject(parent),
+      model_(this),
+      pairing_(*this, this),
+      store_(std::move(store)),
+      remotePlayReady_(remotePlayReady)
 {
     if (store_)
     {
@@ -94,6 +111,90 @@ ConsoleListModel* ConsolesController::model()
 ConsolesController::DiscoveryStatus ConsolesController::discoveryStatus() const
 {
     return discoveryStatus_;
+}
+
+PairingController* ConsolesController::pairing()
+{
+    return &pairing_;
+}
+
+QString ConsolesController::savedAccountId() const
+{
+    if (!file_.accountId)
+    {
+        return {};
+    }
+
+    return fromUtf8(remoteplay::formatAccountId(*file_.accountId));
+}
+
+std::optional<ConsolesController::PairingTarget> ConsolesController::pairingTarget(
+    const QString& key) const
+{
+    const ConsoleEntry* entry = findEntry(key);
+
+    if (entry == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    if (entry->discovered)
+    {
+        return PairingTarget{.address = entry->discovered->address,
+                             .target = entry->discovered->target};
+    }
+
+    if (!entry->savedIndex)
+    {
+        return std::nullopt;
+    }
+
+    const SavedConsole& saved = file_.consoles.at(*entry->savedIndex);
+    const std::string& address = saved.address.empty() ? saved.manualHost : saved.address;
+    return PairingTarget{.address = address, .target = saved.target};
+}
+
+QString ConsolesController::storePairing(const QString& key,
+                                         const remoteplay::PairedConsole& paired,
+                                         const remoteplay::AccountId& accountId)
+{
+    SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        console = saveDiscovered(key);
+    }
+
+    if (console == nullptr)
+    {
+        console = &file_.consoles.emplace_back();
+    }
+
+    if (console->hostId.empty())
+    {
+        console->hostId = remoteplay::hostIdFromMac(paired.serverMac);
+    }
+
+    if (console->hostName.empty())
+    {
+        console->hostName = paired.serverNickname;
+    }
+
+    if (paired.target != 0)
+    {
+        console->target = paired.target;
+    }
+
+    console->credentials = paired.credentials;
+    console->serverMac = paired.serverMac;
+    const std::string pairedKey = remoteplay::consoleKey(*console);
+
+    file_.accountId = accountId;
+    emit savedAccountIdChanged();
+    saveFile();
+    refreshModel();
+
+    return fromUtf8(pairedKey);
 }
 
 void ConsolesController::retryDiscovery()
@@ -157,6 +258,59 @@ void ConsolesController::play(const QString& key)
     spdlog::info("Play requested on {}; streaming isn't available yet", key.toStdString());
     emit notice(u"info"_s, u"O streaming ainda não chegou"_s,
                 u"Esta versão encontra, pareia e liga o PS5. Jogar chega na próxima versão."_s);
+}
+
+QString ConsolesController::addressError(const QString& text) const
+{
+    const auto address = remoteplay::normalizeHostAddress(text.toStdString());
+
+    if (address)
+    {
+        return {};
+    }
+
+    switch (address.error())
+    {
+    case HostAddressError::Empty:
+        return u"Informe o endereço IP ou o nome do host do PS5."_s;
+    case HostAddressError::Ipv4PartOutOfRange:
+        return u"Endereço inválido: cada parte do IP vai de 0 a 255. Use um IP como "
+               u"192.168.0.25 ou um nome como ps5.local."_s;
+    case HostAddressError::Invalid:
+        break;
+    }
+
+    return u"Endereço inválido. Use um IP como 192.168.0.25 ou um nome como ps5.local."_s;
+}
+
+QString ConsolesController::addByAddress(const QString& text)
+{
+    const auto address = remoteplay::normalizeHostAddress(text.toStdString());
+
+    if (!address)
+    {
+        return {};
+    }
+
+    if (const ConsoleEntry* existing = findEntryByAddress(*address); existing != nullptr)
+    {
+        spdlog::info("{} is already listed", *address);
+        emit notice(u"info"_s, u"Esse console já está na lista"_s,
+                    u"O endereço %1 já é de um dos consoles."_s.arg(fromUtf8(*address)));
+        return fromUtf8(existing->key);
+    }
+
+    SavedConsole console;
+    console.manualHost = *address;
+    const std::string key = remoteplay::consoleKey(console);
+    file_.consoles.push_back(std::move(console));
+    spdlog::info("Console added by address {}", *address);
+
+    saveFile();
+    markSearching(key);
+    refreshModel();
+
+    return fromUtf8(key);
 }
 
 void ConsolesController::startDiscovery()
@@ -345,6 +499,28 @@ const DiscoveredHost* ConsolesController::findDiscovered(const QString& key) con
 {
     const auto host = std::ranges::find(discovered_, key.toStdString(), &DiscoveredHost::hostId);
     return host != discovered_.end() ? &*host : nullptr;
+}
+
+const ConsoleEntry* ConsolesController::findEntry(const QString& key) const
+{
+    const auto entry = std::ranges::find(entries_, key.toStdString(), &ConsoleEntry::key);
+    return entry != entries_.end() ? &*entry : nullptr;
+}
+
+const ConsoleEntry* ConsolesController::findEntryByAddress(const std::string& address) const
+{
+    for (const ConsoleEntry& entry : entries_)
+    {
+        const SavedConsole* saved =
+            entry.savedIndex ? &file_.consoles.at(*entry.savedIndex) : nullptr;
+
+        if (isAt(entry, saved, address))
+        {
+            return &entry;
+        }
+    }
+
+    return nullptr;
 }
 
 SavedConsole* ConsolesController::saveDiscovered(const QString& key)

@@ -1,7 +1,7 @@
 #include "remoteplay/Pin.h"
 
-#include <algorithm>
-#include <cctype>
+#include "core/Text.h"
+
 #include <charconv>
 
 namespace lynx::remoteplay
@@ -9,11 +9,7 @@ namespace lynx::remoteplay
 
 std::optional<std::uint32_t> parsePin(std::string_view text)
 {
-    const bool onlyDigits = std::ranges::all_of(text, [](char character) {
-        return std::isdigit(static_cast<unsigned char>(character)) != 0;
-    });
-
-    if (text.size() != kPinDigits || !onlyDigits)
+    if (text.size() != kPinDigits || !core::isDigits(text))
     {
         return std::nullopt;
     }

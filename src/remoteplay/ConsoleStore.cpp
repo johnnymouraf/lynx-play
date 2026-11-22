@@ -1,5 +1,6 @@
 #include "remoteplay/ConsoleStore.h"
 
+#include "core/Text.h"
 #include "remoteplay/Base64.h"
 
 #include <algorithm>
@@ -25,22 +26,7 @@ namespace
 using Json = nlohmann::ordered_json;
 
 constexpr int kJsonIndent = 2;
-constexpr std::string_view kHexDigits = "0123456789abcdef";
 constexpr int kHexBase = 16;
-
-std::string toHex(std::span<const std::uint8_t> bytes)
-{
-    std::string text;
-    text.reserve(bytes.size() * 2);
-
-    for (const std::uint8_t byte : bytes)
-    {
-        text += kHexDigits[byte >> 4U];
-        text += kHexDigits[byte & 0x0FU];
-    }
-
-    return text;
-}
 
 std::array<std::uint8_t, kMacSize> macFromHex(std::string_view text)
 {
@@ -128,7 +114,7 @@ std::expected<Json, std::string> consoleToJson(const SavedConsole& console,
         {"ps5", console.ps5},
         {"target", console.target},
         {"systemVersion", console.systemVersion},
-        {"serverMac", toHex(console.serverMac)},
+        {"serverMac", core::toHex(console.serverMac)},
     };
 
     if (console.credentials)

@@ -13,8 +13,7 @@ FocusScope {
     readonly property int minimumCardWidth: 280
     property int currentIndex: 0
 
-    signal addByAddressRequested
-    signal pairRequested(string key, string name)
+    signal toastRequested(string tone, string title, string message)
 
     function focusFirstControl() {
         if (page.hasConsoles) {
@@ -23,6 +22,17 @@ FocusScope {
         }
 
         emptyState.focusAction();
+    }
+
+    function focusCard(key) {
+        for (let i = 0; i < cards.count; ++i) {
+            if (cards.itemAt(i).key === key) {
+                page.currentIndex = i;
+                cardsArea.forceActiveFocus(Qt.TabFocusReason);
+                page.revealCard(cards.itemAt(i));
+                return;
+            }
+        }
     }
 
     function moveCurrent(step) {
@@ -150,7 +160,7 @@ FocusScope {
                     visible: page.hasConsoles
                     iconName: "plus"
                     text: "Adicionar pelo IP"
-                    onClicked: page.addByAddressRequested()
+                    onClicked: addDialog.openEmpty()
                 }
             }
 
@@ -193,7 +203,7 @@ FocusScope {
                             width: cardsArea.cardWidth
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
                             onPlayRequested: page.consoles.play(consoleCard.key)
-                            onPairRequested: page.pairRequested(consoleCard.key, consoleCard.name)
+                            onPairRequested: pairingDialog.openFor(consoleCard.key, consoleCard.name)
                             onRefreshRequested: page.consoles.refresh(consoleCard.key)
                             onMenuRequested: anchor => cardMenu.openFor(consoleCard, anchor)
                         }
@@ -213,7 +223,7 @@ FocusScope {
 
                     anchors.centerIn: parent
                     width: parent.width
-                    onAddByAddressRequested: page.addByAddressRequested()
+                    onAddByAddressRequested: addDialog.openEmpty()
                 }
             }
         }
@@ -261,5 +271,20 @@ FocusScope {
         id: forgetDialog
 
         onForgetRequested: key => page.consoles.forget(key)
+    }
+
+    AddByAddressDialog {
+        id: addDialog
+
+        consoles: page.consoles
+        onAdded: key => page.focusCard(key)
+    }
+
+    PairingDialog {
+        id: pairingDialog
+
+        consoles: page.consoles
+        onPaired: (key, name) => page.toastRequested("ready", `${name} pareado`,
+                                                      "Ele já aparece na lista de consoles.")
     }
 }

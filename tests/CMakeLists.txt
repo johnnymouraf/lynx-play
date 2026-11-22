@@ -5,6 +5,8 @@ add_executable(lynx_tests
     remoteplay/ChiakiRuntimeTests.cpp
     remoteplay/ConsoleMergeTests.cpp
     remoteplay/ConsoleStoreTests.cpp
+    remoteplay/HostAddressTests.cpp
+    remoteplay/PairingFailureTests.cpp
     remoteplay/PinTests.cpp
     render/AdapterSelectionTests.cpp)
 

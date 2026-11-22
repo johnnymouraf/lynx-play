@@ -14,9 +14,13 @@ add_library(lynx_remoteplay STATIC
     ConsoleDiscovery.h
     ConsoleMerge.cpp
     ConsoleMerge.h
+    ConsoleRegistration.cpp
+    ConsoleRegistration.h
     ConsoleStore.cpp
     ConsoleStore.h
     Dpapi.cpp
+    HostAddress.cpp
+    HostAddress.h
     Pin.cpp
     Pin.h
     SecretProtector.h)
