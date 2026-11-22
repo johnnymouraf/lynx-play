@@ -55,9 +55,35 @@ ColumnLayout {
             onActivated: value => section.settings.upscaling = value
         }
 
-        StateBadge {
-            status: "waking"
-            label: "Experimental"
+        Rectangle {
+            implicitWidth: experimentalRow.implicitWidth + 2 * Theme.space2
+            implicitHeight: 28
+            radius: Theme.radiusFull
+            color: Theme.standbySubtle
+            Accessible.role: Accessible.StaticText
+            Accessible.name: "Experimental"
+
+            Row {
+                id: experimentalRow
+
+                anchors.centerIn: parent
+                spacing: Theme.space1
+
+                Icon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "flask-conical"
+                    size: 14
+                    bold: true
+                    color: Theme.standby
+                }
+
+                AppText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Experimental"
+                    textStyle: "caption"
+                    color: Theme.standby
+                }
+            }
         }
     }
 

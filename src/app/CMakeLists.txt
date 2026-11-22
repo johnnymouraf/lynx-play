@@ -119,6 +119,7 @@ qt_add_qml_module(lynx-play
         assets/icons/external-link.svg
         assets/icons/folder-open.svg
         assets/icons/gamepad-2.svg
+        assets/icons/flask-conical.svg
         assets/icons/house-wifi.svg
         assets/icons/info.svg
         assets/icons/link-2.svg
