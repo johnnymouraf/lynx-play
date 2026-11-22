@@ -11,6 +11,7 @@ add_library(lynx_core STATIC
     RateCounter.h
     Text.cpp
     Text.h
+    VideoCodec.h
     Windows.cpp
     Windows.h)
 add_library(Lynx::core ALIAS lynx_core)
