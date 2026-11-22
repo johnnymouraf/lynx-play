@@ -21,6 +21,7 @@
 namespace lynx::app
 {
 
+class InputController;
 class SettingsController;
 
 // Playing on a console: the session, the stream window it opens once the
@@ -60,7 +61,8 @@ public:
         std::optional<remoteplay::Credentials> credentials;
     };
 
-    explicit StreamController(const SettingsController& settings, QObject* parent = nullptr);
+    StreamController(SettingsController& settings, InputController& input,
+                     QObject* parent = nullptr);
     ~StreamController() override;
 
     [[nodiscard]] Phase phase() const;
@@ -97,7 +99,8 @@ private:
     void fail(const QString& title, const QString& message);
     void setPhase(Phase phase);
 
-    const SettingsController& settings_;
+    SettingsController& settings_;
+    InputController& input_;
     std::optional<Target> target_;
     // The main window, whose monitor the stream window opens on.
     HWND mainWindow_ = nullptr;

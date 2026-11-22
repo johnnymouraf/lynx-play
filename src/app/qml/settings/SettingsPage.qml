@@ -9,6 +9,7 @@ Item {
 
     required property AppController controller
     required property SettingsController settings
+    required property InputController input
 
     property string section: "video"
 
@@ -46,6 +47,22 @@ Item {
 
                 NavItem {
                     Layout.fillWidth: true
+                    text: "Áudio e microfone"
+                    iconName: "volume-2"
+                    selected: page.section === "audio"
+                    onClicked: page.section = "audio"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    text: "Controles"
+                    iconName: "gamepad-2"
+                    selected: page.section === "controls"
+                    onClicked: page.section = "controls"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
                     text: "Sobre"
                     iconName: "info"
                     selected: page.section === "about"
@@ -72,7 +89,8 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: width
-            contentHeight: sections.children[sections.currentIndex].implicitHeight + 2 * Theme.space8
+            contentHeight: sections.children[sections.currentIndex].implicitHeight
+                           + 2 * Theme.space8
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
@@ -84,10 +102,29 @@ Item {
                 x: Theme.space10
                 y: Theme.space8
                 width: scroller.width - 2 * Theme.space10
-                currentIndex: page.section === "video" ? 0 : 1
+                currentIndex: {
+                    if (page.section === "audio") {
+                        return 1;
+                    }
+
+                    if (page.section === "controls") {
+                        return 2;
+                    }
+
+                    return page.section === "about" ? 3 : 0;
+                }
 
                 VideoSettings {
                     settings: page.settings
+                }
+
+                AudioSettings {
+                    settings: page.settings
+                }
+
+                ControllerSettings {
+                    settings: page.settings
+                    input: page.input
                 }
 
                 AboutSettings {

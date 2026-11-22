@@ -1,8 +1,12 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(lynx_tests
+    audio/AudioOutputTests.cpp
+    audio/HapticsTests.cpp
     core/RateCounterTests.cpp
     core/SettingsTests.cpp
+    input/ControllerMappingTests.cpp
+    input/DualSenseEffectsTests.cpp
     media/AnnexBTests.cpp
     media/FilePlayerTests.cpp
     remoteplay/AccountIdTests.cpp
@@ -21,6 +25,8 @@ add_executable(lynx_tests
     render/TestPatternTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE
+    Lynx::audio
+    Lynx::input
     Lynx::media
     Lynx::remoteplay
     Lynx::render

@@ -85,6 +85,30 @@ std::optional<std::int64_t> integerAt(const Json& object, const std::string& key
     return entry->get<std::int64_t>();
 }
 
+std::string stringAt(const Json& object, const std::string& key, std::string fallback)
+{
+    const auto entry = object.find(key);
+
+    if (entry == object.end() || !entry->is_string())
+    {
+        return fallback;
+    }
+
+    return entry->get<std::string>();
+}
+
+bool booleanAt(const Json& object, const std::string& key, bool fallback)
+{
+    const auto entry = object.find(key);
+
+    if (entry == object.end() || !entry->is_boolean())
+    {
+        return fallback;
+    }
+
+    return entry->get<bool>();
+}
+
 VideoSettings readVideo(const Json& video)
 {
     VideoSettings settings;
@@ -118,6 +142,41 @@ VideoSettings readVideo(const Json& video)
     return settings;
 }
 
+AudioSettings readAudio(const Json& audio)
+{
+    AudioSettings settings;
+
+    if (!audio.is_object())
+    {
+        return settings;
+    }
+
+    settings.outputDevice = stringAt(audio, "outputDevice", settings.outputDevice);
+    settings.microphoneDevice = stringAt(audio, "microphoneDevice", settings.microphoneDevice);
+    settings.microphoneMuted = booleanAt(audio, "microphoneMuted", settings.microphoneMuted);
+
+    const auto volume = integerAt(audio, "volumePercent");
+
+    if (volume && *volume >= 0 && *volume <= 100)
+    {
+        settings.volumePercent = static_cast<int>(*volume);
+    }
+
+    return settings;
+}
+
+ControllerSettings readController(const Json& controller)
+{
+    ControllerSettings settings;
+
+    if (controller.is_object())
+    {
+        settings.preferred = stringAt(controller, "preferred", settings.preferred);
+    }
+
+    return settings;
+}
+
 } // namespace
 
 std::expected<Settings, std::string> readSettings(std::istream& input)
@@ -144,12 +203,23 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.video = readVideo(*video);
     }
 
+    if (const auto audio = root.find("audio"); audio != root.end())
+    {
+        settings.audio = readAudio(*audio);
+    }
+
+    if (const auto controller = root.find("controller"); controller != root.end())
+    {
+        settings.controller = readController(*controller);
+    }
+
     return settings;
 }
 
 void writeSettings(const Settings& settings, std::ostream& output)
 {
     const VideoSettings& video = settings.video;
+    const AudioSettings& audio = settings.audio;
 
     const Json root{
         {"version", kSettingsVersion},
@@ -160,6 +230,17 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"codec", nameOf(kCodecNames, video.codec)},
              {"bitrateKbps", video.bitrateKbps},
              {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
+         }},
+        {"audio",
+         {
+             {"outputDevice", audio.outputDevice},
+             {"microphoneDevice", audio.microphoneDevice},
+             {"microphoneMuted", audio.microphoneMuted},
+             {"volumePercent", audio.volumePercent},
+         }},
+        {"controller",
+         {
+             {"preferred", settings.controller.preferred},
          }},
     };
 

@@ -99,7 +99,9 @@ ctest --preset release
 | ----------------------- | ------------------------------------------------------- |
 | `src/app`               | Entry point, Qt application and QML interface           |
 | `src/app/assets`        | Bundled fonts, icons and images, with their licenses    |
+| `src/audio`             | SDL audio output, microphone capture and haptics        |
 | `src/core`              | Logging, settings and shared utilities                  |
+| `src/input`             | SDL gamepads and the DualSense effect packets          |
 | `src/media`             | GPU decoding (FFmpeg, D3D12VA) and the test file source |
 | `src/render`            | Direct3D 12 stream window, frame presenter and shaders  |
 | `src/remoteplay`        | chiaki-ng bridge: discovery, pairing, wake, saved list  |

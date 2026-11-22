@@ -45,10 +45,33 @@ struct VideoSettings
     bool operator==(const VideoSettings&) const = default;
 };
 
+// The game's sound and the microphone. Empty device names mean the Windows
+// default.
+struct AudioSettings
+{
+    std::string outputDevice;
+    std::string microphoneDevice;
+    bool microphoneMuted = false;
+    int volumePercent = 85;
+
+    bool operator==(const AudioSettings&) const = default;
+};
+
+struct ControllerSettings
+{
+    // The controller to use when more than one is connected; empty means the
+    // first one.
+    std::string preferred;
+
+    bool operator==(const ControllerSettings&) const = default;
+};
+
 // What settings.json holds.
 struct Settings
 {
     VideoSettings video;
+    AudioSettings audio;
+    ControllerSettings controller;
 
     bool operator==(const Settings&) const = default;
 };

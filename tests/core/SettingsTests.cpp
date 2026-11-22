@@ -28,6 +28,13 @@ TEST_CASE("Settings survive a write and a read")
         .bitrateKbps = 12000,
         .presentMode = PresentMode::LowestLatency,
     };
+    settings.audio = {
+        .outputDevice = "Fone de ouvido (Arctis 7)",
+        .microphoneDevice = "Microfone do DualSense",
+        .microphoneMuted = true,
+        .volumePercent = 70,
+    };
+    settings.controller.preferred = "DualSense Wireless Controller";
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -48,6 +55,18 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync")
     CHECK(defaults.presentMode == PresentMode::VSync);
 }
 
+TEST_CASE("Audio and controller defaults use the Windows default devices")
+{
+    const AudioSettings audio;
+    const ControllerSettings controller;
+
+    CHECK(audio.outputDevice.empty());
+    CHECK(audio.microphoneDevice.empty());
+    CHECK_FALSE(audio.microphoneMuted);
+    CHECK(audio.volumePercent == 85);
+    CHECK(controller.preferred.empty());
+}
+
 TEST_CASE("Settings keep their defaults for missing or invalid values")
 {
     const auto settings = read(R"({
@@ -58,11 +77,22 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
             "codec": "h265",
             "bitrateKbps": 900000,
             "presentMode": true
+        },
+        "audio": {
+            "outputDevice": 4,
+            "microphoneDevice": null,
+            "microphoneMuted": "yes",
+            "volumePercent": 140
+        },
+        "controller": {
+            "preferred": false
         }
     })");
 
     REQUIRE(settings.has_value());
     CHECK(settings->video == VideoSettings{});
+    CHECK(settings->audio == AudioSettings{});
+    CHECK(settings->controller == ControllerSettings{});
 }
 
 TEST_CASE("Settings refuse files that aren't theirs")
