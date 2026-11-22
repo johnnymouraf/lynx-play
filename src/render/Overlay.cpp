@@ -46,6 +46,8 @@ const char* stageLabel(EffectStage stage)
     {
     case EffectStage::ColorConversion:
         return "Conversão de cor";
+    case EffectStage::VideoSuperResolution:
+        return "VSR";
     case EffectStage::Scaling:
         return "Escala";
     case EffectStage::Overlay:

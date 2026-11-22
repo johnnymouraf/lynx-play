@@ -71,6 +71,8 @@ struct ControllerSettings
 struct RtxSettings
 {
     ReflexMode reflex = ReflexMode::On;
+    // RTX Video Super Resolution through the driver's video processor.
+    bool videoSuperResolution = false;
 
     bool operator==(const RtxSettings&) const = default;
 };

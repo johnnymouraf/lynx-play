@@ -122,6 +122,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
     requestedReflex_.store(options_.reflex);
+    requestedVideoSuperResolution_.store(options_.videoSuperResolution);
 }
 
 FrameRenderer::~FrameRenderer()
@@ -154,6 +155,12 @@ void FrameRenderer::setReflexMode(core::ReflexMode mode)
     SetEvent(wakeEvent_.get());
 }
 
+void FrameRenderer::setVideoSuperResolution(bool enabled)
+{
+    requestedVideoSuperResolution_.store(enabled);
+    SetEvent(wakeEvent_.get());
+}
+
 std::expected<void, std::string> FrameRenderer::createFrameResources()
 {
     for (auto& allocator : allocators_)
@@ -175,6 +182,26 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
     }
 
     commandList_->Close();
+
+    for (auto& allocator : copyAllocators_)
+    {
+        if (const HRESULT result = gpu_.device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
+            FAILED(result))
+        {
+            return std::unexpected(describeFailure("CreateCommandAllocator (VSR)", result));
+        }
+    }
+
+    if (const HRESULT result = gpu_.device->CreateCommandList(
+            0, D3D12_COMMAND_LIST_TYPE_DIRECT, copyAllocators_[0].Get(), nullptr,
+            IID_PPV_ARGS(&copyCommandList_));
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("CreateCommandList (VSR)", result));
+    }
+
+    copyCommandList_->Close();
 
     if (const HRESULT result =
             gpu_.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
@@ -253,6 +280,7 @@ void FrameRenderer::run(const std::stop_token& stop)
         }
 
         applyRequestedReflex();
+        applyRequestedVideoSuperResolution();
 
         if (auto frame = renderFrame(overlay.get()); !frame)
         {
@@ -347,6 +375,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
     // the frame that last used it; so can the picture that frame read.
     const UINT bufferIndex = swapChain_.currentIndex();
     waitForFence(allocatorFenceValues_.at(bufferIndex));
+    waitForFence(copyAllocatorFenceValues_.at(bufferIndex));
     framesInFlight_.at(bufferIndex).reset();
 
     if (auto times = timer_->take(bufferIndex))
@@ -364,15 +393,37 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
         reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
     }
 
-    auto& allocator = allocators_.at(bufferIndex);
-    allocator->Reset();
-    commandList_->Reset(allocator.Get(), nullptr);
-    recordFrame(bufferIndex, overlay);
-    commandList_->Close();
-
-    if (shownFrame_ && shownFrame_->fence)
+    if (prepareVideoSuperResolution())
     {
-        gpu_.queue->Wait(shownFrame_->fence.Get(), shownFrame_->fenceValue);
+        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, overlay);
+
+        if (!recorded)
+        {
+            return std::unexpected(recorded.error());
+        }
+
+        // The processor failed; the shader path retakes the same frame.
+        if (!*recorded)
+        {
+            return {};
+        }
+    }
+    else
+    {
+        auto& allocator = allocators_.at(bufferIndex);
+        allocator->Reset();
+        commandList_->Reset(allocator.Get(), nullptr);
+        recordShaderFrame(bufferIndex, overlay);
+
+        if (const HRESULT result = commandList_->Close(); FAILED(result))
+        {
+            return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close", result));
+        }
+
+        if (shownFrame_ && shownFrame_->fence)
+        {
+            gpu_.queue->Wait(shownFrame_->fence.Get(), shownFrame_->fenceValue);
+        }
     }
 
     const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
@@ -438,7 +489,85 @@ void FrameRenderer::applyRequestedReflex()
     reflex_.configure(requested, gpu_.device.Get());
 }
 
-void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
+void FrameRenderer::applyRequestedVideoSuperResolution()
+{
+    const bool requested = requestedVideoSuperResolution_.load();
+
+    if (requested == requestedVideoSuperResolutionApplied_)
+    {
+        return;
+    }
+
+    requestedVideoSuperResolutionApplied_ = requested;
+    videoSuperResolutionFailed_ = false;
+    spdlog::info("VSR: {}", requested ? "on" : "off");
+}
+
+bool FrameRenderer::prepareVideoSuperResolution()
+{
+    if (!shownFrame_ || !requestedVideoSuperResolutionApplied_ || videoSuperResolutionFailed_)
+    {
+        return false;
+    }
+
+    const SurfaceSize input{.width = shownFrame_->width, .height = shownFrame_->height};
+    const PixelRect area = fitPicture(swapChain_.size(), input);
+    const SurfaceSize output{.width = area.width, .height = area.height};
+
+    if (!videoSuperResolutionEligible(requestedVideoSuperResolutionApplied_,
+                                       gpu_.info.vendorId, input, output))
+    {
+        return false;
+    }
+
+    const VsrPicture picture{
+        .input = input,
+        .output = output,
+        .format = shownFrame_->format,
+        .matrix = shownFrame_->matrix,
+        .range = shownFrame_->range,
+    };
+
+    if (videoSuperResolution_ && videoSuperResolution_->configuredFor(picture))
+    {
+        return true;
+    }
+
+    waitForGpu();
+
+    if (!videoSuperResolution_)
+    {
+        auto created = VideoSuperResolution::create(*gpu_.device.Get(), *gpu_.adapter.Get(),
+                                                   SwapChain::kBufferCount);
+
+        if (!created)
+        {
+            videoSuperResolutionFailed_ = true;
+            spdlog::error("VSR is unavailable; the shader path scales the stream: {}",
+                          created.error());
+            return false;
+        }
+
+        videoSuperResolution_.emplace(std::move(*created));
+    }
+
+    if (auto configured = videoSuperResolution_->configure(picture); !configured)
+    {
+        videoSuperResolutionFailed_ = true;
+        spdlog::error("VSR is unavailable; the shader path scales the stream: {}",
+                      configured.error());
+        return false;
+    }
+
+    for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+    {
+        presenter_.writeVideoSuperResolutionView(index, *videoSuperResolution_->output(index));
+    }
+
+    return true;
+}
+
+void FrameRenderer::recordShaderFrame(UINT bufferIndex, Overlay* overlay)
 {
     ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
     const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
@@ -463,7 +592,9 @@ void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
 
     if (shownFrame_)
     {
-        presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size());
+        const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+        presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(),
+                                  picture, ScaledPicture::Converted);
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
@@ -482,6 +613,138 @@ void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
     commandList_->ResourceBarrier(1, &toPresent);
 
     timer_->endFrame(*commandList_.Get(), bufferIndex);
+}
+
+std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(UINT bufferIndex,
+                                                                               Overlay* overlay)
+{
+    const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+
+    copyAllocators_.at(bufferIndex)->Reset();
+    copyCommandList_->Reset(copyAllocators_.at(bufferIndex).Get(), nullptr);
+    timer_->beginFrame(*copyCommandList_, bufferIndex);
+    timer_->beginStage(*copyCommandList_, bufferIndex, EffectStage::VideoSuperResolution);
+    recordInputCopy(*copyCommandList_, bufferIndex);
+
+    if (const HRESULT result = copyCommandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (VSR)", result));
+    }
+
+    if (shownFrame_->fence)
+    {
+        gpu_.queue->Wait(shownFrame_->fence.Get(), shownFrame_->fenceValue);
+    }
+
+    const std::array<ID3D12CommandList*, 1> copyLists{copyCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(copyLists.size()), copyLists.data());
+
+    const UINT64 inputReady = videoSuperResolution_->inputReadyValue();
+    gpu_.queue->Signal(videoSuperResolution_->fence(), inputReady);
+    copyAllocatorFenceValues_.at(bufferIndex) = ++lastSignaledFence_;
+    gpu_.queue->Signal(fence_.Get(), lastSignaledFence_);
+
+    const auto outputReady = videoSuperResolution_->blit(bufferIndex, inputReady);
+
+    if (!outputReady)
+    {
+        videoSuperResolutionFailed_ = true;
+        redrawRequested_.store(true);
+        SetEvent(wakeEvent_.get());
+        spdlog::error("VSR stopped on this frame; the shader path draws the next one: {}",
+                      outputReady.error());
+        return false;
+    }
+
+    auto& allocator = allocators_.at(bufferIndex);
+    allocator->Reset();
+    commandList_->Reset(allocator.Get(), nullptr);
+
+    // The processor's work happened between the two lists: this stamp closes
+    // the stage after the queue has waited for it.
+    timer_->endStage(*commandList_, bufferIndex, EffectStage::VideoSuperResolution);
+    timer_->beginStage(*commandList_, bufferIndex, EffectStage::ColorConversion);
+    timer_->endStage(*commandList_, bufferIndex, EffectStage::ColorConversion);
+
+    ID3D12Resource* const output = videoSuperResolution_->output(bufferIndex);
+    const auto toShader = transition(output, D3D12_RESOURCE_STATE_COMMON,
+                                     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    commandList_->ResourceBarrier(1, &toShader);
+
+    ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
+    const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
+
+    const auto toRenderTarget =
+        transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    commandList_->ResourceBarrier(1, &toRenderTarget);
+    commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
+
+    timer_->beginStage(*commandList_, bufferIndex, EffectStage::Scaling);
+    presenter_.recordScaling(*commandList_, bufferIndex, target, swapChain_.size(), picture,
+                              ScaledPicture::VideoSuperResolution);
+    timer_->endStage(*commandList_, bufferIndex, EffectStage::Scaling);
+
+    timer_->beginStage(*commandList_, bufferIndex, EffectStage::Overlay);
+
+    if (overlay != nullptr)
+    {
+        overlay->render(*commandList_, target, overlayStats());
+    }
+
+    timer_->endStage(*commandList_, bufferIndex, EffectStage::Overlay);
+
+    const auto pictureToCommon = transition(output, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                                            D3D12_RESOURCE_STATE_COMMON);
+    commandList_->ResourceBarrier(1, &pictureToCommon);
+
+    const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                      D3D12_RESOURCE_STATE_PRESENT);
+    commandList_->ResourceBarrier(1, &toPresent);
+
+    timer_->endFrame(*commandList_, bufferIndex);
+
+    if (const HRESULT result = commandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (VSR)", result));
+    }
+
+    // The draw reads the processor's output only after its signal.
+    gpu_.queue->Wait(videoSuperResolution_->fence(), *outputReady);
+    return true;
+}
+
+void FrameRenderer::recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex)
+{
+    ID3D12Resource* const input = videoSuperResolution_->input(bufferIndex);
+
+    const auto toCopy = transition(input, D3D12_RESOURCE_STATE_COMMON,
+                                   D3D12_RESOURCE_STATE_COPY_DEST);
+    commandList.ResourceBarrier(1, &toCopy);
+
+    D3D12_TEXTURE_COPY_LOCATION source{
+        .pResource = shownFrame_->texture.Get(),
+        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+        .SubresourceIndex = D3D12CalcSubresource(0, shownFrame_->arraySlice, 0, 1, 1),
+    };
+    D3D12_TEXTURE_COPY_LOCATION destination{
+        .pResource = input,
+        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+        .SubresourceIndex = 0,
+    };
+    const D3D12_BOX box{
+        .left = 0,
+        .top = 0,
+        .front = 0,
+        .right = shownFrame_->width,
+        .bottom = shownFrame_->height,
+        .back = 1,
+    };
+
+    commandList.CopyTextureRegion(&destination, 0, 0, 0, &source, &box);
+
+    const auto toCommon = transition(input, D3D12_RESOURCE_STATE_COPY_DEST,
+                                     D3D12_RESOURCE_STATE_COMMON);
+    commandList.ResourceBarrier(1, &toCommon);
 }
 
 OverlayStats FrameRenderer::overlayStats() const
@@ -585,11 +848,15 @@ void FrameRenderer::reportStatistics()
 
     if (lastGpuTimes_)
     {
-        spdlog::info("GPU: {} {:.2f} ms, {} {:.2f} ms, {} {:.2f} ms, total {:.2f} ms",
-                     stageName(EffectStage::ColorConversion), lastGpuTimes_->stages.at(0),
-                     stageName(EffectStage::Scaling), lastGpuTimes_->stages.at(1),
-                     stageName(EffectStage::Overlay), lastGpuTimes_->stages.at(2),
-                     lastGpuTimes_->total);
+        std::string stages;
+
+        for (std::size_t stage = 0; stage < kEffectStageCount; ++stage)
+        {
+            stages += std::format("{} {:.2f} ms, ", stageName(static_cast<EffectStage>(stage)),
+                                  lastGpuTimes_->stages.at(stage));
+        }
+
+        spdlog::info("GPU: {}total {:.2f} ms", stages, lastGpuTimes_->total);
     }
 
     reflex_.logSummary();

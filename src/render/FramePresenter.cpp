@@ -30,8 +30,13 @@ struct ConversionConstants
 };
 
 constexpr UINT kConstantCount = sizeof(ConversionConstants) / sizeof(float);
-// Luma and chroma views, then the intermediate picture.
-constexpr UINT kViewsPerBuffer = 3;
+// Luma and chroma views, the intermediate picture and, when VSR runs, the
+// video processor's output.
+constexpr UINT kLumaView = 0;
+constexpr UINT kChromaView = 1;
+constexpr UINT kIntermediateView = 2;
+constexpr UINT kVideoSuperResolutionView = 3;
+constexpr UINT kViewsPerBuffer = 4;
 constexpr UINT kConstantsParameter = 0;
 constexpr UINT kViewsParameter = 1;
 
@@ -366,13 +371,23 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
         }
 
         device_->CreateRenderTargetView(texture.Get(), nullptr, cpuRenderTarget(index));
-        device_->CreateShaderResourceView(
-            texture.Get(), nullptr,
-            cpuView(index * kViewsPerBuffer + kViewsPerBuffer - 1));
+        device_->CreateShaderResourceView(texture.Get(), nullptr,
+                                          cpuView(index * kViewsPerBuffer + kIntermediateView));
     }
 
     pictureSize_ = picture;
     return {};
+}
+
+void FramePresenter::writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resource& texture)
+{
+    if (bufferIndex >= bufferCount_)
+    {
+        return;
+    }
+
+    device_->CreateShaderResourceView(
+        &texture, nullptr, cpuView(bufferIndex * kViewsPerBuffer + kVideoSuperResolutionView));
 }
 
 void FramePresenter::recordConversion(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
@@ -429,9 +444,10 @@ void FramePresenter::recordConversion(ID3D12GraphicsCommandList& commandList, UI
 }
 
 void FramePresenter::recordScaling(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
-                                   D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize)
+                                   D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize,
+                                   SurfaceSize pictureSize, ScaledPicture picture)
 {
-    const PixelRect area = fitPicture(targetSize, pictureSize_);
+    const PixelRect area = fitPicture(targetSize, pictureSize);
 
     if (area.width == 0 || area.height == 0)
     {
@@ -452,12 +468,15 @@ void FramePresenter::recordScaling(ID3D12GraphicsCommandList& commandList, UINT 
         .right = static_cast<LONG>(area.left + area.width),
         .bottom = static_cast<LONG>(area.top + area.height),
     };
+    const UINT pictureView =
+        picture == ScaledPicture::VideoSuperResolution ? kVideoSuperResolutionView
+                                                       : kIntermediateView;
 
     const std::array<ID3D12DescriptorHeap*, 1> heaps{viewHeap_.Get()};
     commandList.SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
     commandList.SetGraphicsRootSignature(scalingRootSignature_.Get());
     commandList.SetGraphicsRootDescriptorTable(
-        0, gpuView(bufferIndex * kViewsPerBuffer + kViewsPerBuffer - 1));
+        0, gpuView(bufferIndex * kViewsPerBuffer + pictureView));
     commandList.SetPipelineState(scalingPipeline_.Get());
     commandList.RSSetViewports(1, &viewport);
     commandList.RSSetScissorRects(1, &scissor);
@@ -473,6 +492,8 @@ void FramePresenter::writeInputViews(UINT bufferIndex, const VideoFrame& frame)
 
     for (UINT plane = 0; plane < 2; ++plane)
     {
+        const UINT viewIndex = plane == 0 ? kLumaView : kChromaView;
+
         D3D12_SHADER_RESOURCE_VIEW_DESC view{
             .Format = planeFormats.at(plane),
             .ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY,
@@ -488,7 +509,7 @@ void FramePresenter::writeInputViews(UINT bufferIndex, const VideoFrame& frame)
         };
 
         device_->CreateShaderResourceView(frame.texture.Get(), &view,
-                                          cpuView(bufferIndex * kViewsPerBuffer + plane));
+                                          cpuView(bufferIndex * kViewsPerBuffer + viewIndex));
     }
 }
 

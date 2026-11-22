@@ -37,6 +37,8 @@ AppController::AppController(StartupState state, const SettingsController& setti
                 if (videoTestWindow_ != nullptr)
                 {
                     videoTestWindow_->setReflexMode(settings_.reflexMode());
+                    videoTestWindow_->setVideoSuperResolution(
+                        settings_.videoSuperResolution());
                 }
             });
 }
@@ -127,6 +129,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .title = kVideoTestTitle,
                                                  .timing = settings_.presentTiming(),
                                                  .reflex = settings_.reflexMode(),
+                                                 .videoSuperResolution =
+                                                     settings_.videoSuperResolution(),
                                                  .overlayFont = overlayFont(),
                                                  .onClosed = closeLater,
                                              });

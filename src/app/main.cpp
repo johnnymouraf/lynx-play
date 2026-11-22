@@ -193,7 +193,8 @@ int main(int argc, char* argv[])
     if (commandLine->playFile)
     {
         return lynx::app::playFile(*commandLine->playFile, commandLine->framesPerSecond,
-                                   settings.presentTiming(), settings.reflexMode());
+                                   settings.presentTiming(), settings.reflexMode(),
+                                   settings.videoSuperResolution());
     }
 
     lynx::app::loadBundledFonts();

@@ -16,7 +16,7 @@ namespace lynx::app
 {
 
 int playFile(const std::filesystem::path& path, double framesPerSecond,
-             render::PresentTiming timing, core::ReflexMode reflex)
+             render::PresentTiming timing, core::ReflexMode reflex, bool videoSuperResolution)
 {
     const auto gpu = render::createGpuDevice();
 
@@ -49,6 +49,7 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
             .title = L"Lynx Play — " + path.filename().wstring(),
             .timing = timing,
             .reflex = reflex,
+            .videoSuperResolution = videoSuperResolution,
             .overlayFont = overlayFont(),
             .onClosed = quit,
         });

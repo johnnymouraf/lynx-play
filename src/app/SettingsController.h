@@ -44,6 +44,8 @@ class SettingsController : public QObject
     Q_PROPERTY(QString reflex READ reflex WRITE setReflex NOTIFY rtxChanged)
     Q_PROPERTY(bool reflexAvailable READ reflexAvailable CONSTANT)
     Q_PROPERTY(QString reflexUnavailableReason READ reflexUnavailableReason CONSTANT)
+    Q_PROPERTY(bool videoSuperResolution READ videoSuperResolution WRITE setVideoSuperResolution
+                   NOTIFY rtxChanged)
 
 public:
     // Without a store, changes last until the app closes.
@@ -102,6 +104,9 @@ public:
     // "off", "on" or "boost".
     [[nodiscard]] QString reflex() const;
     void setReflex(const QString& name);
+
+    [[nodiscard]] bool videoSuperResolution() const;
+    void setVideoSuperResolution(bool enabled);
 
     // False without an NVIDIA stream GPU or a working NVAPI.
     [[nodiscard]] bool reflexAvailable() const;

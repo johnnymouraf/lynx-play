@@ -112,6 +112,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     FrameRenderer::Options rendererOptions{
         .timing = options.timing,
         .reflex = options.reflex,
+        .videoSuperResolution = options.videoSuperResolution,
         .overlayFont = std::move(options.overlayFont),
         .onFailure = [window] { PostMessageW(window, kRenderFailedMessage, 0, 0); },
     };
@@ -164,6 +165,14 @@ void StreamWindow::setReflexMode(core::ReflexMode mode)
     if (renderer_ != nullptr)
     {
         renderer_->setReflexMode(mode);
+    }
+}
+
+void StreamWindow::setVideoSuperResolution(bool enabled)
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setVideoSuperResolution(enabled);
     }
 }
 

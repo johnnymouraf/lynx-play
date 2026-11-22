@@ -12,6 +12,7 @@ namespace lynx::app
 // window, without the main window, until that window closes. It checks the
 // decoder and renderer without a console. Returns the process exit code.
 [[nodiscard]] int playFile(const std::filesystem::path& path, double framesPerSecond,
-                           render::PresentTiming timing, core::ReflexMode reflex);
+                           render::PresentTiming timing, core::ReflexMode reflex,
+                           bool videoSuperResolution);
 
 } // namespace lynx::app

@@ -195,6 +195,8 @@ RtxSettings readRtx(const Json& rtx)
     }
 
     settings.reflex = namedValue(kReflexNames, rtx, "reflex", settings.reflex);
+    settings.videoSuperResolution =
+        booleanAt(rtx, "videoSuperResolution", settings.videoSuperResolution);
 
     return settings;
 }
@@ -274,6 +276,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
         {"rtx",
          {
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
+             {"videoSuperResolution", rtx.videoSuperResolution},
          }},
     };
 

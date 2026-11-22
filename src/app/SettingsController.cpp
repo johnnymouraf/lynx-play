@@ -361,6 +361,18 @@ QString SettingsController::reflexUnavailableReason() const
     return {};
 }
 
+bool SettingsController::videoSuperResolution() const
+{
+    return settings_.rtx.videoSuperResolution;
+}
+
+void SettingsController::setVideoSuperResolution(bool enabled)
+{
+    core::RtxSettings rtx = settings_.rtx;
+    rtx.videoSuperResolution = enabled;
+    applyRtx(rtx);
+}
+
 void SettingsController::apply(const core::VideoSettings& video)
 {
     if (video == settings_.video)
@@ -415,7 +427,8 @@ void SettingsController::applyRtx(const core::RtxSettings& rtx)
     }
 
     settings_.rtx = rtx;
-    spdlog::info("RTX settings: Reflex {}", render::reflexModeName(rtx.reflex));
+    spdlog::info("RTX settings: Reflex {}, VSR {}", render::reflexModeName(rtx.reflex),
+                 rtx.videoSuperResolution ? "on" : "off");
     emit rtxChanged();
     save();
 }

@@ -35,7 +35,7 @@ TEST_CASE("Settings survive a write and a read")
         .volumePercent = 70,
     };
     settings.controller.preferred = "DualSense Wireless Controller";
-    settings.rtx = {.reflex = ReflexMode::Boost};
+    settings.rtx = {.reflex = ReflexMode::Boost, .videoSuperResolution = true};
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -58,6 +58,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.video.bitrateKbps == kMaxBitrateKbps);
     CHECK(defaults.video.presentMode == PresentMode::VSync);
     CHECK(defaults.rtx.reflex == ReflexMode::On);
+    CHECK_FALSE(defaults.rtx.videoSuperResolution);
 }
 
 TEST_CASE("Audio and controller defaults use the Windows default devices")
@@ -93,7 +94,8 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
             "preferred": false
         },
         "rtx": {
-            "reflex": "turbo"
+            "reflex": "turbo",
+            "videoSuperResolution": "yes"
         }
     })");
 

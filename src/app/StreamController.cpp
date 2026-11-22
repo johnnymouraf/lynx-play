@@ -118,6 +118,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                 if (window_ != nullptr)
                 {
                     window_->setReflexMode(settings_.reflexMode());
+                    window_->setVideoSuperResolution(settings_.videoSuperResolution());
                 }
             });
 
@@ -330,6 +331,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                           target_->name.toStdWString(),
                                                  .timing = settings_.presentTiming(),
                                                  .reflex = settings_.reflexMode(),
+                                                 .videoSuperResolution =
+                                                     settings_.videoSuperResolution(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
                                                  .overlayFont = overlayFont(),

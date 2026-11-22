@@ -37,6 +37,7 @@ struct StreamWindowOptions
     std::wstring title;
     PresentTiming timing = PresentTiming::VSync;
     core::ReflexMode reflex = core::ReflexMode::Off;
+    bool videoSuperResolution = false;
     WindowMode mode = WindowMode::Windowed;
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
@@ -68,6 +69,7 @@ public:
     [[nodiscard]] bool isOpen() const;
     void bringToFront();
     void setReflexMode(core::ReflexMode mode);
+    void setVideoSuperResolution(bool enabled);
 
 private:
     explicit StreamWindow(std::function<void(CloseReason)> onClosed);

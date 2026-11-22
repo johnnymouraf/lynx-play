@@ -10,6 +10,7 @@
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
 #include "render/VideoFrame.h"
+#include "render/VideoSuperResolution.h"
 
 #include <array>
 #include <atomic>
@@ -36,6 +37,9 @@ public:
     {
         PresentTiming timing = PresentTiming::VSync;
         core::ReflexMode reflex = core::ReflexMode::Off;
+        // Runs the stream through RTX Video Super Resolution when the GPU
+        // and the driver support it, instead of the shader's scaling pass.
+        bool videoSuperResolution = false;
         // The font the overlay's text is drawn with; empty uses Dear ImGui's.
         std::shared_ptr<const std::vector<std::uint8_t>> overlayFont;
         // Called once on the renderer's thread when it stops for good (the
@@ -63,6 +67,10 @@ public:
     // the stream.
     void setReflexMode(core::ReflexMode mode);
 
+    // Safe from any thread; the pipeline switches between the video
+    // processor and the shader's path before the next frame.
+    void setVideoSuperResolution(bool enabled);
+
 private:
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
                   std::shared_ptr<FrameMailbox> mailbox, Options options);
@@ -72,7 +80,16 @@ private:
     [[nodiscard]] std::expected<void, std::string> renderFrame(Overlay* overlay);
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
-    void recordFrame(UINT bufferIndex, Overlay* overlay);
+    void applyRequestedVideoSuperResolution();
+    // Configures the video processor for the picture on screen and the
+    // window it fits; false means the shader's path draws this frame.
+    [[nodiscard]] bool prepareVideoSuperResolution();
+    void recordShaderFrame(UINT bufferIndex, Overlay* overlay);
+    // Copies the frame into the VSR input, runs the processor and records the
+    // draw; false when the frame was dropped and the shader path retakes it.
+    [[nodiscard]] std::expected<bool, std::string> recordVideoSuperResolutionFrame(
+        UINT bufferIndex, Overlay* overlay);
+    void recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex);
     [[nodiscard]] OverlayStats overlayStats() const;
     [[nodiscard]] std::uint32_t lastGpuWorkUs() const;
     [[nodiscard]] std::string describePresentFailure(HRESULT result) const;
@@ -90,6 +107,12 @@ private:
     ReflexUnavailable reflexReason_ = ReflexUnavailable::NoNvidiaGpu;
     std::atomic<core::ReflexMode> requestedReflex_;
     core::ReflexMode requestedReflexApplied_ = core::ReflexMode::Off;
+    std::atomic<bool> requestedVideoSuperResolution_;
+    bool requestedVideoSuperResolutionApplied_ = false;
+    // Built the first time the setting is on with a picture that can use it;
+    // a failure falls back to the shader until the setting changes.
+    std::optional<VideoSuperResolution> videoSuperResolution_;
+    bool videoSuperResolutionFailed_ = false;
     // The Reflex frame id of a source frame taken but not presented yet; it
     // survives a frame-slot timeout so the retry reuses its one sleep.
     std::optional<std::uint64_t> reflexFrameId_;
@@ -98,6 +121,11 @@ private:
     ComPtr<ID3D12GraphicsCommandList> commandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> allocators_;
     std::array<UINT64, SwapChain::kBufferCount> allocatorFenceValues_{};
+    // The VSR path's input copy is its own submission, with its own list and
+    // allocators, so its fence values are tracked apart from the draw's.
+    ComPtr<ID3D12GraphicsCommandList> copyCommandList_;
+    std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> copyAllocators_;
+    std::array<UINT64, SwapChain::kBufferCount> copyAllocatorFenceValues_{};
     // The frame each back buffer's last commands read, kept until the GPU is
     // done with them.
     std::array<std::optional<VideoFrame>, SwapChain::kBufferCount> framesInFlight_;
