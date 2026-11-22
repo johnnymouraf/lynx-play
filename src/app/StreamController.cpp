@@ -155,7 +155,11 @@ void StreamController::cancel()
         return;
     }
 
-    spdlog::info("Connecting canceled");
+    if (phase_ == Phase::Connecting || phase_ == Phase::StartingVideo)
+    {
+        spdlog::info("Connecting canceled");
+    }
+
     stop();
     setPhase(Phase::Idle);
 }
