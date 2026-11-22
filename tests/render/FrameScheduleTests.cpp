@@ -64,7 +64,7 @@ TEST_CASE("A repeat pauses generation and shows its real picture")
 {
     FrameSchedule schedule;
     schedule.setCadence(60.0);
-    schedule.observe(Decision::Distinct);
+    (void)schedule.observe(Decision::Distinct);
 
     const FrameGenerationPlan repeat = schedule.observe(Decision::Repeat);
 
@@ -77,8 +77,8 @@ TEST_CASE("A scene cut resets the next pair")
 {
     FrameSchedule schedule;
     schedule.setCadence(60.0);
-    schedule.observe(Decision::Distinct);
-    schedule.observe(Decision::Distinct);
+    (void)schedule.observe(Decision::Distinct);
+    (void)schedule.observe(Decision::Distinct);
 
     const FrameGenerationPlan cut = schedule.observe(Decision::SceneCut);
 
@@ -95,7 +95,7 @@ TEST_CASE("An unmeasured frame resets the pair")
 {
     FrameSchedule schedule;
     schedule.setCadence(60.0);
-    schedule.observe(Decision::Distinct);
+    (void)schedule.observe(Decision::Distinct);
 
     const FrameGenerationPlan ignored = schedule.observe(Decision::Ignored);
 
@@ -112,7 +112,7 @@ TEST_CASE("Reset makes the next pair start over")
 {
     FrameSchedule schedule;
     schedule.setCadence(60.0);
-    schedule.observe(Decision::Distinct);
+    (void)schedule.observe(Decision::Distinct);
 
     schedule.reset();
 
