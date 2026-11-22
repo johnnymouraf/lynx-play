@@ -6,11 +6,15 @@
 #include "core/Windows.h"
 #include "render/CadenceDetector.h"
 #include "render/CadenceMetric.h"
+#include "render/FrameGeneration.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
+#include "render/FrameSchedule.h"
 #include "render/GpuDevice.h"
 #include "render/GpuTimer.h"
 #include "render/Hdr.h"
+#include "render/MotionVectors.h"
+#include "render/NgxHost.h"
 #include "render/OpticalFlow.h"
 #include "render/Overlay.h"
 #include "render/ReflexSession.h"
@@ -50,6 +54,8 @@ public:
         // Computes the driver's optical flow between the picture and the one
         // before it; cadence detection runs either way.
         bool opticalFlow = true;
+        // DLSS Frame Generation; it needs the optical flow and Reflex.
+        core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
         // What to ask of HDR and what to do with the stream's PQ pictures.
         core::HdrMode hdr = core::HdrMode::Auto;
         // Whether the driver accepted RTX Video HDR's extension.
@@ -93,6 +99,10 @@ public:
     // Safe from any thread; optical flow starts or stops on the next frame.
     void setOpticalFlow(bool enabled);
 
+    // Safe from any thread; DLSS Frame Generation starts or stops on the next
+    // frame.
+    void setFrameGeneration(core::FrameGenerationMode mode);
+
     // Safe from any thread; the HDR path switches before the next frame,
     // recreating the swap chain when the display can show HDR.
     void setHdrMode(core::HdrMode mode);
@@ -130,6 +140,17 @@ private:
         float sdrWhiteNits = 200.0F;
     };
 
+    // Where a frame draws its final picture: the swap chain's back buffer
+    // when Frame Generation is off, or the retained real picture it evaluates
+    // and copies from when it is on.
+    struct FrameTarget
+    {
+        ID3D12Resource* resource = nullptr;
+        D3D12_CPU_DESCRIPTOR_HANDLE view{};
+        D3D12_RESOURCE_STATES before = D3D12_RESOURCE_STATE_PRESENT;
+        D3D12_RESOURCE_STATES after = D3D12_RESOURCE_STATE_PRESENT;
+    };
+
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
                   HdrDisplayState display, std::shared_ptr<FrameMailbox> mailbox,
                   Options options);
@@ -148,6 +169,7 @@ private:
     void applyRequestedReflex();
     void applyRequestedVideoSuperResolution();
     void applyRequestedOpticalFlow();
+    void applyRequestedFrameGeneration();
     void applyRequestedHdr();
     // Configures the video processor for the picture on screen and the
     // window it fits; false means the shader's path draws this frame.
@@ -155,14 +177,32 @@ private:
     // Builds the optical flow session for the picture on screen; false leaves
     // the frame on the block-difference cadence metric alone.
     [[nodiscard]] bool prepareOpticalFlow();
+    // Builds or rebuilds the NGX host, the DLSS-G feature, the retained real
+    // picture and the motion-vector picture; false draws the shader's path
+    // into the swap chain this frame.
+    [[nodiscard]] bool prepareFrameGeneration(UINT bufferIndex);
+    void releaseFrameGeneration();
+    // The draw target for this frame: the swap chain when Frame Generation
+    // is off, the retained real picture when it is on.
+    [[nodiscard]] FrameTarget frameTarget(UINT bufferIndex, bool offscreen);
+    // Densifies the flow, evaluates DLSS-G, copies the generated picture
+    // into the current back buffer, draws the overlay over it and presents
+    // it. False when the evaluation failed and the real picture is the only
+    // one this frame can show.
+    [[nodiscard]] std::expected<bool, std::string> presentGenerated(
+        UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput,
+        bool waitForFlow, bool reset, bool keepReal);
+    // Copies the retained real picture into the current back buffer and
+    // presents it.
+    [[nodiscard]] std::expected<void, std::string> presentReal(std::uint64_t frameId);
     // Optical flow reads the SDR picture, so a PQ stream is tone-mapped for
     // it even when the display takes PQ.
     [[nodiscard]] ToneMapParameters flowToneMap() const;
-    void recordShaderFrame(UINT bufferIndex, const FramePlan& plan);
+    void recordShaderFrame(UINT bufferIndex, const FramePlan& plan, const FrameTarget& target);
     // Copies the frame into the VSR input, runs the processor and records the
     // draw; false when the frame was dropped and the shader path retakes it.
     [[nodiscard]] std::expected<bool, std::string> recordVideoSuperResolutionFrame(
-        UINT bufferIndex, const FramePlan& plan);
+        UINT bufferIndex, const FramePlan& plan, const FrameTarget& target);
     void recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex);
     // Signals the cadence fence after a list that recorded a sample.
     void signalCadence();
@@ -208,6 +248,30 @@ private:
     bool videoSuperResolutionFailed_ = false;
     std::atomic<bool> requestedOpticalFlow_;
     bool requestedOpticalFlowApplied_ = false;
+    std::atomic<core::FrameGenerationMode> requestedFrameGeneration_;
+    core::FrameGenerationMode requestedFrameGenerationApplied_ = core::FrameGenerationMode::Off;
+    // The features and the cadence flag only; the GPU objects are built on
+    // the first frame that can use them.
+    FrameGenerationAvailability frameGenerationAvailability_;
+    std::optional<NgxHost> ngx_;
+    std::optional<FrameGeneration> frameGeneration_;
+    std::optional<MotionVectors> motionVectors_;
+    FrameSchedule frameSchedule_;
+    bool frameGenerationFailed_ = false;
+    std::string frameGenerationFailure_;
+    // The composed picture DLSS-G reads and the copy that reaches the screen.
+    ComPtr<ID3D12Resource> realPicture_;
+    ComPtr<ID3D12DescriptorHeap> realPictureViews_;
+    D3D12_CPU_DESCRIPTOR_HANDLE realPictureView_{};
+    D3D12_RESOURCE_STATES realPictureState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    // The lists that densify, evaluate and copy the two pictures, with their
+    // own allocators since a source frame presents twice.
+    ComPtr<ID3D12GraphicsCommandList> generationCommandList_;
+    std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> generationAllocators_;
+    std::array<UINT64, SwapChain::kBufferCount> generationAllocatorFenceValues_{};
+    std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> presentAllocators_;
+    std::array<UINT64, SwapChain::kBufferCount> presentAllocatorFenceValues_{};
+    std::uint64_t generatedFrames_ = 0;
     // Built the first time the setting is on with a picture; a failure keeps
     // cadence detection running on the blocks alone.
     std::optional<OpticalFlow> opticalFlow_;
@@ -222,6 +286,9 @@ private:
     // A format change restarts the windows like a source change does.
     std::optional<PixelFormat> lastPictureFormat_;
     std::uint64_t cadenceSignal_ = 0;
+    // The value the last recorded frame signaled on the cadence fence, for
+    // Frame Generation's one-frame wait for the decision.
+    std::uint64_t cadenceFrameValue_ = 0;
     std::uint64_t droppedFrames_ = 0;
     std::atomic<core::HdrMode> requestedHdr_;
     core::HdrMode requestedHdrApplied_ = core::HdrMode::Auto;

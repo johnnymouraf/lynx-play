@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Settings.h"
+#include "render/FrameGeneration.h"
 #include "render/Hdr.h"
 #include "render/OpticalFlow.h"
 #include "render/ReflexSession.h"
@@ -59,6 +60,11 @@ class SettingsController : public QObject
     Q_PROPERTY(bool opticalFlow READ opticalFlow WRITE setOpticalFlow NOTIFY rtxChanged)
     Q_PROPERTY(bool opticalFlowAvailable READ opticalFlowAvailable CONSTANT)
     Q_PROPERTY(QString opticalFlowUnavailableReason READ opticalFlowUnavailableReason CONSTANT)
+    Q_PROPERTY(QString frameGeneration READ frameGeneration WRITE setFrameGeneration NOTIFY
+                   rtxChanged)
+    Q_PROPERTY(bool frameGenerationAvailable READ frameGenerationAvailable NOTIFY rtxChanged)
+    Q_PROPERTY(QString frameGenerationUnavailableReason READ frameGenerationUnavailableReason NOTIFY
+                   rtxChanged)
     Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
                    setOverlayStatisticsVisible NOTIFY overlayChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
@@ -152,6 +158,16 @@ public:
     [[nodiscard]] bool opticalFlowAvailable() const;
     [[nodiscard]] QString opticalFlowUnavailableReason() const;
 
+    // "off" or "2x".
+    [[nodiscard]] QString frameGeneration() const;
+    [[nodiscard]] core::FrameGenerationMode frameGenerationMode() const;
+    void setFrameGeneration(const QString& name);
+
+    // False below Ada, without the runtime, with HAGS off, or with the flow
+    // or Reflex off; the RTX row explains which.
+    [[nodiscard]] bool frameGenerationAvailable() const;
+    [[nodiscard]] QString frameGenerationUnavailableReason() const;
+
     // False without an NVIDIA stream GPU or a working NVAPI.
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
@@ -196,6 +212,7 @@ private:
     render::ReflexAvailability reflexAvailability_;
     render::VsrAvailability videoSuperResolutionAvailability_;
     render::OpticalFlowAvailability opticalFlowAvailability_;
+    render::FrameGenerationAvailability frameGenerationAvailability_;
     render::HdrDisplayState hdrDisplay_;
     render::RtxHdrAvailability rtxHdrAvailability_;
     QStringList outputDevices_;

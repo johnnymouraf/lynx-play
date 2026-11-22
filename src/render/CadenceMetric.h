@@ -56,6 +56,11 @@ public:
     // returns nullopt.
     [[nodiscard]] std::optional<CadenceReadback> take();
 
+    // Waits for the sample the frame with this fence value produced. Frame
+    // generation needs the current frame's decision before it evaluates, so
+    // it pays this one short GPU wait instead of guessing a frame late.
+    [[nodiscard]] std::optional<CadenceReadback> wait(std::uint64_t fenceValue);
+
     [[nodiscard]] ID3D12Fence* fence() const;
 
 private:
@@ -80,7 +85,7 @@ private:
     UINT descriptorSize_ = 0;
     std::array<Slot, kSlotCount> slots_;
     Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
-    core::UniqueHandle fenceEvent_;
+    core::UniqueHandle samplesReadyEvent_;
     std::uint64_t nextFenceValue_ = 0;
 };
 

@@ -27,7 +27,13 @@ struct StreamMetricsSnapshot
 
     double receivedFps = 0.0;
     double decodedFps = 0.0;
+    // New decoded pictures shown on screen.
     double presentedFps = 0.0;
+    // Every picture shown, real and generated.
+    double allPresentedFps = 0.0;
+    // Pictures DLSS Frame Generation produced since the stream started.
+    std::uint64_t generatedFrames = 0;
+    double generatedFps = 0.0;
     double bitrateMbps = 0.0;
 
     bool packetLossValid = false;
@@ -68,6 +74,10 @@ public:
     // frame, and the time from the frame being ready only for new frames.
     void addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
                        std::optional<Clock::duration> readyToPresent, bool uniqueFrame);
+    // One present of a picture DLSS Frame Generation produced. It counts in
+    // the all-presents rate and in the generated count, never as a real
+    // presented frame.
+    void addGeneratedPresent(Clock::time_point at);
 
     [[nodiscard]] StreamMetricsSnapshot snapshot(Clock::time_point now);
 
@@ -80,6 +90,9 @@ private:
     SlidingWindow received_;
     SlidingWindow decoded_;
     SlidingWindow presented_;
+    SlidingWindow allPresented_;
+    SlidingWindow generated_;
+    std::uint64_t generatedFrames_ = 0;
     SlidingWindow decodeTime_;
     SlidingWindow presentInterval_;
     SlidingWindow readyToPresent_;

@@ -40,6 +40,12 @@ enum class LatencyMarker
     RenderSubmitEnd,
     PresentStart,
     PresentEnd,
+    // On the out-of-band queue: the work that copies a generated picture and
+    // the present of that picture.
+    OutOfBandRenderSubmitStart,
+    OutOfBandRenderSubmitEnd,
+    OutOfBandPresentStart,
+    OutOfBandPresentEnd,
 };
 
 // NvAPI_D3D_GetLatency's latest report, in milliseconds.
@@ -127,6 +133,16 @@ public:
 
     void mark(std::uint64_t frameId, LatencyMarker marker);
 
+    // Tells the driver this queue presents pictures the application did not
+    // render. Frame generation is gated on it, so a failure disables the
+    // feature for the stream.
+    [[nodiscard]] bool enableOutOfBand(ID3D12CommandQueue& queue);
+    [[nodiscard]] bool outOfBandEnabled() const;
+
+    // The out-of-band markers for the copies and presents of generated
+    // pictures; they target the queue, not the device.
+    void markOutOfBand(std::uint64_t frameId, LatencyMarker marker);
+
     // Polls the sleep status and the latency report at most once a second.
     void poll();
 
@@ -158,13 +174,16 @@ private:
     bool latencyFailureLogged_ = false;
     bool markerFailureLogged_ = false;
     bool markersStarted_ = false;
+    bool outOfBandMarkersLogged_ = false;
     std::string detail_;
     ID3D12Device* device_ = nullptr;
+    ID3D12CommandQueue* outOfBandQueue_ = nullptr;
     core::ReflexMode mode_ = core::ReflexMode::Off;
     core::ReflexMode appliedMode_ = core::ReflexMode::Off;
     std::uint64_t nextFrameId_ = 1;
     std::uint64_t sleepCount_ = 0;
     std::uint64_t markerSets_ = 0;
+    std::uint64_t outOfBandMarkers_ = 0;
     std::uint64_t framesMarked_ = 0;
     double lastSleepMilliseconds_ = 0.0;
     std::array<double, 64> sleepWindow_{};

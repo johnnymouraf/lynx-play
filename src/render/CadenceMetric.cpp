@@ -259,9 +259,9 @@ std::expected<CadenceMetric, std::string> CadenceMetric::create(ID3D12Device& de
         return std::unexpected(describeFailure("CreateFence (cadence)", result));
     }
 
-    metric.fenceEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
+    metric.samplesReadyEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
 
-    if (!metric.fenceEvent_)
+    if (!metric.samplesReadyEvent_)
     {
         return std::unexpected(
             describeFailure("CreateEventW (cadence)", HRESULT_FROM_WIN32(GetLastError())));
@@ -375,6 +375,63 @@ std::optional<CadenceReadback> CadenceMetric::take()
         {
             slot.pending = 0;
             continue;
+        }
+
+        CadenceReadback sample;
+        std::memcpy(&sample, mapped, sizeof(sample));
+        slot.readback->Unmap(0, nullptr);
+        slot.pending = 0;
+
+        return sample;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<CadenceReadback> CadenceMetric::wait(std::uint64_t fenceValue)
+{
+    constexpr DWORD kWaitTimeoutMilliseconds = 100;
+
+    if (fenceValue == 0)
+    {
+        return std::nullopt;
+    }
+
+    if (fence_->GetCompletedValue() < fenceValue)
+    {
+        if (samplesReadyEvent_ == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        if (const HRESULT result =
+                fence_->SetEventOnCompletion(fenceValue, samplesReadyEvent_.get());
+            FAILED(result))
+        {
+            return std::nullopt;
+        }
+
+        if (WaitForSingleObject(samplesReadyEvent_.get(), kWaitTimeoutMilliseconds) !=
+            WAIT_OBJECT_0)
+        {
+            return std::nullopt;
+        }
+    }
+
+    for (Slot& slot : slots_)
+    {
+        if (slot.pending != fenceValue)
+        {
+            continue;
+        }
+
+        void* mapped = nullptr;
+        const D3D12_RANGE range{.Begin = 0, .End = sizeof(CadenceReadback)};
+
+        if (const HRESULT result = slot.readback->Map(0, &range, &mapped); FAILED(result))
+        {
+            slot.pending = 0;
+            return std::nullopt;
         }
 
         CadenceReadback sample;

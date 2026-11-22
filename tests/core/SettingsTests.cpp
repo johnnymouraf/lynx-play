@@ -40,6 +40,7 @@ TEST_CASE("Settings survive a write and a read")
         .reflex = ReflexMode::Boost,
         .videoSuperResolution = true,
         .opticalFlow = false,
+        .frameGeneration = FrameGenerationMode::X2,
     };
     settings.overlay.statisticsVisible = true;
     std::ostringstream output;
@@ -68,6 +69,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.rtx.reflex == ReflexMode::On);
     CHECK_FALSE(defaults.rtx.videoSuperResolution);
     CHECK(defaults.rtx.opticalFlow);
+    CHECK(defaults.rtx.frameGeneration == FrameGenerationMode::Off);
 }
 
 TEST_CASE("Audio and controller defaults use the Windows default devices")
@@ -106,7 +108,8 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
         "rtx": {
             "reflex": "turbo",
             "videoSuperResolution": "yes",
-            "opticalFlow": "yes"
+            "opticalFlow": "yes",
+            "frameGeneration": "4x"
         }
     })");
 
