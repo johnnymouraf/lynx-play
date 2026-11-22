@@ -6,3 +6,4 @@
 /.idea/
 CMakeUserPresets.json
 *.user
+/.vcpkg-cache/

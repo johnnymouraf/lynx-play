@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\.vcpkg-cache,readwrite
+  VCPKG_DISABLE_METRICS: 1
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch chiaki-ng
+        run: ./scripts/init-chiaki-submodules.ps1
+
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install chiaki-ng's protobuf generator dependencies
+        run: python -m pip install --disable-pip-version-check protobuf grpcio-tools
+
+      - name: Set up the MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Show toolchain versions
+        run: |
+          clang-cl --version
+          cmake --version
+          ninja --version
+
+      - name: Set up vcpkg at the manifest baseline
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          $vcpkgRoot = Join-Path $env:RUNNER_TEMP 'vcpkg'
+          git init --quiet $vcpkgRoot
+          git -C $vcpkgRoot fetch --quiet --depth 1 https://github.com/microsoft/vcpkg.git $baseline
+          git -C $vcpkgRoot checkout --quiet FETCH_HEAD
+          & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force .vcpkg-cache | Out-Null
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+
+      - name: Restore the vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-
+            vcpkg-
+
+      - name: Configure
+        run: >
+          cmake --preset release
+          -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
+
+      - name: Save the vcpkg binary cache
+        if: always() && steps.vcpkg-cache.outcome == 'success'
+        uses: actions/cache/save@v6
+        with:
+          path: .vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Test
+        run: ctest --preset release
