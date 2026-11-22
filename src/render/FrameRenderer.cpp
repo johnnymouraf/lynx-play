@@ -622,9 +622,9 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 
     copyAllocators_.at(bufferIndex)->Reset();
     copyCommandList_->Reset(copyAllocators_.at(bufferIndex).Get(), nullptr);
-    timer_->beginFrame(*copyCommandList_, bufferIndex);
-    timer_->beginStage(*copyCommandList_, bufferIndex, EffectStage::VideoSuperResolution);
-    recordInputCopy(*copyCommandList_, bufferIndex);
+    timer_->beginFrame(*copyCommandList_.Get(), bufferIndex);
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    recordInputCopy(*copyCommandList_.Get(), bufferIndex);
 
     if (const HRESULT result = copyCommandList_->Close(); FAILED(result))
     {
@@ -662,9 +662,9 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 
     // The processor's work happened between the two lists: this stamp closes
     // the stage after the queue has waited for it.
-    timer_->endStage(*commandList_, bufferIndex, EffectStage::VideoSuperResolution);
-    timer_->beginStage(*commandList_, bufferIndex, EffectStage::ColorConversion);
-    timer_->endStage(*commandList_, bufferIndex, EffectStage::ColorConversion);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
 
     ID3D12Resource* const output = videoSuperResolution_->output(bufferIndex);
     const auto toShader = transition(output, D3D12_RESOURCE_STATE_COMMON,
@@ -679,19 +679,19 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
     commandList_->ResourceBarrier(1, &toRenderTarget);
     commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
 
-    timer_->beginStage(*commandList_, bufferIndex, EffectStage::Scaling);
-    presenter_.recordScaling(*commandList_, bufferIndex, target, swapChain_.size(), picture,
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+    presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(), picture,
                               ScaledPicture::VideoSuperResolution);
-    timer_->endStage(*commandList_, bufferIndex, EffectStage::Scaling);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
 
-    timer_->beginStage(*commandList_, bufferIndex, EffectStage::Overlay);
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
     if (overlay != nullptr)
     {
-        overlay->render(*commandList_, target, overlayStats());
+        overlay->render(*commandList_.Get(), target, overlayStats());
     }
 
-    timer_->endStage(*commandList_, bufferIndex, EffectStage::Overlay);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
     const auto pictureToCommon = transition(output, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
                                             D3D12_RESOURCE_STATE_COMMON);
@@ -701,7 +701,7 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
                                       D3D12_RESOURCE_STATE_PRESENT);
     commandList_->ResourceBarrier(1, &toPresent);
 
-    timer_->endFrame(*commandList_, bufferIndex);
+    timer_->endFrame(*commandList_.Get(), bufferIndex);
 
     if (const HRESULT result = commandList_->Close(); FAILED(result))
     {
@@ -721,10 +721,12 @@ void FrameRenderer::recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT
                                    D3D12_RESOURCE_STATE_COPY_DEST);
     commandList.ResourceBarrier(1, &toCopy);
 
+    // Decoder textures have one mip, and a subresource's array slice is its
+    // index: the visible picture sits in `arraySlice`.
     D3D12_TEXTURE_COPY_LOCATION source{
         .pResource = shownFrame_->texture.Get(),
         .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        .SubresourceIndex = D3D12CalcSubresource(0, shownFrame_->arraySlice, 0, 1, 1),
+        .SubresourceIndex = static_cast<UINT>(shownFrame_->arraySlice),
     };
     D3D12_TEXTURE_COPY_LOCATION destination{
         .pResource = input,
