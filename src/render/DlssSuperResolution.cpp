@@ -189,18 +189,20 @@ struct DlssSuperResolution::Impl
 
     D3D12_CPU_DESCRIPTOR_HANDLE viewHandle(UINT index) const
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE handle = viewHeap->GetCPUDescriptorHandleForHeapStart();
-        handle.ptr += static_cast<SIZE_T>(index) * viewDescriptorSize;
+        D3D12_CPU_DESCRIPTOR_HANDLE descriptor =
+            viewHeap->GetCPUDescriptorHandleForHeapStart();
+        descriptor.ptr += static_cast<SIZE_T>(index) * viewDescriptorSize;
 
-        return handle;
+        return descriptor;
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE gpuViewHandle(UINT index) const
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE handle = viewHeap->GetGPUDescriptorHandleForHeapStart();
-        handle.ptr += static_cast<UINT64>(index) * viewDescriptorSize;
+        D3D12_GPU_DESCRIPTOR_HANDLE descriptor =
+            viewHeap->GetGPUDescriptorHandleForHeapStart();
+        descriptor.ptr += static_cast<UINT64>(index) * viewDescriptorSize;
 
-        return handle;
+        return descriptor;
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE depthView() const
@@ -227,7 +229,7 @@ struct DlssSuperResolution::Impl
     {
         if (parameters != nullptr)
         {
-            NVSDK_NGX_DestroyParameters(parameters);
+            NVSDK_NGX_D3D12_DestroyParameters(parameters);
             parameters = nullptr;
         }
     }
@@ -239,9 +241,16 @@ namespace
 
 #ifdef LYNX_HAVE_NGX
 
+// The SDK's NVSDK_NGX_FAILED macro compares an unsigned result with an enum
+// and trips -Wsign-compare.
+bool ngxFailed(NVSDK_NGX_Result result)
+{
+    return (static_cast<std::uint32_t>(result) & 0xFFF00000U) == 0xBAD00000U;
+}
+
 std::string ngxResult(NVSDK_NGX_Result result)
 {
-    return ngxResultText(result);
+    return ngxResultText(static_cast<std::uint32_t>(result));
 }
 
 #endif
@@ -266,7 +275,7 @@ std::expected<void, std::string> DlssSuperResolution::Impl::recordFeature(
         NVSDK_NGX_PerfQuality_Value_Balanced, &optimalWidth, &optimalHeight, &maxWidth,
         &maxHeight, &minWidth, &minHeight, &sharpness);
 
-    if (NVSDK_NGX_FAILED(settings))
+    if (ngxFailed(settings))
     {
         return std::unexpected(
             std::format("NGX_DLSS_GET_OPTIMAL_SETTINGS: {}", ngxResult(settings)));
@@ -297,7 +306,7 @@ std::expected<void, std::string> DlssSuperResolution::Impl::recordFeature(
     const NVSDK_NGX_Result result =
         NGX_D3D12_CREATE_DLSS_EXT(featureList.Get(), 1, 1, &handle, parameters, &create);
 
-    if (NVSDK_NGX_FAILED(result))
+    if (ngxFailed(result))
     {
         return std::unexpected(std::format("NGX_D3D12_CREATE_DLSS_EXT: {}", ngxResult(result)));
     }
@@ -390,7 +399,7 @@ std::expected<DlssSuperResolution, std::string> DlssSuperResolution::create(
     const NVSDK_NGX_Result parameters =
         NVSDK_NGX_D3D12_GetCapabilityParameters(&impl->parameters);
 
-    if (NVSDK_NGX_FAILED(parameters))
+    if (ngxFailed(parameters))
     {
         return std::unexpected(
             std::format("NVSDK_NGX_D3D12_GetCapabilityParameters: {}", ngxResult(parameters)));
@@ -666,7 +675,7 @@ std::expected<void, std::string> DlssSuperResolution::record(
 
     entry.outputState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-    if (NVSDK_NGX_FAILED(evaluated))
+    if (ngxFailed(evaluated))
     {
         return std::unexpected(
             std::format("NGX_D3D12_EVALUATE_DLSS_EXT: {}", ngxResult(evaluated)));

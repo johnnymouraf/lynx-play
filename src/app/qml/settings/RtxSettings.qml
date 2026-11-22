@@ -11,9 +11,10 @@ ColumnLayout {
 
     function upscalingDescription() {
         if (!section.settings.dlssAvailable) {
+            var fallback = section.settings.videoSuperResolutionAvailable
+                    ? " O RTX VSR amplia a imagem." : " O shader amplia a imagem.";
             return "DLSS Super Resolution indisponível: "
-                    + section.settings.dlssUnavailableReason
-                    + " O RTX VSR amplia a imagem.";
+                    + section.settings.dlssUnavailableReason + fallback;
         }
 
         if (!section.settings.videoSuperResolutionAvailable) {

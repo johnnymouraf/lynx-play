@@ -43,6 +43,12 @@ struct DlssAvailability
     std::string detail;
 };
 
+// The NVAPI architecture id of Ada (AD100); newer chips have larger ids.
+inline constexpr std::uint32_t kAdaArchitecture = 0x00000190;
+
+// Whether DLSS Super Resolution supports this GPU architecture.
+[[nodiscard]] bool dlssArchitectureSupported(std::uint32_t architecture);
+
 // Whether DLSS Super Resolution can run here: an NVIDIA adapter of Ada or
 // newer, the driver's NGX core and the app's DLSS runtime. Never fails the
 // app on a machine without them.

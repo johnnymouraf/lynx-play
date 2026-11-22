@@ -209,6 +209,11 @@ bool fileExists(const std::filesystem::path& path)
 
 #ifdef LYNX_HAVE_NGX
 
+bool ngxFailed(NVSDK_NGX_Result result)
+{
+    return (static_cast<std::uint32_t>(result) & 0xFFF00000U) == 0xBAD00000U;
+}
+
 std::filesystem::path applicationDataPath()
 {
     if (const auto dataDir = core::localDataDir(); dataDir)
@@ -244,6 +249,11 @@ std::string ngxResultText(std::uint32_t result)
 #endif
 
     return "unknown NGX result";
+}
+
+bool dlssArchitectureSupported(std::uint32_t architecture)
+{
+    return architecture >= kAdaArchitecture;
 }
 
 DlssAvailability probeDlss()
@@ -304,7 +314,7 @@ DlssAvailability probeDlss()
         };
     }
 
-    if (*architecture < static_cast<NvU32>(NV_GPU_ARCHITECTURE_AD100))
+    if (!dlssArchitectureSupported(*architecture))
     {
         return {
             .available = false,
@@ -359,11 +369,11 @@ std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
         kProjectId, NVSDK_NGX_ENGINE_TYPE_CUSTOM, kEngineVersion, dataPathText.c_str(), &device,
         nullptr, NVSDK_NGX_Version_API);
 
-    if (NVSDK_NGX_FAILED(result))
+    if (ngxFailed(result))
     {
         return std::unexpected(
             std::format("NVSDK_NGX_D3D12_Init_with_ProjectID: {}",
-                        ngxResultText(result)));
+                        ngxResultText(static_cast<std::uint32_t>(result))));
     }
 
     NgxHost host;
@@ -413,9 +423,10 @@ NgxHost::~NgxHost()
 
 #ifdef LYNX_HAVE_NGX
     if (const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_Shutdown1(device_.Get());
-        NVSDK_NGX_FAILED(result))
+        ngxFailed(result))
     {
-        spdlog::warn("NGX: shutdown failed: {}", ngxResultText(result));
+        spdlog::warn("NGX: shutdown failed: {}",
+                     ngxResultText(static_cast<std::uint32_t>(result)));
     }
 #endif
 
