@@ -30,7 +30,8 @@ jobs:
       - uses: actions/checkout@v7
 
       # Artifacts count against the account's storage; keep only the newest
-      # eight (a run is tested within minutes of finishing).
+      # two (one per branch building in parallel; each is tested within
+      # minutes of finishing).
       - name: Purge old artifacts
         if: github.event_name == 'push'
         env:
@@ -38,7 +39,7 @@ jobs:
         run: |
           $artifacts = (gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" | ConvertFrom-Json).artifacts |
             Sort-Object created_at -Descending
-          $artifacts | Select-Object -Skip 8 | ForEach-Object {
+          $artifacts | Select-Object -Skip 2 | ForEach-Object {
             gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$($_.id)" | Out-Null
           }
 
