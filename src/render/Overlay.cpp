@@ -583,19 +583,6 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
             clicked = true;
         }
 
-        static int lastHovered = -1;
-
-        if ((ImGui::IsItemHovered() && lastHovered != static_cast<int>(index)) ||
-            ImGui::IsItemClicked())
-        {
-            const ImVec2 mouse = ImGui::GetIO().MousePos;
-            spdlog::info("overlay segment {}: clicked={} item={},{} {}x{} mouse={},{}", index,
-                         ImGui::IsItemClicked(), segmentTop.x, segmentTop.y, width, kHeight,
-                         mouse.x, mouse.y);
-        }
-
-        lastHovered = ImGui::IsItemHovered() ? static_cast<int>(index) : lastHovered;
-
         ImGui::PopID();
 
         const char* label = reflexModeLabel(kModes.at(index));
@@ -672,6 +659,8 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
     {
         result.reflexChanged = true;
         result.reflex = chosen;
+        spdlog::info("overlay: reflex segment chose {} (state {})", static_cast<int>(chosen),
+                     static_cast<int>(stats.reflex.state));
     }
 
     if (toggleRow("stats-row", menuFonts, "Mostrar estatísticas", "", statsVisible, 44.0F))
@@ -912,22 +901,29 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
 
         if (menu.statisticsToggled)
         {
+            spdlog::info("overlay: statistics toggle {}", !statisticsVisible);
             statisticsVisible_.store(!statisticsVisible);
         }
 
         if (menu.reflexChanged)
         {
             reflex_ = menu.reflex;
+            spdlog::info("overlay: applying reflex {}", static_cast<int>(reflex_));
 
             if (actions_.reflexChanged)
             {
                 actions_.reflexChanged(reflex_);
+            }
+            else
+            {
+                spdlog::warn("overlay: no reflex action");
             }
         }
 
         if (menu.microphoneToggled)
         {
             microphoneMuted_ = !microphoneMuted_;
+            spdlog::info("overlay: microphone {}", microphoneMuted_ ? "muted" : "unmuted");
 
             if (actions_.microphoneMutedChanged)
             {
