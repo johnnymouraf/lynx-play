@@ -375,8 +375,8 @@ QString SettingsController::hdrDescription() const
     if (hdrRtxAvailable())
     {
         description +=
-            u" O RTX Video HDR também precisa estar ligado no NVIDIA App (Sistema › Vídeo › RTX "
-            u"Video Enhancements)."_s;
+            u" O RTX Video HDR também precisa estar ligado no NVIDIA App (Sistema › Vídeo › "
+            u"RTX Video Enhancements)."_s;
     }
     else
     {

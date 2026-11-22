@@ -294,9 +294,9 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
         // it knows the model; SetStreamExtension alone can return S_OK and
         // still do nothing.
         UINT supportValue = 0;
-        UINT supportSize = static_cast<UINT>(sizeof(supportValue));
         const HRESULT probe = videoContext.VideoProcessorGetStreamExtension(
-            videoProcessor, 0, &kNvidiaTrueHdr, &supportSize, &supportValue);
+            videoProcessor, 0, &kNvidiaTrueHdr, static_cast<UINT>(sizeof(supportValue)),
+            &supportValue);
 
         if (FAILED(probe) || supportValue == 0)
         {

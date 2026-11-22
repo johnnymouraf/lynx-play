@@ -706,8 +706,8 @@ FrameRenderer::Presentation FrameRenderer::presentationFor(const VideoFrame* fra
 
     return {
         .targetFormat = chosen.hdrSwapChain ? SwapChain::kHdrFormat : SwapChain::kSdrFormat,
-        .intermediateFormat =
-            (chosen.hdrStream || chosen.rtxVideoHdr) ? SwapChain::kHdrFormat : SwapChain::kSdrFormat,
+        .intermediateFormat = (chosen.hdrStream || chosen.rtxVideoHdr) ? SwapChain::kHdrFormat
+                                                                        : SwapChain::kSdrFormat,
         .hdrSwapChain = chosen.hdrSwapChain,
         .toneMap = chosen.toneMap,
         .rtxVideoHdr = chosen.rtxVideoHdr,
