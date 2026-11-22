@@ -89,6 +89,7 @@ qt_add_qml_module(lynx-play
         qml/controls/Toast.qml
         qml/controls/ValueSlider.qml
         qml/settings/AboutSettings.qml
+        qml/settings/RtxSettings.qml
         qml/settings/SectionHeader.qml
         qml/settings/SettingsPage.qml
         qml/settings/VideoSettings.qml
@@ -124,6 +125,7 @@ qt_add_qml_module(lynx-play
         assets/icons/rotate-ccw.svg
         assets/icons/scroll-text.svg
         assets/icons/settings.svg
+        assets/icons/sparkles.svg
         assets/icons/trash.svg
         assets/icons/tv-minimal-play.svg
         assets/icons/wifi-off.svg
@@ -152,6 +154,14 @@ install(FILES "$<TARGET_PDB_FILE:lynx-play>" DESTINATION ${CMAKE_INSTALL_BINDIR}
 install(FILES ${lynx_licenses} DESTINATION licenses)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
         DESTINATION licenses RENAME NVAPI-License.txt)
+
+# Dear ImGui is static inside the executable; its notice ships with it.
+find_file(LYNX_IMGUI_COPYRIGHT NAMES copyright
+    PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/imgui"
+    NO_DEFAULT_PATH)
+if(LYNX_IMGUI_COPYRIGHT)
+    install(FILES "${LYNX_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
+endif()
 
 qt_generate_deploy_qml_app_script(
     TARGET lynx-play

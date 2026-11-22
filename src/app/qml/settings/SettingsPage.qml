@@ -11,6 +11,8 @@ Item {
     required property SettingsController settings
 
     property string section: "video"
+    // The sections the StackLayout below holds, in order.
+    readonly property var sectionIds: ["video", "rtx", "about"]
 
     RowLayout {
         anchors.fill: parent
@@ -42,6 +44,14 @@ Item {
                     iconName: "monitor"
                     selected: page.section === "video"
                     onClicked: page.section = "video"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    text: "RTX"
+                    iconName: "sparkles"
+                    selected: page.section === "rtx"
+                    onClicked: page.section = "rtx"
                 }
 
                 NavItem {
@@ -84,10 +94,15 @@ Item {
                 x: Theme.space10
                 y: Theme.space8
                 width: scroller.width - 2 * Theme.space10
-                currentIndex: page.section === "video" ? 0 : 1
+                currentIndex: Math.max(0, page.sectionIds.indexOf(page.section))
 
                 VideoSettings {
                     settings: page.settings
+                }
+
+                RtxSettings {
+                    settings: page.settings
+                    gpuName: page.controller.gpuName
                 }
 
                 AboutSettings {
