@@ -997,14 +997,14 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
     {
         ImDrawData* const drawData = ImGui::GetDrawData();
 
-        for (int list = 0; drawData != nullptr && list < drawData->CmdListsCount; ++list)
+        for (int index = 0; drawData != nullptr && index < drawData->CmdListsCount; ++index)
         {
-            ImDrawList* const commandList = drawData->CmdLists[list];
+            ImDrawList* const drawList = drawData->CmdLists[index];
 
-            for (int vertex = 0; vertex < commandList->VtxBuffer.Size; ++vertex)
+            for (int vertex = 0; vertex < drawList->VtxBuffer.Size; ++vertex)
             {
-                commandList->VtxBuffer[vertex].col =
-                    pqColor(commandList->VtxBuffer[vertex].col, sdrWhiteNits_);
+                drawList->VtxBuffer[vertex].col =
+                    pqColor(drawList->VtxBuffer[vertex].col, sdrWhiteNits_);
             }
         }
     }

@@ -114,9 +114,12 @@ HdrDisplayState detectHdrDisplay(HWND window)
         window != nullptr
             ? MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST)
             : MonitorFromPoint(POINT{.x = 0, .y = 0}, MONITOR_DEFAULTTOPRIMARY);
-    MONITORINFOEXW monitorInfo{.cbSize = sizeof(MONITORINFOEXW)};
+    // In C++ the extended struct derives from MONITORINFO, so the fields are
+    // inherited and can't be designated.
+    MONITORINFOEXW monitorInfo{};
+    monitorInfo.cbSize = sizeof(MONITORINFOEXW);
 
-    if (!GetMonitorInfoW(monitor, reinterpret_cast<LPMONITORINFO>(&monitorInfo)))
+    if (!GetMonitorInfoW(monitor, &monitorInfo))
     {
         state.name = "unknown";
         spdlog::debug("HDR display: the monitor under the window could not be read");
