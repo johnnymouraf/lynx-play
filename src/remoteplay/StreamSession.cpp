@@ -195,6 +195,15 @@ StreamSession::State::~State()
     inputThread.request_stop();
     inputThread = std::jthread{};
 
+    if (gamepads != nullptr)
+    {
+        input::DualSenseTriggerEffect clear;
+        clear.type = 0x05;
+        gamepads->submit({.rumble = std::pair<std::uint16_t, std::uint16_t>{0, 0},
+                           .leftTrigger = clear,
+                           .rightTrigger = clear});
+    }
+
     // The capture thread sends through the session's Opus encoder; stop it
     // before the session goes away.
     microphone.reset();
