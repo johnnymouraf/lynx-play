@@ -435,17 +435,6 @@ bool toggleRow(const char* id, const Fonts& fonts, const char* label, const char
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
 
-    static bool wasHovered = false;
-
-    if (hovered != wasHovered || clicked)
-    {
-        const ImVec2 mouse = ImGui::GetIO().MousePos;
-        spdlog::info("overlay toggle '{}': clicked={} hovered={} item={},{} {}x{} mouse={},{}",
-                     label, clicked, hovered, start.x, start.y, width, height, mouse.x, mouse.y);
-    }
-
-    wasHovered = hovered;
-
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
 
     if (hovered)
@@ -486,17 +475,6 @@ bool actionButton(const char* id, const Fonts& fonts, const char* label, bool da
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
-
-    static bool wasHovered = false;
-
-    if (hovered != wasHovered || clicked)
-    {
-        const ImVec2 mouse = ImGui::GetIO().MousePos;
-        spdlog::info("overlay button '{}': clicked={} hovered={} item={},{} {}x{} mouse={},{}",
-                     label, clicked, hovered, start.x, start.y, width, kHeight, mouse.x, mouse.y);
-    }
-
-    wasHovered = hovered;
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     const ImVec2 bottomRight(start.x + width, start.y + kHeight);
@@ -576,8 +554,9 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
 
         ImGui::SetCursorScreenPos(segmentTop);
         ImGui::PushID(static_cast<int>(index));
+        ImGui::InvisibleButton("segment", ImVec2(width, kHeight));
 
-        if (ImGui::InvisibleButton("segment", ImVec2(width, kHeight)) && available)
+        if (ImGui::IsItemClicked())
         {
             *chosen = kModes.at(index);
             clicked = true;
@@ -655,7 +634,7 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
         &chosen);
     ImGui::SetCursorScreenPos(ImVec2(reflexStart.x, reflexStart.y + 88.0F));
 
-    if (reflexClicked && chosen != currentReflex)
+    if (reflexClicked)
     {
         result.reflexChanged = true;
         result.reflex = chosen;
