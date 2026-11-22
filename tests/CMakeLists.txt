@@ -17,7 +17,9 @@ add_executable(lynx_tests
     render/AdapterSelectionTests.cpp
     render/ColorConversionTests.cpp
     render/FrameMailboxTests.cpp
+    render/GpuTimerTests.cpp
     render/LayoutTests.cpp
+    render/ReflexTests.cpp
     render/TestPatternTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE

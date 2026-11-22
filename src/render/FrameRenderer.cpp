@@ -1,6 +1,10 @@
 #include "render/FrameRenderer.h"
 
+#include <algorithm>
 #include <format>
+#include <span>
+#include <string>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -32,6 +36,38 @@ D3D12_RESOURCE_BARRIER transition(ID3D12Resource* resource, D3D12_RESOURCE_STATE
     return barrier;
 }
 
+std::string reflexModeLabel(core::ReflexMode mode)
+{
+    switch (mode)
+    {
+    case core::ReflexMode::Off:
+        return "Desligado";
+    case core::ReflexMode::On:
+        return "Ligado";
+    case core::ReflexMode::Boost:
+        return "Ligado + Boost";
+    }
+
+    return "Desligado";
+}
+
+std::string reflexUnavailableReason(ReflexUnavailable reason)
+{
+    switch (reason)
+    {
+    case ReflexUnavailable::NoNvidiaGpu:
+        return "GPU não NVIDIA";
+    case ReflexUnavailable::NoDriver:
+        return "driver NVIDIA não encontrado";
+    case ReflexUnavailable::DriverFailed:
+        return "o driver NVIDIA recusou o NVAPI";
+    case ReflexUnavailable::None:
+        break;
+    }
+
+    return "indisponível";
+}
+
 } // namespace
 
 std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
@@ -55,7 +91,8 @@ std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
 
     // The constructor is private, out of make_unique's reach.
     std::unique_ptr<FrameRenderer> renderer(new FrameRenderer(
-        gpu, std::move(*swapChain), std::move(*presenter), std::move(mailbox), std::move(options)));
+        gpu, window, std::move(*swapChain), std::move(*presenter), std::move(mailbox),
+        std::move(options)));
 
     if (auto resources = renderer->createFrameResources(); !resources)
     {
@@ -72,9 +109,11 @@ std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
     return renderer;
 }
 
-FrameRenderer::FrameRenderer(GpuDevice gpu, SwapChain swapChain, FramePresenter presenter,
-                             std::shared_ptr<FrameMailbox> mailbox, Options options)
+FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
+                             FramePresenter presenter, std::shared_ptr<FrameMailbox> mailbox,
+                             Options options)
     : gpu_(std::move(gpu)),
+      window_(window),
       swapChain_(std::move(swapChain)),
       presenter_(std::move(presenter)),
       mailbox_(std::move(mailbox)),
@@ -82,6 +121,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, SwapChain swapChain, FramePresenter 
       requestedSize_(swapChain_.size()),
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
+    requestedReflex_.store(options_.reflex);
 }
 
 FrameRenderer::~FrameRenderer()
@@ -92,6 +132,7 @@ FrameRenderer::~FrameRenderer()
         thread_.join();
     }
 
+    reflex_.shutdown();
     waitForGpu();
 }
 
@@ -104,6 +145,12 @@ void FrameRenderer::resize(SurfaceSize size)
 
     requestedSize_.store(size);
     redrawRequested_.store(true);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::setReflexMode(core::ReflexMode mode)
+{
+    requestedReflex_.store(mode);
     SetEvent(wakeEvent_.get());
 }
 
@@ -136,6 +183,15 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
         return std::unexpected(describeFailure("CreateFence", result));
     }
 
+    auto timer = GpuTimer::create(*gpu_.device.Get(), *gpu_.queue.Get(), SwapChain::kBufferCount);
+
+    if (!timer)
+    {
+        return std::unexpected(timer.error());
+    }
+
+    timer_ = std::move(*timer);
+
     fenceEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
     wakeEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
 
@@ -151,6 +207,39 @@ void FrameRenderer::run(const std::stop_token& stop)
 {
     SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
 
+    const ReflexAvailability availability = ReflexSession::probe();
+    reflexReason_ = availability.reason;
+
+    if (!availability.available)
+    {
+        spdlog::info("reflex: unavailable ({})", availability.detail);
+    }
+    else if (!reflex_.open())
+    {
+        reflexReason_ = ReflexUnavailable::DriverFailed;
+        spdlog::warn("reflex: {}", reflex_.detail());
+    }
+
+    requestedReflexApplied_ = requestedReflex_.load();
+    reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
+
+    const std::span<const std::uint8_t> font =
+        options_.overlayFont ? std::span<const std::uint8_t>(*options_.overlayFont)
+                             : std::span<const std::uint8_t>{};
+
+    std::unique_ptr<Overlay> overlay;
+    auto created = Overlay::create(*gpu_.device.Get(), *gpu_.queue.Get(), window_,
+                                   SwapChain::kBufferCount, SwapChain::kFormat, font);
+
+    if (!created)
+    {
+        spdlog::warn("The overlay is unavailable: {}", created.error());
+    }
+    else
+    {
+        overlay = std::move(*created);
+    }
+
     const std::stop_callback wakeOnStop(stop, [this] { SetEvent(wakeEvent_.get()); });
     const std::array events{mailbox_->frameReadyEvent(), wakeEvent_.get()};
 
@@ -163,7 +252,9 @@ void FrameRenderer::run(const std::stop_token& stop)
             return;
         }
 
-        if (auto frame = renderFrame(); !frame)
+        applyRequestedReflex();
+
+        if (auto frame = renderFrame(overlay.get()); !frame)
         {
             spdlog::error("Rendering stopped: {}", frame.error());
 
@@ -179,7 +270,7 @@ void FrameRenderer::run(const std::stop_token& stop)
     }
 }
 
-std::expected<void, std::string> FrameRenderer::renderFrame()
+std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
 {
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
@@ -187,6 +278,13 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     if (!newest && !redraw)
     {
         return {};
+    }
+
+    // The first new frame of this pass is accepted here, so its one sleep
+    // comes before any of its work; a retry reuses the same id.
+    if (newest && !reflexFrameId_)
+    {
+        reflexFrameId_ = reflex_.beginSourceFrame(lastGpuWorkUs());
     }
 
     // Each wait takes a slot that only a present gives back, so it comes
@@ -211,6 +309,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     const bool showsNewFrame = newest.has_value();
 
+    if (showsNewFrame && !reflexFrameId_)
+    {
+        reflexFrameId_ = reflex_.beginSourceFrame(lastGpuWorkUs());
+    }
+
     if (showsNewFrame)
     {
         shownFrame_ = std::move(newest);
@@ -221,16 +324,51 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         return resized;
     }
 
+    if (shownFrame_)
+    {
+        const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+
+        if (presenter_.needsPicture(picture))
+        {
+            waitForGpu();
+
+            if (auto resized = presenter_.resizePicture(picture); !resized)
+            {
+                return resized;
+            }
+        }
+    }
+
     // A buffer's command allocator can be reset only once the GPU has finished
     // the frame that last used it; so can the picture that frame read.
     const UINT bufferIndex = swapChain_.currentIndex();
     waitForFence(allocatorFenceValues_.at(bufferIndex));
     framesInFlight_.at(bufferIndex).reset();
 
+    if (auto times = timer_->take(bufferIndex))
+    {
+        lastGpuTimes_ = *times;
+    }
+
+    const bool marked = reflexFrameId_.has_value();
+    const std::uint64_t reflexFrameId = reflexFrameId_.value_or(0);
+
+    if (marked)
+    {
+        reflex_.mark(reflexFrameId, LatencyMarker::SimulationStart);
+    }
+
     auto& allocator = allocators_.at(bufferIndex);
     allocator->Reset();
     commandList_->Reset(allocator.Get(), nullptr);
-    recordFrame(bufferIndex);
+
+    if (marked)
+    {
+        reflex_.mark(reflexFrameId, LatencyMarker::SimulationEnd);
+        reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
+    }
+
+    recordFrame(bufferIndex, overlay);
     commandList_->Close();
 
     if (shownFrame_ && shownFrame_->fence)
@@ -241,9 +379,22 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
     gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
 
-    if (const HRESULT result = swapChain_.present(options_.timing); FAILED(result))
+    if (marked)
     {
-        return std::unexpected(describePresentFailure(result));
+        reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitEnd);
+        reflex_.mark(reflexFrameId, LatencyMarker::PresentStart);
+    }
+
+    const HRESULT presentResult = swapChain_.present(options_.timing);
+
+    if (marked)
+    {
+        reflex_.mark(reflexFrameId, LatencyMarker::PresentEnd);
+    }
+
+    if (FAILED(presentResult))
+    {
+        return std::unexpected(describePresentFailure(presentResult));
     }
 
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
@@ -255,6 +406,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         presented_.add(std::chrono::steady_clock::now() - shownFrame_->timestamp);
     }
 
+    reflexFrameId_.reset();
+    reflex_.poll();
     return {};
 }
 
@@ -273,25 +426,126 @@ std::expected<void, std::string> FrameRenderer::applyRequestedSize()
     return swapChain_.resize(requested);
 }
 
-void FrameRenderer::recordFrame(UINT bufferIndex)
+void FrameRenderer::applyRequestedReflex()
+{
+    const core::ReflexMode requested = requestedReflex_.load();
+
+    if (requested == requestedReflexApplied_)
+    {
+        return;
+    }
+
+    requestedReflexApplied_ = requested;
+    reflex_.configure(requested, gpu_.device.Get());
+}
+
+void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
 {
     ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
     const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
+
+    timer_->beginFrame(*commandList_.Get(), bufferIndex);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    if (shownFrame_)
+    {
+        presenter_.recordConversion(*commandList_.Get(), bufferIndex, *shownFrame_);
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
 
     const auto toRenderTarget =
         transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     commandList_->ResourceBarrier(1, &toRenderTarget);
     commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
 
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+
     if (shownFrame_)
     {
-        presenter_.record(*commandList_.Get(), bufferIndex, *shownFrame_, target,
-                          swapChain_.size());
+        presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size());
     }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
+
+    if (overlay != nullptr)
+    {
+        overlay->render(*commandList_.Get(), target, overlayStats());
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
     const auto toPresent =
         transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     commandList_->ResourceBarrier(1, &toPresent);
+
+    timer_->endFrame(*commandList_.Get(), bufferIndex);
+}
+
+OverlayStats FrameRenderer::overlayStats() const
+{
+    OverlayStats stats;
+
+    if (lastGpuTimes_)
+    {
+        stats.gpuTimingsValid = true;
+        stats.stageMilliseconds = lastGpuTimes_->stages;
+        stats.totalMilliseconds = lastGpuTimes_->total;
+    }
+
+    ReflexOverlayStats& reflex = stats.reflex;
+
+    if (!reflex_.available())
+    {
+        reflex.state = ReflexOverlayStats::State::Unavailable;
+        reflex.reason = reflexUnavailableReason(reflexReason_);
+        return stats;
+    }
+
+    reflex.mode = reflexModeLabel(reflex_.mode());
+    reflex.lowLatencyEffective = reflex_.sleepStatus().lowLatency;
+    reflex.driverSeesSleep = reflex_.sleepStatus().driverSeesSleep;
+    reflex.sleepMeanMs = reflex_.meanSleepMilliseconds();
+    reflex.sleepMaxMs = reflex_.maxSleepMilliseconds();
+
+    const ReflexLatency& latency = reflex_.latency();
+    reflex.latencyValid = latency.valid;
+    reflex.latencyTotalMs = latency.totalMilliseconds;
+    reflex.latencyGpuMs = latency.gpuMilliseconds;
+    reflex.latencyRenderMs = latency.renderSubmitMilliseconds;
+    reflex.latencyPresentMs = latency.presentMilliseconds;
+    reflex.latencyDriverMs = latency.driverMilliseconds;
+    reflex.latencyQueueMs = latency.queueMilliseconds;
+
+    if (reflex_.failed())
+    {
+        reflex.state = ReflexOverlayStats::State::Failed;
+    }
+    else if (reflex_.stalled())
+    {
+        reflex.state = ReflexOverlayStats::State::Stalled;
+    }
+    else if (latency.valid)
+    {
+        reflex.state = ReflexOverlayStats::State::Active;
+    }
+
+    return stats;
+}
+
+std::uint32_t FrameRenderer::lastGpuWorkUs() const
+{
+    if (!lastGpuTimes_)
+    {
+        return 0;
+    }
+
+    constexpr double kMaxMicroseconds = 4'000'000.0;
+    return static_cast<std::uint32_t>(
+        std::min(lastGpuTimes_->total * 1000.0, kMaxMicroseconds));
 }
 
 std::string FrameRenderer::describePresentFailure(HRESULT result) const
@@ -329,6 +583,17 @@ void FrameRenderer::reportStatistics()
                  "ms at most), {} frames replaced before being shown",
                  summary->perSecond, summary->averageMilliseconds, summary->maxMilliseconds,
                  dropped);
+
+    if (lastGpuTimes_)
+    {
+        spdlog::info("GPU: {} {:.2f} ms, {} {:.2f} ms, {} {:.2f} ms, total {:.2f} ms",
+                     stageName(EffectStage::ColorConversion), lastGpuTimes_->stages.at(0),
+                     stageName(EffectStage::Scaling), lastGpuTimes_->stages.at(1),
+                     stageName(EffectStage::Overlay), lastGpuTimes_->stages.at(2),
+                     lastGpuTimes_->total);
+    }
+
+    reflex_.logSummary();
 }
 
 void FrameRenderer::waitForFence(UINT64 value)

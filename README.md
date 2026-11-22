@@ -88,6 +88,7 @@ the reference for the toolchain:
 ```powershell
 git submodule update --init third_party/chiaki-ng
 ./scripts/init-chiaki-submodules.ps1
+./scripts/init-nvapi-submodule.ps1
 cmake --preset release -DCMAKE_PREFIX_PATH=<Qt dir>/msvc2022_64 -DPYTHON_EXECUTABLE=<python.exe>
 cmake --build --preset release
 ctest --preset release
@@ -105,13 +106,15 @@ ctest --preset release
 | `src/remoteplay`        | chiaki-ng bridge: discovery, pairing, wake, saved list  |
 | `tests`                 | Unit tests (Catch2)                                     |
 | `third_party/chiaki-ng` | chiaki-ng, pinned as a submodule                        |
+| `third_party/nvapi`    | NVIDIA's NVAPI headers, for Reflex                      |
 | `cmake`, `triplets`     | CMake helpers and the vcpkg triplet                     |
 
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE), required by chiaki-ng's
 library, which is AGPL-3.0 with an OpenSSL exception. NVIDIA runtimes are
-downloaded at build time under NVIDIA's own licenses and are never committed.
+downloaded at build time under NVIDIA's own licenses and are never committed;
+the NVAPI headers vendored in `third_party/nvapi` are MIT. Dear ImGui is MIT.
 
 The interface bundles the Sora, Inter and JetBrains Mono fonts (SIL Open Font
 License 1.1) and Lucide icons (ISC License); their license files sit next to

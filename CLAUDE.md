@@ -27,6 +27,9 @@ the layout and `docs/plan.md` for the plan in progress.
 - chiaki-ng is a pinned submodule in `third_party/chiaki-ng`. Don't edit it;
   adapt it from our CMake. Only its needed nested submodules are fetched
   (`scripts/init-chiaki-submodules.ps1`).
+- NVIDIA's NVAPI headers are a pinned submodule in `third_party/nvapi`
+  (`scripts/init-nvapi-submodule.ps1`). The driver's `nvapi64.dll` loads at
+  run time; no import library is linked.
 - NVIDIA and other third-party binaries (DLLs, SDKs, models) are never
   committed. The workflow downloads them from their official public sources.
 

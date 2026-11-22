@@ -54,6 +54,17 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     {
         settings_ = store_->load();
     }
+
+    reflexAvailability_ = render::ReflexSession::probe();
+
+    if (reflexAvailability_.available)
+    {
+        spdlog::info("Reflex is available ({})", reflexAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("Reflex is unavailable: {}", reflexAvailability_.detail);
+    }
 }
 
 const core::VideoSettings& SettingsController::video() const
@@ -156,6 +167,72 @@ int SettingsController::maxBitrateMbps() const
     return static_cast<int>(core::kMaxBitrateKbps) / kKbpsPerMbps;
 }
 
+core::ReflexMode SettingsController::reflexMode() const
+{
+    return settings_.rtx.reflex;
+}
+
+QString SettingsController::reflex() const
+{
+    switch (settings_.rtx.reflex)
+    {
+    case core::ReflexMode::Off:
+        return u"off"_s;
+    case core::ReflexMode::On:
+        return u"on"_s;
+    case core::ReflexMode::Boost:
+        return u"boost"_s;
+    }
+
+    return u"off"_s;
+}
+
+void SettingsController::setReflex(const QString& name)
+{
+    core::RtxSettings rtx = settings_.rtx;
+
+    if (name == u"off"_s)
+    {
+        rtx.reflex = core::ReflexMode::Off;
+    }
+    else if (name == u"on"_s)
+    {
+        rtx.reflex = core::ReflexMode::On;
+    }
+    else if (name == u"boost"_s)
+    {
+        rtx.reflex = core::ReflexMode::Boost;
+    }
+    else
+    {
+        return;
+    }
+
+    applyRtx(rtx);
+}
+
+bool SettingsController::reflexAvailable() const
+{
+    return reflexAvailability_.available;
+}
+
+QString SettingsController::reflexUnavailableReason() const
+{
+    switch (reflexAvailability_.reason)
+    {
+    case render::ReflexUnavailable::NoNvidiaGpu:
+        return u"A GPU usada para o vídeo não é NVIDIA."_s;
+    case render::ReflexUnavailable::NoDriver:
+        return u"O driver NVIDIA não está instalado."_s;
+    case render::ReflexUnavailable::DriverFailed:
+        return u"O driver NVIDIA não respondeu ao NVAPI."_s;
+    case render::ReflexUnavailable::None:
+        break;
+    }
+
+    return {};
+}
+
 void SettingsController::apply(const core::VideoSettings& video)
 {
     if (video == settings_.video)
@@ -168,7 +245,24 @@ void SettingsController::apply(const core::VideoSettings& video)
                  video.framesPerSecond, core::codecName(video.codec), bitrateMbps(),
                  presentModeName(video.presentMode));
     emit videoChanged();
+    save();
+}
 
+void SettingsController::applyRtx(const core::RtxSettings& rtx)
+{
+    if (rtx == settings_.rtx)
+    {
+        return;
+    }
+
+    settings_.rtx = rtx;
+    spdlog::info("RTX settings: Reflex {}", render::reflexModeName(rtx.reflex));
+    emit rtxChanged();
+    save();
+}
+
+void SettingsController::save()
+{
     if (!store_)
     {
         return;

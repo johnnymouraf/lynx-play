@@ -2,11 +2,15 @@
 
 #include "core/Windows.h"
 #include "render/ColorConversion.h"
+#include "render/shaders/ScalePixelShader.h"
+#include "render/shaders/ScaleVertexShader.h"
 #include "render/shaders/VideoFramePixelShader.h"
 #include "render/shaders/VideoFrameVertexShader.h"
 
 #include <array>
 #include <climits>
+#include <cstdint>
+#include <span>
 
 namespace lynx::render
 {
@@ -26,7 +30,8 @@ struct ConversionConstants
 };
 
 constexpr UINT kConstantCount = sizeof(ConversionConstants) / sizeof(float);
-constexpr UINT kViewsPerFrame = 2;
+// Luma and chroma views, then the intermediate picture.
+constexpr UINT kViewsPerBuffer = 3;
 constexpr UINT kConstantsParameter = 0;
 constexpr UINT kViewsParameter = 1;
 
@@ -46,11 +51,38 @@ PlaneFormats planeFormatsOf(PixelFormat format)
     return {.luma = DXGI_FORMAT_R8_UNORM, .chroma = DXGI_FORMAT_R8G8_UNORM};
 }
 
-std::expected<ComPtr<ID3D12RootSignature>, std::string> createRootSignature(ID3D12Device& device)
+D3D12_RESOURCE_BARRIER transition(ID3D12Resource* resource, D3D12_RESOURCE_STATES before,
+                                  D3D12_RESOURCE_STATES after)
+{
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = before;
+    barrier.Transition.StateAfter = after;
+
+    return barrier;
+}
+
+D3D12_STATIC_SAMPLER_DESC bilinearSampler()
+{
+    return {
+        .Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+        .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .MaxLOD = D3D12_FLOAT32_MAX,
+        .ShaderRegister = 0,
+        .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL,
+    };
+}
+
+std::expected<ComPtr<ID3D12RootSignature>, std::string> createConversionRootSignature(
+    ID3D12Device& device)
 {
     const D3D12_DESCRIPTOR_RANGE planes{
         .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-        .NumDescriptors = kViewsPerFrame,
+        .NumDescriptors = kViewsPerBuffer,
         .BaseShaderRegister = 0,
         .RegisterSpace = 0,
         .OffsetInDescriptorsFromTableStart = 0,
@@ -71,16 +103,7 @@ std::expected<ComPtr<ID3D12RootSignature>, std::string> createRootSignature(ID3D
     };
     parameters[kViewsParameter].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    const D3D12_STATIC_SAMPLER_DESC bilinear{
-        .Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-        .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-        .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-        .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-        .MaxLOD = D3D12_FLOAT32_MAX,
-        .ShaderRegister = 0,
-        .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL,
-    };
-
+    const D3D12_STATIC_SAMPLER_DESC bilinear = bilinearSampler();
     const D3D12_ROOT_SIGNATURE_DESC description{
         .NumParameters = static_cast<UINT>(parameters.size()),
         .pParameters = parameters.data(),
@@ -114,13 +137,67 @@ std::expected<ComPtr<ID3D12RootSignature>, std::string> createRootSignature(ID3D
     return rootSignature;
 }
 
+std::expected<ComPtr<ID3D12RootSignature>, std::string> createScalingRootSignature(
+    ID3D12Device& device)
+{
+    const D3D12_DESCRIPTOR_RANGE picture{
+        .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+        .NumDescriptors = 1,
+        .BaseShaderRegister = 0,
+        .RegisterSpace = 0,
+        .OffsetInDescriptorsFromTableStart = 0,
+    };
+
+    D3D12_ROOT_PARAMETER parameter{};
+    parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    parameter.DescriptorTable = {
+        .NumDescriptorRanges = 1,
+        .pDescriptorRanges = &picture,
+    };
+    parameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    const D3D12_STATIC_SAMPLER_DESC bilinear = bilinearSampler();
+    const D3D12_ROOT_SIGNATURE_DESC description{
+        .NumParameters = 1,
+        .pParameters = &parameter,
+        .NumStaticSamplers = 1,
+        .pStaticSamplers = &bilinear,
+        .Flags = D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                 D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                 D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS,
+    };
+
+    ComPtr<ID3DBlob> serialized;
+    ComPtr<ID3DBlob> errors;
+
+    if (const HRESULT result = D3D12SerializeRootSignature(
+            &description, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors);
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("D3D12SerializeRootSignature", result));
+    }
+
+    ComPtr<ID3D12RootSignature> rootSignature;
+
+    if (const HRESULT result =
+            device.CreateRootSignature(0, serialized->GetBufferPointer(),
+                                       serialized->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("CreateRootSignature", result));
+    }
+
+    return rootSignature;
+}
+
 std::expected<ComPtr<ID3D12PipelineState>, std::string> createPipeline(
-    ID3D12Device& device, ID3D12RootSignature& rootSignature, DXGI_FORMAT targetFormat)
+    ID3D12Device& device, ID3D12RootSignature& rootSignature, DXGI_FORMAT targetFormat,
+    std::span<const std::uint8_t> vertexShader, std::span<const std::uint8_t> pixelShader)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC description{};
     description.pRootSignature = &rootSignature;
-    description.VS = {kVideoFrameVertexShader, sizeof(kVideoFrameVertexShader)};
-    description.PS = {kVideoFramePixelShader, sizeof(kVideoFramePixelShader)};
+    description.VS = {vertexShader.data(), vertexShader.size()};
+    description.PS = {pixelShader.data(), pixelShader.size()};
     description.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     description.SampleMask = UINT_MAX;
     description.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -155,6 +232,22 @@ ConversionConstants constantsFor(const VideoFrame& frame)
     };
 }
 
+D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture)
+{
+    return {
+        .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        .Alignment = 0,
+        .Width = picture.width,
+        .Height = picture.height,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+    };
+}
+
 } // namespace
 
 std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& device,
@@ -163,32 +256,58 @@ std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& 
 {
     FramePresenter presenter;
     presenter.device_ = &device;
+    presenter.bufferCount_ = bufferCount;
 
-    auto rootSignature = createRootSignature(device);
+    auto conversionRoot = createConversionRootSignature(device);
 
-    if (!rootSignature)
+    if (!conversionRoot)
     {
-        return std::unexpected(rootSignature.error());
+        return std::unexpected(conversionRoot.error());
     }
 
-    presenter.rootSignature_ = std::move(*rootSignature);
-    auto pipeline = createPipeline(device, *presenter.rootSignature_.Get(), targetFormat);
+    presenter.conversionRootSignature_ = std::move(*conversionRoot);
 
-    if (!pipeline)
+    auto scalingRoot = createScalingRootSignature(device);
+
+    if (!scalingRoot)
     {
-        return std::unexpected(pipeline.error());
+        return std::unexpected(scalingRoot.error());
     }
 
-    presenter.pipeline_ = std::move(*pipeline);
+    presenter.scalingRootSignature_ = std::move(*scalingRoot);
 
-    const D3D12_DESCRIPTOR_HEAP_DESC heapDescription{
+    auto conversionPipeline =
+        createPipeline(device, *presenter.conversionRootSignature_.Get(), targetFormat,
+                       {kVideoFrameVertexShader, sizeof(kVideoFrameVertexShader)},
+                       {kVideoFramePixelShader, sizeof(kVideoFramePixelShader)});
+
+    if (!conversionPipeline)
+    {
+        return std::unexpected(conversionPipeline.error());
+    }
+
+    presenter.conversionPipeline_ = std::move(*conversionPipeline);
+
+    auto scalingPipeline =
+        createPipeline(device, *presenter.scalingRootSignature_.Get(), targetFormat,
+                       {kScaleVertexShader, sizeof(kScaleVertexShader)},
+                       {kScalePixelShader, sizeof(kScalePixelShader)});
+
+    if (!scalingPipeline)
+    {
+        return std::unexpected(scalingPipeline.error());
+    }
+
+    presenter.scalingPipeline_ = std::move(*scalingPipeline);
+
+    const D3D12_DESCRIPTOR_HEAP_DESC viewHeapDescription{
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        .NumDescriptors = bufferCount * kViewsPerFrame,
+        .NumDescriptors = bufferCount * kViewsPerBuffer,
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
     };
 
     if (const HRESULT result =
-            device.CreateDescriptorHeap(&heapDescription, IID_PPV_ARGS(&presenter.viewHeap_));
+            device.CreateDescriptorHeap(&viewHeapDescription, IID_PPV_ARGS(&presenter.viewHeap_));
         FAILED(result))
     {
         return std::unexpected(describeFailure("CreateDescriptorHeap", result));
@@ -197,22 +316,127 @@ std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& 
     presenter.viewDescriptorSize_ =
         device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    const D3D12_DESCRIPTOR_HEAP_DESC targetHeapDescription{
+        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        .NumDescriptors = bufferCount,
+    };
+
+    if (const HRESULT result = device.CreateDescriptorHeap(&targetHeapDescription,
+                                                           IID_PPV_ARGS(
+                                                               &presenter.intermediateTargetHeap_));
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("CreateDescriptorHeap (intermediates)", result));
+    }
+
+    presenter.intermediateTargetDescriptorSize_ =
+        device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
     return presenter;
 }
 
-void FramePresenter::record(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
-                            const VideoFrame& frame, D3D12_CPU_DESCRIPTOR_HANDLE target,
-                            SurfaceSize targetSize)
+bool FramePresenter::needsPicture(SurfaceSize picture) const
 {
-    const PixelRect area = fitPicture(targetSize, {.width = frame.width, .height = frame.height});
+    return picture != pictureSize_;
+}
+
+std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize picture)
+{
+    if (picture.width == 0 || picture.height == 0)
+    {
+        return {};
+    }
+
+    const D3D12_RESOURCE_DESC description = intermediateDescription(picture);
+    const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
+
+    intermediates_.clear();
+    intermediates_.resize(bufferCount_);
+
+    for (UINT index = 0; index < static_cast<UINT>(bufferCount); ++index)
+    {
+        ComPtr<ID3D12Resource>& texture = intermediates_.at(index);
+
+        if (const HRESULT result = device_->CreateCommittedResource(
+                &defaultHeap, D3D12_HEAP_FLAG_NONE, &description,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&texture));
+            FAILED(result))
+        {
+            return std::unexpected(describeFailure("CreateCommittedResource (picture)", result));
+        }
+
+        device_->CreateRenderTargetView(texture.Get(), nullptr, cpuRenderTarget(index));
+        device_->CreateShaderResourceView(
+            texture.Get(), nullptr,
+            cpuView(index * kViewsPerBuffer + kViewsPerBuffer - 1));
+    }
+
+    pictureSize_ = picture;
+    return {};
+}
+
+void FramePresenter::recordConversion(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
+                                      const VideoFrame& frame)
+{
+    if (bufferIndex >= intermediates_.size())
+    {
+        return;
+    }
+
+    ID3D12Resource* const intermediate = intermediates_.at(bufferIndex).Get();
+
+    const auto toTarget =
+        transition(intermediate, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                   D3D12_RESOURCE_STATE_RENDER_TARGET);
+    commandList.ResourceBarrier(1, &toTarget);
+
+    writeInputViews(bufferIndex, frame);
+    const ConversionConstants constants = constantsFor(frame);
+
+    const D3D12_VIEWPORT viewport{
+        .TopLeftX = 0.0F,
+        .TopLeftY = 0.0F,
+        .Width = static_cast<float>(pictureSize_.width),
+        .Height = static_cast<float>(pictureSize_.height),
+        .MinDepth = 0.0F,
+        .MaxDepth = 1.0F,
+    };
+    const D3D12_RECT scissor{
+        .left = 0,
+        .top = 0,
+        .right = static_cast<LONG>(pictureSize_.width),
+        .bottom = static_cast<LONG>(pictureSize_.height),
+    };
+
+    const std::array<ID3D12DescriptorHeap*, 1> heaps{viewHeap_.Get()};
+    commandList.SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+    commandList.SetGraphicsRootSignature(conversionRootSignature_.Get());
+    commandList.SetGraphicsRoot32BitConstants(kConstantsParameter, kConstantCount, &constants, 0);
+    commandList.SetGraphicsRootDescriptorTable(kViewsParameter,
+                                               gpuView(bufferIndex * kViewsPerBuffer));
+    commandList.SetPipelineState(conversionPipeline_.Get());
+    commandList.RSSetViewports(1, &viewport);
+    commandList.RSSetScissorRects(1, &scissor);
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE target = cpuRenderTarget(bufferIndex);
+    commandList.OMSetRenderTargets(1, &target, FALSE, nullptr);
+    commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList.DrawInstanced(3, 1, 0, 0);
+
+    const auto toShader = transition(intermediate, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    commandList.ResourceBarrier(1, &toShader);
+}
+
+void FramePresenter::recordScaling(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
+                                   D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize)
+{
+    const PixelRect area = fitPicture(targetSize, pictureSize_);
 
     if (area.width == 0 || area.height == 0)
     {
         return;
     }
-
-    writeViews(bufferIndex, frame);
-    const ConversionConstants constants = constantsFor(frame);
 
     const D3D12_VIEWPORT viewport{
         .TopLeftX = static_cast<float>(area.left),
@@ -231,11 +455,10 @@ void FramePresenter::record(ID3D12GraphicsCommandList& commandList, UINT bufferI
 
     const std::array<ID3D12DescriptorHeap*, 1> heaps{viewHeap_.Get()};
     commandList.SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
-    commandList.SetGraphicsRootSignature(rootSignature_.Get());
-    commandList.SetGraphicsRoot32BitConstants(kConstantsParameter, kConstantCount, &constants, 0);
-    commandList.SetGraphicsRootDescriptorTable(kViewsParameter,
-                                               gpuView(bufferIndex * kViewsPerFrame));
-    commandList.SetPipelineState(pipeline_.Get());
+    commandList.SetGraphicsRootSignature(scalingRootSignature_.Get());
+    commandList.SetGraphicsRootDescriptorTable(
+        0, gpuView(bufferIndex * kViewsPerBuffer + kViewsPerBuffer - 1));
+    commandList.SetPipelineState(scalingPipeline_.Get());
     commandList.RSSetViewports(1, &viewport);
     commandList.RSSetScissorRects(1, &scissor);
     commandList.OMSetRenderTargets(1, &target, FALSE, nullptr);
@@ -243,12 +466,12 @@ void FramePresenter::record(ID3D12GraphicsCommandList& commandList, UINT bufferI
     commandList.DrawInstanced(3, 1, 0, 0);
 }
 
-void FramePresenter::writeViews(UINT bufferIndex, const VideoFrame& frame)
+void FramePresenter::writeInputViews(UINT bufferIndex, const VideoFrame& frame)
 {
     const PlaneFormats formats = planeFormatsOf(frame.format);
     const std::array planeFormats{formats.luma, formats.chroma};
 
-    for (UINT plane = 0; plane < kViewsPerFrame; ++plane)
+    for (UINT plane = 0; plane < 2; ++plane)
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC view{
             .Format = planeFormats.at(plane),
@@ -265,7 +488,7 @@ void FramePresenter::writeViews(UINT bufferIndex, const VideoFrame& frame)
         };
 
         device_->CreateShaderResourceView(frame.texture.Get(), &view,
-                                          cpuView(bufferIndex * kViewsPerFrame + plane));
+                                          cpuView(bufferIndex * kViewsPerBuffer + plane));
     }
 }
 
@@ -281,6 +504,15 @@ D3D12_GPU_DESCRIPTOR_HANDLE FramePresenter::gpuView(UINT index) const
 {
     D3D12_GPU_DESCRIPTOR_HANDLE handle = viewHeap_->GetGPUDescriptorHandleForHeapStart();
     handle.ptr += static_cast<UINT64>(index) * viewDescriptorSize_;
+
+    return handle;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FramePresenter::cpuRenderTarget(UINT index) const
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle =
+        intermediateTargetHeap_->GetCPUDescriptorHandleForHeapStart();
+    handle.ptr += static_cast<SIZE_T>(index) * intermediateTargetDescriptorSize_;
 
     return handle;
 }

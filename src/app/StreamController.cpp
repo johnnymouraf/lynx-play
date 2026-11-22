@@ -1,5 +1,6 @@
 #include "app/StreamController.h"
 
+#include "app/Fonts.h"
 #include "app/SettingsController.h"
 
 #include <QGuiApplication>
@@ -107,6 +108,14 @@ HWND focusedWindow()
 StreamController::StreamController(const SettingsController& settings, QObject* parent)
     : QObject(parent), settings_(settings)
 {
+    connect(&settings_, &SettingsController::rtxChanged, this,
+            [this]
+            {
+                if (window_ != nullptr)
+                {
+                    window_->setReflexMode(settings_.reflexMode());
+                }
+            });
 }
 
 StreamController::~StreamController()
@@ -268,8 +277,10 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .title = L"Lynx Play — " +
                                                           target_->name.toStdWString(),
                                                  .timing = settings_.presentTiming(),
+                                                 .reflex = settings_.reflexMode(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
+                                                 .overlayFont = overlayFont(),
                                                  .onClosed = closed,
                                              });
 

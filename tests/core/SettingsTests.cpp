@@ -28,6 +28,7 @@ TEST_CASE("Settings survive a write and a read")
         .bitrateKbps = 12000,
         .presentMode = PresentMode::LowestLatency,
     };
+    settings.rtx = {.reflex = ReflexMode::Boost};
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -37,15 +38,16 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(*readBack == settings);
 }
 
-TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync")
+TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and Reflex")
 {
-    const VideoSettings defaults;
+    const Settings defaults;
 
-    CHECK(defaults.resolution == VideoResolution::P1080);
-    CHECK(defaults.framesPerSecond == 60);
-    CHECK(defaults.codec == VideoCodec::H265);
-    CHECK(defaults.bitrateKbps == kMaxBitrateKbps);
-    CHECK(defaults.presentMode == PresentMode::VSync);
+    CHECK(defaults.video.resolution == VideoResolution::P1080);
+    CHECK(defaults.video.framesPerSecond == 60);
+    CHECK(defaults.video.codec == VideoCodec::H265);
+    CHECK(defaults.video.bitrateKbps == kMaxBitrateKbps);
+    CHECK(defaults.video.presentMode == PresentMode::VSync);
+    CHECK(defaults.rtx.reflex == ReflexMode::On);
 }
 
 TEST_CASE("Settings keep their defaults for missing or invalid values")
@@ -58,11 +60,15 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
             "codec": "h265",
             "bitrateKbps": 900000,
             "presentMode": true
+        },
+        "rtx": {
+            "reflex": "turbo"
         }
     })");
 
     REQUIRE(settings.has_value());
     CHECK(settings->video == VideoSettings{});
+    CHECK(settings->rtx == RtxSettings{});
 }
 
 TEST_CASE("Settings refuse files that aren't theirs")

@@ -111,6 +111,8 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
 
     FrameRenderer::Options rendererOptions{
         .timing = options.timing,
+        .reflex = options.reflex,
+        .overlayFont = std::move(options.overlayFont),
         .onFailure = [window] { PostMessageW(window, kRenderFailedMessage, 0, 0); },
     };
     auto renderer = FrameRenderer::start(gpu, window, clientSize(window), std::move(mailbox),
@@ -155,6 +157,14 @@ void StreamWindow::bringToFront()
 
     ShowWindow(window_, SW_RESTORE);
     SetForegroundWindow(window_);
+}
+
+void StreamWindow::setReflexMode(core::ReflexMode mode)
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setReflexMode(mode);
+    }
 }
 
 LRESULT CALLBACK StreamWindow::windowProc(HWND window, UINT message, WPARAM wParam,

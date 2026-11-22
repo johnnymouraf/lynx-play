@@ -46,6 +46,12 @@ constexpr Names<PresentMode, 2> kPresentModeNames{{
     {"lowestLatency", PresentMode::LowestLatency},
 }};
 
+constexpr Names<ReflexMode, 3> kReflexNames{{
+    {"off", ReflexMode::Off},
+    {"on", ReflexMode::On},
+    {"boost", ReflexMode::Boost},
+}};
+
 template <typename Value, std::size_t Size>
 std::string nameOf(const Names<Value, Size>& names, Value value)
 {
@@ -118,6 +124,19 @@ VideoSettings readVideo(const Json& video)
     return settings;
 }
 
+RtxSettings readRtx(const Json& rtx)
+{
+    RtxSettings settings;
+
+    if (!rtx.is_object())
+    {
+        return settings;
+    }
+
+    settings.reflex = namedValue(kReflexNames, rtx, "reflex", settings.reflex);
+    return settings;
+}
+
 } // namespace
 
 std::expected<Settings, std::string> readSettings(std::istream& input)
@@ -144,6 +163,11 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.video = readVideo(*video);
     }
 
+    if (const auto rtx = root.find("rtx"); rtx != root.end())
+    {
+        settings.rtx = readRtx(*rtx);
+    }
+
     return settings;
 }
 
@@ -160,6 +184,10 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"codec", nameOf(kCodecNames, video.codec)},
              {"bitrateKbps", video.bitrateKbps},
              {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
+         }},
+        {"rtx",
+         {
+             {"reflex", nameOf(kReflexNames, settings.rtx.reflex)},
          }},
     };
 

@@ -1,5 +1,6 @@
 #include "app/FilePlayback.h"
 
+#include "app/Fonts.h"
 #include "media/FilePlayer.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
@@ -15,7 +16,7 @@ namespace lynx::app
 {
 
 int playFile(const std::filesystem::path& path, double framesPerSecond,
-             render::PresentTiming timing)
+             render::PresentTiming timing, core::ReflexMode reflex)
 {
     const auto gpu = render::createGpuDevice();
 
@@ -47,6 +48,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
         {
             .title = L"Lynx Play — " + path.filename().wstring(),
             .timing = timing,
+            .reflex = reflex,
+            .overlayFont = overlayFont(),
             .onClosed = quit,
         });
 

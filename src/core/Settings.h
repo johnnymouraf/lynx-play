@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ReflexMode.h"
 #include "core/VideoCodec.h"
 
 #include <cstdint>
@@ -45,10 +46,19 @@ struct VideoSettings
     bool operator==(const VideoSettings&) const = default;
 };
 
+// The NVIDIA features applied to the stream.
+struct RtxSettings
+{
+    ReflexMode reflex = ReflexMode::On;
+
+    bool operator==(const RtxSettings&) const = default;
+};
+
 // What settings.json holds.
 struct Settings
 {
     VideoSettings video;
+    RtxSettings rtx;
 
     bool operator==(const Settings&) const = default;
 };

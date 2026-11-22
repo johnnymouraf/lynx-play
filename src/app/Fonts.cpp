@@ -1,6 +1,8 @@
 #include "app/Fonts.h"
 
+#include <QByteArray>
 #include <QDir>
+#include <QFile>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -15,6 +17,7 @@ namespace
 {
 
 constexpr auto kFontDirectory = ":/qt/qml/LynxPlay/assets/fonts";
+constexpr auto kOverlayFontPath = ":/qt/qml/LynxPlay/assets/fonts/JetBrainsMono-Medium.ttf";
 constexpr auto kDefaultFamily = "Inter";
 constexpr int kDefaultPixelSize = 14;
 
@@ -42,6 +45,22 @@ void loadBundledFonts()
     QFont font(QString::fromLatin1(kDefaultFamily));
     font.setPixelSize(kDefaultPixelSize);
     QGuiApplication::setFont(font);
+}
+
+std::shared_ptr<const std::vector<std::uint8_t>> overlayFont()
+{
+    QFile file(QString::fromLatin1(kOverlayFontPath));
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        spdlog::warn("The overlay font is missing: {}", kOverlayFontPath);
+        return {};
+    }
+
+    const QByteArray bytes = file.readAll();
+    const auto* const begin = reinterpret_cast<const std::uint8_t*>(bytes.constData());
+
+    return std::make_shared<const std::vector<std::uint8_t>>(begin, begin + bytes.size());
 }
 
 } // namespace lynx::app

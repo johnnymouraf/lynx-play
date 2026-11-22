@@ -1,5 +1,6 @@
 #include "app/AppController.h"
 
+#include "app/Fonts.h"
 #include "app/SettingsController.h"
 #include "app/Version.h"
 #include "core/Paths.h"
@@ -30,6 +31,14 @@ AppController::AppController(StartupState state, const SettingsController& setti
                              QObject* parent)
     : QObject(parent), state_(std::move(state)), settings_(settings)
 {
+    connect(&settings_, &SettingsController::rtxChanged, this,
+            [this]
+            {
+                if (videoTestWindow_ != nullptr)
+                {
+                    videoTestWindow_->setReflexMode(settings_.reflexMode());
+                }
+            });
 }
 
 AppController::~AppController() = default;
@@ -117,6 +126,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                              {
                                                  .title = kVideoTestTitle,
                                                  .timing = settings_.presentTiming(),
+                                                 .reflex = settings_.reflexMode(),
+                                                 .overlayFont = overlayFont(),
                                                  .onClosed = closeLater,
                                              });
 

@@ -3,8 +3,10 @@
 #include "render/Layout.h"
 #include "render/VideoFrame.h"
 
+#include <cstddef>
 #include <expected>
 #include <string>
+#include <vector>
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -12,33 +14,52 @@
 namespace lynx::render
 {
 
-// Draws VideoFrames into back buffers: YUV to RGB in a pixel shader, scaled to
-// fit the target with black bars around the picture.
+// Draws VideoFrames in two passes: YUV to RGB into an intermediate picture,
+// then the picture scaled to fit the back buffer with black bars around it.
+// The stages are separate so the pipeline can time each one.
 class FramePresenter
 {
 public:
-    // Keeps a set of views per back buffer, since each frame in flight reads
-    // its own picture.
+    // Keeps a set of views and an intermediate picture per back buffer, since
+    // each frame in flight reads and writes its own.
     [[nodiscard]] static std::expected<FramePresenter, std::string> create(
         ID3D12Device& device, UINT bufferCount, DXGI_FORMAT targetFormat);
 
+    // Whether the decoded picture's size differs from the intermediate's.
+    [[nodiscard]] bool needsPicture(SurfaceSize picture) const;
+
+    // Recreates the intermediate pictures. The GPU must be idle.
+    [[nodiscard]] std::expected<void, std::string> resizePicture(SurfaceSize picture);
+
+    // YUV to RGB into this buffer's intermediate picture.
+    void recordConversion(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
+                          const VideoFrame& frame);
+
     // `target` is back buffer `bufferIndex`'s render target view, already in
     // the RENDER_TARGET state and cleared to black.
-    void record(ID3D12GraphicsCommandList& commandList, UINT bufferIndex, const VideoFrame& frame,
-                D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize);
+    void recordScaling(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
+                       D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize);
 
 private:
     FramePresenter() = default;
 
-    void writeViews(UINT bufferIndex, const VideoFrame& frame);
+    void writeInputViews(UINT bufferIndex, const VideoFrame& frame);
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE cpuView(UINT index) const;
     [[nodiscard]] D3D12_GPU_DESCRIPTOR_HANDLE gpuView(UINT index) const;
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE cpuRenderTarget(UINT index) const;
 
     Microsoft::WRL::ComPtr<ID3D12Device> device_;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> conversionRootSignature_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> conversionPipeline_;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> scalingRootSignature_;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> scalingPipeline_;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> viewHeap_;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> intermediateTargetHeap_;
     UINT viewDescriptorSize_ = 0;
+    UINT intermediateTargetDescriptorSize_ = 0;
+    UINT bufferCount_ = 0;
+    std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> intermediates_;
+    SurfaceSize pictureSize_;
 };
 
 } // namespace lynx::render

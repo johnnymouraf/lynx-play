@@ -1,14 +1,17 @@
 #pragma once
 
+#include "core/ReflexMode.h"
 #include "render/FrameMailbox.h"
 #include "render/FrameRenderer.h"
 #include "render/GpuDevice.h"
 #include "render/SwapChain.h"
 
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <windows.h>
 
@@ -33,10 +36,13 @@ struct StreamWindowOptions
 {
     std::wstring title;
     PresentTiming timing = PresentTiming::VSync;
+    core::ReflexMode reflex = core::ReflexMode::Off;
     WindowMode mode = WindowMode::Windowed;
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
     HWND monitorOf = nullptr;
+    // The font the statistics overlay draws with; empty uses Dear ImGui's.
+    std::shared_ptr<const std::vector<std::uint8_t>> overlayFont;
     // Called once when the window closes by itself, never when its owner
     // destroys it. It runs inside the window's message handling, so it must
     // not destroy the StreamWindow; defer that to the event loop.
@@ -61,6 +67,7 @@ public:
 
     [[nodiscard]] bool isOpen() const;
     void bringToFront();
+    void setReflexMode(core::ReflexMode mode);
 
 private:
     explicit StreamWindow(std::function<void(CloseReason)> onClosed);
