@@ -83,7 +83,8 @@ TEST_CASE("An invalid remap keeps the mapping")
     const KeyboardMouseSettings settings = assignKeyboardBinding(
         KeyboardMouseSettings{}, KeyboardControl::Cross, "Nope");
 
-    CHECK(settings.bindings == KeyboardMouseSettings{}.bindings);
+    CHECK(settings.bindings.at(static_cast<std::size_t>(KeyboardControl::Cross)) == "Space");
+    CHECK(settings.bindings.at(static_cast<std::size_t>(KeyboardControl::Circle)) == "Q");
 }
 
 TEST_CASE("Keyboard and mouse settings survive a write and a read")

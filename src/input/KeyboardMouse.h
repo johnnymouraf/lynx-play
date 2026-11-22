@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/KeyboardBindings.h"
 #include "core/Settings.h"
 #include "input/ControllerMapping.h"
 

@@ -149,6 +149,10 @@ struct StreamSession::State
     // Only touched on chiaki's video thread.
     std::uint32_t decodeFailuresInRow = 0;
     SteadyClock::time_point lastKeyframeRequest{};
+    // Cumulative packet counts from the session; the congestion control resets
+    // them, so each delta starts from what is left after a reset.
+    std::uint64_t lastPacketsReceived = 0;
+    std::uint64_t lastPacketsLost = 0;
     // The end reaches the interface once, whichever thread sees it first.
     std::atomic<bool> endReported = false;
 
@@ -254,8 +258,15 @@ bool StreamSession::State::decode(std::span<const std::uint8_t> sample)
     {
         std::uint64_t received = 0;
         std::uint64_t lost = 0;
-        chiaki_packet_stats_get(&session.stream_connection.packet_stats, true, &received, &lost);
-        metrics->addPacketStats(SteadyClock::now(), received, lost);
+        chiaki_packet_stats_get(&session.stream_connection.packet_stats, false, &received, &lost);
+
+        const std::uint64_t receivedDelta =
+            received >= lastPacketsReceived ? received - lastPacketsReceived : received;
+        const std::uint64_t lostDelta = lost >= lastPacketsLost ? lost - lastPacketsLost : lost;
+        lastPacketsReceived = received;
+        lastPacketsLost = lost;
+
+        metrics->addPacketStats(SteadyClock::now(), receivedDelta, lostDelta);
     }
 
     const auto decoded = decoder->decode(sample);

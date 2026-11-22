@@ -301,6 +301,7 @@ void drawFrameTime(const Fonts& fonts, const OverlayStats& stats)
     rightText(fonts.caption, kCaptionSize, kTextMuted,
               millisecondsText(video.presentIntervalMilliseconds).c_str());
     ImGui::PopFont();
+    ImGui::NewLine();
 
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0F, 0.0F));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0F, 1.0F, 1.0F, 0.0392F));

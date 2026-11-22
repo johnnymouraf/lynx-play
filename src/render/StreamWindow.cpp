@@ -410,7 +410,7 @@ void StreamWindow::handleRawInput(LPARAM lParam)
 
     // RAWMOUSE and RAWINPUTHEADER fit here; a bigger HID report is not mouse
     // input the stream uses.
-    std::array<std::uint8_t, 128> buffer{};
+    alignas(RAWINPUT) std::array<std::uint8_t, 128> buffer{};
 
     if (size > buffer.size())
     {
