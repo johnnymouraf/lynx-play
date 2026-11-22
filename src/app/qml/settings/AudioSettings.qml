@@ -88,7 +88,11 @@ ColumnLayout {
 
             checked: section.settings.microphoneMuted
             Accessible.name: "Silenciar microfone"
-            onToggled: section.settings.microphoneMuted = checked
+            onCheckedChanged: {
+                if (checked !== section.settings.microphoneMuted) {
+                    section.settings.microphoneMuted = checked;
+                }
+            }
         }
     }
 
@@ -107,7 +111,13 @@ ColumnLayout {
                 snapMode: T.Slider.SnapAlways
                 value: section.settings.volumePercent
                 Accessible.name: "Volume do jogo"
-                onMoved: section.settings.volumePercent = Math.round(value)
+                onValueChanged: {
+                    const percent = Math.round(value);
+
+                    if (percent !== section.settings.volumePercent) {
+                        section.settings.volumePercent = percent;
+                    }
+                }
             }
 
             AppText {
