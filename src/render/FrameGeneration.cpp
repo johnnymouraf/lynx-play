@@ -387,7 +387,7 @@ FrameGenerationAvailability computeProbe()
     }
 
     NgxHost host;
-    const auto initialized = host.initialize(*device);
+    const auto initialized = host.initialize(*device.Get());
     const auto shutdown = [&host] { host.shutdown(); };
 
     if (!initialized)
