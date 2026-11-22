@@ -153,9 +153,8 @@ std::expected<VideoDevice, VsrFailure> openVideoDevice(IDXGIAdapter4& adapter)
     support.InFormat = DXGI_FORMAT_NV12;
     const HRESULT supportResult = video.device->CheckFeatureSupport(
         D3D11_FEATURE_FORMAT_SUPPORT, &support, sizeof(support));
-    spdlog::info("VSR diagnostics: D3D11 NV12 format support 0x{:X}/0x{:X} (0x{:08X})",
+    spdlog::info("VSR diagnostics: D3D11 NV12 format support 0x{:X} (0x{:08X})",
                  static_cast<unsigned>(support.OutFormatSupport),
-                 static_cast<unsigned>(support.OutFormatSupport2),
                  static_cast<unsigned>(supportResult));
 
     return video;
@@ -274,22 +273,80 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
     return processor;
 }
 
-// Textures the renderer and the video processor both use are created on
-// D3D12, which only validates them for sharing at the shared heap, and opened
-// on D3D11: the D3D11 runtime rejects some NV12 shared combinations that
-// D3D12 accepts. The D3D11 side sees the bind flags the D3D12 flags imply.
+// Textures the renderer and the video processor both use. A shared texture
+// travels one way or the other: the D3D11 runtime's strict validation of
+// shared descriptions rejects some NV12 combinations that D3D12 accepts, and
+// the other direction works, so the stage tries the D3D11-created texture
+// first and falls back to the D3D12-created one.
 struct SharedTexture
 {
     ComPtr<ID3D12Resource> texture12;
     ComPtr<ID3D11Texture2D> texture11;
 };
 
-std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& device12,
-                                                              ID3D11Device5& device11,
-                                                              SurfaceSize size,
-                                                              DXGI_FORMAT format,
-                                                              D3D12_RESOURCE_FLAGS flags,
-                                                              std::string_view what)
+std::expected<SharedTexture, std::string> createSharedTextureFromD3D11(
+    ID3D11Device& device11, ID3D12Device& device12, SurfaceSize size, DXGI_FORMAT format,
+    UINT bindFlags, std::string_view what)
+{
+    const D3D11_TEXTURE2D_DESC description{
+        .Width = size.width,
+        .Height = size.height,
+        .MipLevels = 1,
+        .ArraySize = 1,
+        .Format = format,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .Usage = D3D11_USAGE_DEFAULT,
+        .BindFlags = bindFlags,
+        .CPUAccessFlags = 0,
+        .MiscFlags = static_cast<UINT>(D3D11_RESOURCE_MISC_SHARED |
+                                        D3D11_RESOURCE_MISC_SHARED_NTHANDLE),
+    };
+
+    SharedTexture texture;
+
+    if (const HRESULT result = device11.CreateTexture2D(&description, nullptr,
+                                                        texture.texture11.GetAddressOf());
+        FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure(std::format("CreateTexture2D ({})", what), result));
+    }
+
+    ComPtr<IDXGIResource1> resource;
+
+    if (const HRESULT result = texture.texture11.As(&resource); FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure(std::format("IDXGIResource1 ({})", what), result));
+    }
+
+    HANDLE handle = nullptr;
+
+    if (const HRESULT result = resource->CreateSharedHandle(
+            nullptr,
+            static_cast<DWORD>(DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE),
+            nullptr, &handle);
+        FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure(std::format("CreateSharedHandle ({})", what), result));
+    }
+
+    const HRESULT opened = device12.OpenSharedHandle(handle, IID_PPV_ARGS(&texture.texture12));
+    CloseHandle(handle);
+
+    if (FAILED(opened))
+    {
+        return std::unexpected(
+            describeFailure(std::format("OpenSharedHandle ({})", what), opened));
+    }
+
+    return texture;
+}
+
+std::expected<SharedTexture, std::string> createSharedTextureFromD3D12(
+    ID3D12Device& device12, ID3D11Device5& device11, SurfaceSize size, DXGI_FORMAT format,
+    D3D12_RESOURCE_FLAGS flags, std::string_view what)
 {
     const D3D12_RESOURCE_DESC description{
         .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
@@ -369,6 +426,23 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
     }
 
     return texture;
+}
+
+std::expected<SharedTexture, std::string> createSharedTexture(
+    ID3D11Device5& device11, ID3D12Device& device12, SurfaceSize size, DXGI_FORMAT format,
+    UINT bindFlags, D3D12_RESOURCE_FLAGS flags, std::string_view what)
+{
+    auto created = createSharedTextureFromD3D11(device11, device12, size, format, bindFlags, what);
+
+    if (created)
+    {
+        return created;
+    }
+
+    spdlog::info("VSR: the D3D11-created {} texture failed ({}); trying the D3D12 side", what,
+                 created.error());
+
+    return createSharedTextureFromD3D12(device12, device11, size, format, flags, what);
 }
 
 std::expected<ComPtr<ID3D11Texture2D>, std::string> createLocalTexture(ID3D11Device& device,
@@ -581,9 +655,10 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
 {
     Slot slot;
 
-    auto input = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.input,
-                                      inputFormatOf(picture.format),
-                                      D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, "VSR input");
+    auto input = createSharedTexture(
+        *device5_.Get(), *device12_.Get(), picture.input, inputFormatOf(picture.format),
+        static_cast<UINT>(D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE),
+        D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, "VSR input");
 
     if (!input)
     {
@@ -629,9 +704,10 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
                      "into a local one");
     }
 
-    auto output = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.output,
-                                      kOutputFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
-                                      "VSR output");
+    auto output = createSharedTexture(
+        *device5_.Get(), *device12_.Get(), picture.output, kOutputFormat,
+        static_cast<UINT>(D3D11_BIND_RENDER_TARGET), D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+        "VSR output");
 
     if (!output)
     {
