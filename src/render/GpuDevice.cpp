@@ -94,7 +94,7 @@ std::expected<std::vector<AdapterInfo>, std::string> listAdapters()
     return describeAll(enumerateAdapters(*factory->Get()));
 }
 
-std::expected<GpuDevice, std::string> createGpuDevice()
+std::expected<StreamAdapter, std::string> findStreamAdapter()
 {
     auto factory = createFactory();
 
@@ -112,11 +112,27 @@ std::expected<GpuDevice, std::string> createGpuDevice()
         return std::unexpected("no hardware GPU supports Direct3D 12");
     }
 
-    GpuDevice gpu{
+    return StreamAdapter{
         .factory = *factory,
         .adapter = adapters[*chosen],
         .info = infos[*chosen],
-        .supportsTearing = supportsTearing(*factory->Get()),
+    };
+}
+
+std::expected<GpuDevice, std::string> createGpuDevice()
+{
+    auto stream = findStreamAdapter();
+
+    if (!stream)
+    {
+        return std::unexpected(stream.error());
+    }
+
+    GpuDevice gpu{
+        .factory = stream->factory,
+        .adapter = stream->adapter,
+        .info = stream->info,
+        .supportsTearing = supportsTearing(*stream->factory.Get()),
     };
 
     if (const HRESULT result = D3D12CreateDevice(gpu.adapter.Get(), D3D_FEATURE_LEVEL_12_0,

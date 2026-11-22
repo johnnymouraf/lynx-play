@@ -24,7 +24,8 @@ add_executable(lynx_tests
     render/GpuTimerTests.cpp
     render/LayoutTests.cpp
     render/ReflexTests.cpp
-    render/TestPatternTests.cpp)
+    render/TestPatternTests.cpp
+    render/VideoSuperResolutionTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE
     Lynx::audio

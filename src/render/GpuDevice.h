@@ -26,8 +26,19 @@ struct GpuDevice
     bool supportsTearing = false;
 };
 
+// The adapter the stream renders on, for subsystems that need a device of
+// their own on it (the video processor's D3D11 device).
+struct StreamAdapter
+{
+    ComPtr<IDXGIFactory6> factory;
+    ComPtr<IDXGIAdapter4> adapter;
+    AdapterInfo info;
+};
+
 // The hardware adapters in DXGI's high-performance order.
 [[nodiscard]] std::expected<std::vector<AdapterInfo>, std::string> listAdapters();
+
+[[nodiscard]] std::expected<StreamAdapter, std::string> findStreamAdapter();
 
 [[nodiscard]] std::expected<GpuDevice, std::string> createGpuDevice();
 

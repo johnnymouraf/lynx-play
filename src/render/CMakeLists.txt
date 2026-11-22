@@ -27,7 +27,9 @@ add_library(lynx_render STATIC
     TestPattern.h
     TestPatternSource.cpp
     TestPatternSource.h
-    VideoFrame.h)
+    VideoFrame.h
+    VideoSuperResolution.cpp
+    VideoSuperResolution.h)
 add_library(Lynx::render ALIAS lynx_render)
 
 # Shaders compile at build time into headers holding their bytecode:
@@ -73,5 +75,5 @@ target_compile_definitions(lynx_render PRIVATE LYNX_NVAPI=1)
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx_render
     PUBLIC Lynx::core d3d12 dxgi
-    PRIVATE dxguid user32 imgui::imgui)
+    PRIVATE d3d11 dxguid user32 imgui::imgui)
 lynx_set_warnings(lynx_render)
