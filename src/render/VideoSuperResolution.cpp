@@ -116,7 +116,7 @@ std::expected<VideoDevice, VsrFailure> openVideoDevice(IDXGIAdapter4& adapter)
         static_cast<UINT>(D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT);
 
     if (const HRESULT result = D3D11CreateDevice(
-            adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, kFlags, kLevels, kLevelCount,
+            &adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, kFlags, kLevels, kLevelCount,
             D3D11_SDK_VERSION, video.device.GetAddressOf(), &featureLevel,
             video.context.GetAddressOf());
         FAILED(result))
@@ -223,7 +223,7 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
     videoContext.VideoProcessorSetStreamFrameFormat(videoProcessor, 0,
                                                     D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
     videoContext.VideoProcessorSetStreamColorSpace1(videoProcessor, 0, inputColorSpace);
-    videoContext.VideoProcessorSetOutputColorSpace1(videoProcessor, 0, kOutputColorSpace);
+    videoContext.VideoProcessorSetOutputColorSpace1(videoProcessor, kOutputColorSpace);
 
     const RECT source{
         .left = 0,
@@ -308,7 +308,9 @@ std::expected<ComPtr<ID3D12Resource>, std::string> shareTexture(ID3D11Texture2D&
     HANDLE handle = nullptr;
 
     if (const HRESULT result = resource->CreateSharedHandle(
-            nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr, &handle);
+            nullptr,
+            static_cast<DWORD>(DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE),
+            nullptr, &handle);
         FAILED(result))
     {
         return std::unexpected(describeFailure(what, result));
