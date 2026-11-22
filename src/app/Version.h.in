@@ -1,0 +1,10 @@
+#pragma once
+
+#include <string_view>
+
+namespace lynx::app
+{
+
+inline constexpr std::string_view kVersion = "@PROJECT_VERSION@";
+
+} // namespace lynx::app

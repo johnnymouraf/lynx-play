@@ -51,7 +51,8 @@ Extract the zip anywhere and run `lynx-play.exe`. Logs are written to
 The project is built in GitHub Actions (`.github/workflows/build.yml`), which is
 the reference for the toolchain:
 
-- Visual Studio 2022 Build Tools with `clang-cl`, CMake 3.28+ and Ninja.
+- The Visual Studio C++ build tools (Windows SDK and libraries), LLVM 20+
+  `clang-cl`, CMake 3.28+ and Ninja.
 - Qt 6.12 (`msvc2022_64`).
 - vcpkg, in manifest mode (`vcpkg.json`).
 - Python 3 with `protobuf` and `grpcio-tools`, for chiaki-ng's protocol buffers.
@@ -59,7 +60,7 @@ the reference for the toolchain:
 ```powershell
 git submodule update --init third_party/chiaki-ng
 ./scripts/init-chiaki-submodules.ps1
-cmake --preset release -DCMAKE_PREFIX_PATH=<Qt dir>/msvc2022_64
+cmake --preset release -DCMAKE_PREFIX_PATH=<Qt dir>/msvc2022_64 -DPYTHON_EXECUTABLE=<python.exe>
 cmake --build --preset release
 ctest --preset release
 ```
