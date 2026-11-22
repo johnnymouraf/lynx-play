@@ -2,3 +2,7 @@
 	path = third_party/chiaki-ng
 	url = https://github.com/chiaki-ng/chiaki-ng.git
 	shallow = true
+[submodule "third_party/nvapi"]
+	path = third_party/nvapi
+	url = https://github.com/NVIDIA/nvapi.git
+	shallow = true

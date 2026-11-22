@@ -10,6 +10,10 @@
       "default-features": false,
       "features": ["avcodec"]
     },
+    {
+      "name": "imgui",
+      "features": ["dx12-binding", "win32-binding"]
+    },
     "json-c",
     "libevent",
     "miniupnpc",

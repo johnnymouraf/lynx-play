@@ -150,6 +150,8 @@ lynx_set_warnings(lynx-play)
 install(TARGETS lynx-play RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES "$<TARGET_PDB_FILE:lynx-play>" DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
 install(FILES ${lynx_licenses} DESTINATION licenses)
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
+        DESTINATION licenses RENAME NVAPI-License.txt)
 
 qt_generate_deploy_qml_app_script(
     TARGET lynx-play

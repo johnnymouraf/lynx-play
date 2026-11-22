@@ -45,8 +45,27 @@ endfunction()
 lynx_compile_shader(shaders/VideoFrame.hlsl vertexMain vs_5_1 VideoFrameVertexShader)
 lynx_compile_shader(shaders/VideoFrame.hlsl pixelMain ps_5_1 VideoFramePixelShader)
 
+find_package(imgui CONFIG REQUIRED)
+
+# The overlay compiles against ImGui's headers, which are not ours to fix:
+# include them as system headers so the strict warnings ignore them.
+get_target_property(lynx_imgui_includes imgui::imgui INTERFACE_INCLUDE_DIRECTORIES)
+
+if(lynx_imgui_includes)
+    set_property(TARGET imgui::imgui APPEND PROPERTY
+        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${lynx_imgui_includes}")
+endif()
+
+# The NVAPI headers declare the Reflex entry points; nvapi64.dll is loaded at
+# run time, so only their include path is used.
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    target_include_directories(lynx_render SYSTEM PRIVATE
+        "${PROJECT_SOURCE_DIR}/third_party/nvapi")
+    target_compile_definitions(lynx_render PRIVATE LYNX_NVAPI=1)
+endif()
+
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx_render
     PUBLIC Lynx::core d3d12 dxgi
-    PRIVATE dxguid user32)
+    PRIVATE dxguid user32 imgui::imgui)
 lynx_set_warnings(lynx_render)
