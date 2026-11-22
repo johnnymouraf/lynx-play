@@ -42,6 +42,7 @@ AppController::AppController(StartupState state, SettingsController& settings,
                     videoTestWindow_->setVideoSuperResolution(
                         settings_.videoSuperResolution());
                     videoTestWindow_->setOpticalFlow(settings_.opticalFlow());
+                    videoTestWindow_->setFrameGeneration(settings_.frameGenerationMode());
                 }
             });
 }
@@ -136,6 +137,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .videoSuperResolution =
                                                      settings_.videoSuperResolution(),
                                                  .opticalFlow = settings_.opticalFlow(),
+                                                 .frameGeneration =
+                                                     settings_.frameGenerationMode(),
                                                  .overlayFonts = overlayFonts(),
                                                  .overlay =
                                                      {

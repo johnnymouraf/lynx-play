@@ -54,6 +54,29 @@ std::string reflexModeLabel(core::ReflexMode mode)
     return "Desligado";
 }
 
+std::string frameGenerationUnavailableReason(FrameGenerationUnavailable reason)
+{
+    switch (reason)
+    {
+    case FrameGenerationUnavailable::NoNvidiaGpu:
+        return "the stream GPU is not NVIDIA";
+    case FrameGenerationUnavailable::RuntimeMissing:
+        return "the DLSS-G runtime is missing";
+    case FrameGenerationUnavailable::HagsOff:
+        return "hardware-accelerated GPU scheduling is off";
+    case FrameGenerationUnavailable::DriverTooOld:
+        return "the NVIDIA driver is too old";
+    case FrameGenerationUnavailable::NotAvailable:
+        return "the GPU does not support DLSS Frame Generation";
+    case FrameGenerationUnavailable::DriverFailed:
+        return "the NVIDIA driver refused NGX";
+    case FrameGenerationUnavailable::None:
+        break;
+    }
+
+    return "unavailable";
+}
+
 std::string reflexUnavailableReason(ReflexUnavailable reason)
 {
     switch (reason)
@@ -146,6 +169,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
     requestedReflex_.store(options_.reflex);
     requestedVideoSuperResolution_.store(options_.videoSuperResolution);
     requestedOpticalFlow_.store(options_.opticalFlow);
+    requestedFrameGeneration_.store(options_.frameGeneration);
     requestedHdr_.store(options_.hdr);
     requestedHdrApplied_ = options_.hdr;
 
@@ -184,8 +208,15 @@ FrameRenderer::~FrameRenderer()
         thread_.join();
     }
 
-    reflex_.shutdown();
     waitForGpu();
+    releaseFrameGeneration();
+
+    if (ngx_)
+    {
+        ngx_->shutdown();
+    }
+
+    reflex_.shutdown();
 }
 
 void FrameRenderer::resize(SurfaceSize size)
@@ -215,6 +246,12 @@ void FrameRenderer::setVideoSuperResolution(bool enabled)
 void FrameRenderer::setOpticalFlow(bool enabled)
 {
     requestedOpticalFlow_.store(enabled);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::setFrameGeneration(core::FrameGenerationMode mode)
+{
+    requestedFrameGeneration_.store(mode);
     SetEvent(wakeEvent_.get());
 }
 
@@ -312,6 +349,39 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 
     flowCommandList_->Close();
 
+    for (auto& allocator : generationAllocators_)
+    {
+        if (const HRESULT result = gpu_.device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
+            FAILED(result))
+        {
+            return std::unexpected(
+                describeFailure("CreateCommandAllocator (frame generation)", result));
+        }
+    }
+
+    for (auto& allocator : presentAllocators_)
+    {
+        if (const HRESULT result = gpu_.device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
+            FAILED(result))
+        {
+            return std::unexpected(
+                describeFailure("CreateCommandAllocator (generated present)", result));
+        }
+    }
+
+    if (const HRESULT result = gpu_.device->CreateCommandList(
+            0, D3D12_COMMAND_LIST_TYPE_DIRECT, generationAllocators_[0].Get(), nullptr,
+            IID_PPV_ARGS(&generationCommandList_));
+        FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure("CreateCommandList (frame generation)", result));
+    }
+
+    generationCommandList_->Close();
+
     if (const HRESULT result =
             gpu_.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
         FAILED(result))
@@ -365,6 +435,19 @@ void FrameRenderer::run(const std::stop_token& stop)
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
     requestedOpticalFlowApplied_ = requestedOpticalFlow_.load();
+
+    frameGenerationAvailability_ = FrameGeneration::probe();
+
+    if (frameGenerationAvailability_.available)
+    {
+        spdlog::info("Frame Generation is available: {}", frameGenerationAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("Frame Generation is unavailable: {} ({})",
+                     frameGenerationUnavailableReason(frameGenerationAvailability_.reason),
+                     frameGenerationAvailability_.detail);
+    }
 
     if (auto metric = CadenceMetric::create(*gpu_.device.Get()); metric)
     {
@@ -425,6 +508,7 @@ void FrameRenderer::run(const std::stop_token& stop)
         applyRequestedReflex();
         applyRequestedVideoSuperResolution();
         applyRequestedOpticalFlow();
+        applyRequestedFrameGeneration();
         applyRequestedHdr();
         applyOverlayToggles();
         pollGamepad();
@@ -558,6 +642,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             droppedFrames_ += dropped;
             cadence_.reset();
             cadenceReferenceValid_ = false;
+            flowReferenceValid_ = false;
+            frameSchedule_.reset();
         }
     }
 
@@ -572,6 +658,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         cadence_.reset();
         cadenceReferenceValid_ = false;
         flowReferenceValid_ = false;
+        frameSchedule_.reset();
+        frameSchedule_.setCadence(std::nullopt);
     }
 
     const Presentation presentation = presentationFor(shownFrame_ ? &*shownFrame_ : nullptr);
@@ -600,26 +688,40 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             cadence_.reset();
             cadenceReferenceValid_ = false;
             flowReferenceValid_ = false;
+            frameSchedule_.reset();
+            frameSchedule_.setCadence(std::nullopt);
         }
     }
 
-    // A buffer's command allocator can be reset only once the GPU has finished
-    // the frame that last used it; so can the picture that frame read.
-    const UINT bufferIndex = swapChain_.currentIndex();
-    waitForFence(allocatorFenceValues_.at(bufferIndex));
-    waitForFence(copyAllocatorFenceValues_.at(bufferIndex));
-    waitForFence(flowAllocatorFenceValues_.at(bufferIndex));
-    framesInFlight_.at(bufferIndex).reset();
+    // The swap chain's current index is the present target; the source ring
+    // advances once per decoded picture, since Frame Generation can present
+    // twice for the same one.
+    const UINT presentBufferIndex = swapChain_.currentIndex();
 
-    if (auto times = timer_->take(bufferIndex); times && bufferShowedNewFrame_.at(bufferIndex))
+    if (showsNewFrame)
+    {
+        sourceSlot_ = (sourceSlot_ + 1) % SwapChain::kBufferCount;
+    }
+
+    const UINT sourceIndex = sourceSlot_;
+
+    // A source slot's command allocator can be reset only once the GPU has
+    // finished the frame that last used it; so can the picture it read.
+    waitForFence(allocatorFenceValues_.at(sourceIndex));
+    waitForFence(copyAllocatorFenceValues_.at(sourceIndex));
+    waitForFence(flowAllocatorFenceValues_.at(sourceIndex));
+    framesInFlight_.at(sourceIndex).reset();
+
+    if (auto times = timer_->take(sourceIndex); times && bufferShowedNewFrame_.at(sourceIndex))
     {
         lastGpuTimes_ = *times;
     }
 
     const bool flowReady = prepareOpticalFlow();
+    const bool offscreen = prepareFrameGeneration(sourceIndex);
 
     const UINT previousIndex =
-        (bufferIndex + SwapChain::kBufferCount - 1) % SwapChain::kBufferCount;
+        (sourceIndex + SwapChain::kBufferCount - 1) % SwapChain::kBufferCount;
     const std::optional<VideoFrame>& previousFrame = framesInFlight_.at(previousIndex);
 
     FramePlan plan;
@@ -632,6 +734,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
                    plan.previous->format == shownFrame_->format;
     plan.opticalFlow = showsNewFrame && flowReady && flowReferenceValid_;
     cadenceSignal_ = 0;
+    cadenceFrameValue_ = 0;
 
     const bool marked = reflexFrameId_.has_value();
     const std::uint64_t reflexFrameId = reflexFrameId_.value_or(0);
@@ -643,9 +746,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
     }
 
+    const FrameTarget target = frameTarget(presentBufferIndex, offscreen);
+
     if (prepareVideoSuperResolution())
     {
-        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, plan);
+        const auto recorded = recordVideoSuperResolutionFrame(sourceIndex, plan, target);
 
         if (!recorded)
         {
@@ -660,10 +765,10 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     }
     else
     {
-        auto& allocator = allocators_.at(bufferIndex);
+        auto& allocator = allocators_.at(sourceIndex);
         allocator->Reset();
         commandList_->Reset(allocator.Get(), nullptr);
-        recordShaderFrame(bufferIndex, plan);
+        recordShaderFrame(sourceIndex, plan, target);
 
         if (const HRESULT result = commandList_->Close(); FAILED(result))
         {
@@ -688,7 +793,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         const std::uint64_t inputValue = opticalFlow_->nextInputValue();
         gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
 
-        const auto output = opticalFlow_->execute(bufferIndex, inputValue);
+        const auto output = opticalFlow_->execute(sourceIndex, inputValue);
 
         if (output)
         {
@@ -708,34 +813,113 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     if (marked)
     {
         reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitEnd);
-        reflex_.mark(reflexFrameId, LatencyMarker::PresentStart);
     }
 
-    const HRESULT presentResult = swapChain_.present(options_.timing);
+    bool realPresented = false;
 
-    if (marked)
+    if (offscreen)
     {
-        reflex_.mark(reflexFrameId, LatencyMarker::PresentEnd);
+        FrameGenerationPlan generation;
+
+        if (showsNewFrame)
+        {
+            CadenceDetector::Decision decision = CadenceDetector::Decision::Ignored;
+
+            if (cadenceFrameValue_ != 0 && cadenceMetric_ != nullptr)
+            {
+                if (const auto sample = cadenceMetric_->wait(cadenceFrameValue_))
+                {
+                    const double blockSamples = static_cast<double>(sample->totalBlocks) *
+                                                 CadenceMetric::kSamplesPerBlock;
+                    const CadenceSample comparison{
+                        .changedBlocks = sample->changedBlocks,
+                        .totalBlocks = sample->totalBlocks,
+                        .meanDifference = blockSamples > 0.0
+                                              ? static_cast<double>(sample->sad) / blockSamples
+                                              : 0.0,
+                    };
+                    decision = cadence_.observe(comparison);
+                }
+            }
+
+            // A scene cut restarts the detector's windows but not the source
+            // rate: keep the last published cadence so generation resumes on
+            // the next distinct pair.
+            if (const auto& estimate = cadence_.estimate())
+            {
+                frameSchedule_.setCadence(estimate->framesPerSecond);
+            }
+
+            generation = frameSchedule_.observe(decision);
+        }
+
+        bool generatedPresented = false;
+
+        if (showsNewFrame && generation.generate && flowSubmitted)
+        {
+            const auto presented =
+                presentGenerated(sourceIndex, reflexFrameId, flowOutput, true, generation.reset,
+                                 generation.presentReal);
+
+            if (!presented)
+            {
+                return std::unexpected(presented.error());
+            }
+
+            generatedPresented = *presented;
+        }
+        else if (generation.generate)
+        {
+            // Without this frame's flow there is no pair to interpolate; the
+            // next distinct frame starts over.
+            frameSchedule_.reset();
+        }
+
+        if (!generatedPresented || generation.presentReal)
+        {
+            if (auto presented = presentReal(reflexFrameId, generatedPresented); !presented)
+            {
+                return presented;
+            }
+
+            realPresented = true;
+        }
     }
-
-    if (FAILED(presentResult))
+    else
     {
-        return std::unexpected(describePresentFailure(presentResult));
+        if (marked)
+        {
+            reflex_.mark(reflexFrameId, LatencyMarker::PresentStart);
+        }
+
+        const HRESULT presentResult = swapChain_.present(options_.timing);
+
+        if (marked)
+        {
+            reflex_.mark(reflexFrameId, LatencyMarker::PresentEnd);
+        }
+
+        if (FAILED(presentResult))
+        {
+            return std::unexpected(describePresentFailure(presentResult));
+        }
+
+        realPresented = true;
     }
 
     if (plan.opticalFlow)
     {
-        if (auto watched = recordFlowWatch(bufferIndex, flowSubmitted, flowOutput); !watched)
+        if (auto watched = recordFlowWatch(sourceIndex, flowSubmitted, flowOutput); !watched)
         {
             return watched;
         }
     }
 
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
-    allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
-    flowAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
-    bufferShowedNewFrame_.at(bufferIndex) = showsNewFrame;
-    framesInFlight_.at(bufferIndex) = shownFrame_;
+    allocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
+    flowAllocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
+    bufferShowedNewFrame_.at(sourceIndex) = showsNewFrame;
+    framesInFlight_.at(sourceIndex) = shownFrame_;
 
     if (shownFrame_)
     {
@@ -755,12 +939,12 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     const std::optional<Clock::duration> readyToPresent =
         showsNewFrame ? std::optional(now - shownFrame_->timestamp) : std::nullopt;
 
-    if (metrics_ != nullptr)
+    if (metrics_ != nullptr && realPresented)
     {
         metrics_->addPresented(now, interval, readyToPresent, showsNewFrame);
     }
 
-    if (showsNewFrame)
+    if (showsNewFrame && realPresented)
     {
         lastNewFramePresentTime_ = now;
         presented_.add(now - shownFrame_->timestamp);
@@ -893,6 +1077,8 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
         // The engine registered the old intermediate textures.
         opticalFlow_.reset();
         flowReferenceValid_ = false;
+        frameSchedule_.reset();
+        frameSchedule_.setCadence(std::nullopt);
 
         if (targetChanged && overlay_ != nullptr)
         {
@@ -1062,7 +1248,549 @@ void FrameRenderer::applyRequestedOpticalFlow()
     requestedOpticalFlowApplied_ = requested;
     opticalFlowFailed_ = false;
     flowReferenceValid_ = false;
+    frameSchedule_.reset();
     spdlog::info("Optical flow: {}", requested ? "on" : "off");
+}
+
+void FrameRenderer::applyRequestedFrameGeneration()
+{
+    const core::FrameGenerationMode requested = requestedFrameGeneration_.load();
+
+    if (requested == requestedFrameGenerationApplied_)
+    {
+        return;
+    }
+
+    requestedFrameGenerationApplied_ = requested;
+    frameGenerationFailed_ = false;
+    frameGenerationFailure_.clear();
+    frameSchedule_.reset();
+
+    if (requested == core::FrameGenerationMode::Off)
+    {
+        spdlog::info("Frame Generation: off");
+        waitForGpu();
+        releaseFrameGeneration();
+        return;
+    }
+
+    spdlog::info("Frame Generation: on (2x), {}",
+                 frameGenerationAvailability_.available
+                     ? frameGenerationAvailability_.detail
+                     : frameGenerationUnavailableReason(frameGenerationAvailability_.reason));
+
+    if (!requestedOpticalFlowApplied_)
+    {
+        spdlog::info("Frame Generation: it needs the optical flow; it starts when the flow is "
+                     "ready");
+    }
+}
+
+void FrameRenderer::releaseFrameGeneration()
+{
+    frameGeneration_.reset();
+    motionVectors_.reset();
+    realPicture_.Reset();
+    realPictureViews_.Reset();
+    realPictureView_ = {};
+    realPictureState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    generationAllocatorFenceValues_.fill(0);
+    presentAllocatorFenceValues_.fill(0);
+}
+
+bool FrameRenderer::prepareFrameGeneration(UINT bufferIndex)
+{
+    if (requestedFrameGenerationApplied_ != core::FrameGenerationMode::X2 ||
+        frameGenerationFailed_ || !shownFrame_)
+    {
+        return false;
+    }
+
+    if (!frameGenerationAvailability_.available)
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = frameGenerationAvailability_.detail;
+        spdlog::info("Frame Generation: the RTX screen's availability check refused it ({})",
+                     frameGenerationFailure_);
+        return false;
+    }
+
+    if (cadenceMetric_ == nullptr)
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = "the cadence metric is unavailable";
+        spdlog::info("Frame Generation: it needs the cadence detection, which is unavailable");
+        return false;
+    }
+
+    const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+
+    if (!requestedOpticalFlowApplied_)
+    {
+        return false;
+    }
+
+    if (opticalFlowFailed_)
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = "the optical flow is unavailable";
+        spdlog::info("Frame Generation: it needs the optical flow, which failed");
+        return false;
+    }
+
+    if (!opticalFlow_ || !opticalFlow_->configuredFor(picture))
+    {
+        return false;
+    }
+
+    // Frame Generation needs Reflex's low-latency mode; enforce it here too,
+    // since the settings file may predate the pairing.
+    if (requestedReflex_.load() == core::ReflexMode::Off)
+    {
+        requestedReflex_.store(core::ReflexMode::On);
+        applyRequestedReflex();
+        spdlog::info("Frame Generation: Reflex turned on (required by the feature)");
+    }
+
+    if (!reflex_.available() || reflex_.failed())
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = "Reflex is unavailable";
+        spdlog::info("Frame Generation: it needs the NVIDIA Reflex, which is unavailable here");
+        return false;
+    }
+
+    if (reflex_.mode() == core::ReflexMode::Off)
+    {
+        reflex_.configure(core::ReflexMode::On, gpu_.device.Get());
+
+        if (reflex_.mode() == core::ReflexMode::Off)
+        {
+            frameGenerationFailed_ = true;
+            frameGenerationFailure_ = "Reflex refused the low-latency mode";
+            return false;
+        }
+    }
+
+    const SurfaceSize extent = swapChain_.size();
+    const DXGI_FORMAT format = presentation_.targetFormat;
+    std::array<ID3D12Resource*, SwapChain::kBufferCount> flows{};
+
+    for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+    {
+        flows.at(index) = opticalFlow_->flow(index);
+
+        if (flows.at(index) == nullptr)
+        {
+            return false;
+        }
+    }
+
+    const bool ready =
+        frameGeneration_ && frameGeneration_->configuredFor(extent, format) && motionVectors_ &&
+        motionVectors_->configuredFor(picture, extent, flows) && realPicture_;
+
+    if (ready)
+    {
+        return true;
+    }
+
+    waitForGpu();
+    releaseFrameGeneration();
+    // A new feature has no temporal history.
+    frameSchedule_.reset();
+
+    if (!ngx_)
+    {
+        ngx_.emplace();
+        const auto initialized = ngx_->initialize(*gpu_.device.Get());
+
+        if (!initialized)
+        {
+            frameGenerationFailed_ = true;
+            frameGenerationFailure_ = initialized.error();
+            spdlog::info("Frame Generation: NGX is unavailable: {}", frameGenerationFailure_);
+            return false;
+        }
+    }
+
+    if (!reflex_.outOfBandEnabled() && !reflex_.enableOutOfBand(*gpu_.queue.Get()))
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = "the driver refused the out-of-band queue notification";
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
+    const D3D12_RESOURCE_DESC description{
+        .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        .Alignment = 0,
+        .Width = extent.width,
+        .Height = extent.height,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .Format = format,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+    };
+
+    if (const HRESULT result = gpu_.device->CreateCommittedResource(
+            &defaultHeap, D3D12_HEAP_FLAG_NONE, &description,
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&realPicture_));
+        FAILED(result))
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = describeFailure("CreateCommittedResource (real picture)", result);
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    const D3D12_DESCRIPTOR_HEAP_DESC viewHeapDescription{
+        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        .NumDescriptors = 1,
+    };
+
+    if (const HRESULT result = gpu_.device->CreateDescriptorHeap(
+            &viewHeapDescription, IID_PPV_ARGS(&realPictureViews_));
+        FAILED(result))
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = describeFailure("CreateDescriptorHeap (real picture)", result);
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    realPictureView_ = realPictureViews_->GetCPUDescriptorHandleForHeapStart();
+    gpu_.device->CreateRenderTargetView(realPicture_.Get(), nullptr, realPictureView_);
+    realPictureState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    auto vectors = MotionVectors::create(*gpu_.device.Get(), SwapChain::kBufferCount);
+
+    if (!vectors)
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = vectors.error();
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    if (auto configured = vectors->configure(picture, extent, flows); !configured)
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = configured.error();
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    motionVectors_.emplace(std::move(*vectors));
+
+    waitForFence(generationAllocatorFenceValues_.at(bufferIndex));
+    generationAllocators_.at(bufferIndex)->Reset();
+    generationCommandList_->Reset(generationAllocators_.at(bufferIndex).Get(), nullptr);
+
+    auto feature = FrameGeneration::create(*ngx_, *gpu_.device.Get(),
+                                           *generationCommandList_.Get(), extent, format);
+
+    if (const HRESULT result = generationCommandList_->Close(); FAILED(result))
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ =
+            describeFailure("ID3D12GraphicsCommandList::Close (frame generation)", result);
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    if (!feature)
+    {
+        // The failed feature released its resources, so the recorded list is
+        // discarded instead of executed.
+        generationAllocators_.at(bufferIndex)->Reset();
+        generationCommandList_->Reset(generationAllocators_.at(bufferIndex).Get(), nullptr);
+        generationCommandList_->Close();
+
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = feature.error();
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    const std::array<ID3D12CommandList*, 1> lists{generationCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
+    generationAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
+    waitForFence(lastSignaledFence_);
+    frameGeneration_.emplace(std::move(*feature));
+
+    // The runtime allocates its internals at the first evaluate and can
+    // refuse it once the command list has other views bound; warm the
+    // feature up once, with a reset, before the first real pair.
+    generationAllocators_.at(bufferIndex)->Reset();
+    generationCommandList_->Reset(generationAllocators_.at(bufferIndex).Get(), nullptr);
+
+    const auto realToShader =
+        transition(realPicture_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                   D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    generationCommandList_->ResourceBarrier(1, &realToShader);
+
+    const auto warmed =
+        frameGeneration_->evaluate(*generationCommandList_.Get(), *realPicture_.Get(),
+                                   *motionVectors_->texture(), true, 0);
+
+    if (!warmed)
+    {
+        // The failed evaluate may have left the generated texture in UAV, so
+        // the recorded list is discarded instead of executed.
+        generationCommandList_->Close();
+        generationAllocators_.at(bufferIndex)->Reset();
+        generationCommandList_->Reset(generationAllocators_.at(bufferIndex).Get(), nullptr);
+        generationCommandList_->Close();
+
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = warmed.error();
+        spdlog::info("Frame Generation: the warm-up evaluate failed: {}",
+                     frameGenerationFailure_);
+        frameGeneration_.reset();
+        return false;
+    }
+
+    const auto generatedToCommon = transition(
+        frameGeneration_->generated(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+        D3D12_RESOURCE_STATE_COMMON);
+    generationCommandList_->ResourceBarrier(1, &generatedToCommon);
+
+    const auto realBack =
+        transition(realPicture_.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    generationCommandList_->ResourceBarrier(1, &realBack);
+
+    if (const HRESULT result = generationCommandList_->Close(); FAILED(result))
+    {
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ =
+            describeFailure("ID3D12GraphicsCommandList::Close (frame generation warm-up)",
+                            result);
+        spdlog::info("Frame Generation: {}", frameGenerationFailure_);
+        return false;
+    }
+
+    const std::array<ID3D12CommandList*, 1> warmLists{generationCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(warmLists.size()), warmLists.data());
+    gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
+    generationAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
+    waitForFence(lastSignaledFence_);
+
+    frameGeneration_->generatedCopied();
+    spdlog::info("Frame Generation: {} created for {}x{} {} ({} warm-up evaluations)",
+                 frameGeneration_->description(), extent.width, extent.height,
+                 static_cast<int>(format), frameGeneration_->evaluations());
+    return true;
+}
+
+FrameRenderer::FrameTarget FrameRenderer::frameTarget(UINT bufferIndex, bool offscreen)
+{
+    if (offscreen)
+    {
+        return {
+            .resource = realPicture_.Get(),
+            .view = realPictureView_,
+            .before = realPictureState_,
+            .after = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+        };
+    }
+
+    return {
+        .resource = swapChain_.backBuffer(bufferIndex),
+        .view = swapChain_.renderTargetView(bufferIndex),
+        .before = D3D12_RESOURCE_STATE_PRESENT,
+        .after = D3D12_RESOURCE_STATE_PRESENT,
+    };
+}
+
+std::expected<bool, std::string> FrameRenderer::presentGenerated(
+    UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput, bool waitForFlow,
+    bool reset, bool keepReal)
+{
+    if (!frameGeneration_ || !motionVectors_ || !realPicture_)
+    {
+        return std::unexpected("Frame Generation isn't prepared");
+    }
+
+    // The render loop's wait already granted this frame's first present.
+    const UINT index = swapChain_.currentIndex();
+    waitForFence(generationAllocatorFenceValues_.at(index));
+    generationAllocators_.at(index)->Reset();
+    generationCommandList_->Reset(generationAllocators_.at(index).Get(), nullptr);
+
+    ID3D12GraphicsCommandList& list = *generationCommandList_.Get();
+
+    if (waitForFlow && opticalFlow_)
+    {
+        gpu_.queue->Wait(opticalFlow_->fence(), flowOutput);
+    }
+
+    motionVectors_->record(list, motionVectorsSlot);
+
+    const auto evaluated = frameGeneration_->evaluate(list, *realPicture_.Get(),
+                                                      *motionVectors_->texture(), reset, frameId);
+
+    if (!evaluated)
+    {
+        generationCommandList_->Close();
+        generationAllocators_.at(index)->Reset();
+        generationCommandList_->Reset(generationAllocators_.at(index).Get(), nullptr);
+        generationCommandList_->Close();
+
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = evaluated.error();
+        redrawRequested_.store(true);
+        SetEvent(wakeEvent_.get());
+        spdlog::error("Frame Generation stopped; the stream continues without generated frames: "
+                      "{}",
+                      frameGenerationFailure_);
+        return false;
+    }
+
+    ID3D12Resource* const backBuffer = swapChain_.backBuffer(index);
+    ID3D12Resource* const generated = frameGeneration_->generated();
+
+    const auto toCopy = transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT,
+                                   D3D12_RESOURCE_STATE_COPY_DEST);
+    list.ResourceBarrier(1, &toCopy);
+    list.CopyResource(backBuffer, generated);
+
+    const auto toTarget = transition(backBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                                     D3D12_RESOURCE_STATE_RENDER_TARGET);
+    list.ResourceBarrier(1, &toTarget);
+
+    if (overlay_ != nullptr && overlay_->visible())
+    {
+        overlay_->render(list, swapChain_.renderTargetView(index), overlayStats(), gamepadState());
+    }
+
+    const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                      D3D12_RESOURCE_STATE_PRESENT);
+    list.ResourceBarrier(1, &toPresent);
+
+    const auto generatedBackToCommon = transition(
+        generated, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON);
+    list.ResourceBarrier(1, &generatedBackToCommon);
+    frameGeneration_->generatedCopied();
+
+    const D3D12_RESOURCE_STATES realNext =
+        keepReal ? D3D12_RESOURCE_STATE_COPY_SOURCE : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    const auto realToNext =
+        transition(realPicture_.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, realNext);
+    list.ResourceBarrier(1, &realToNext);
+    realPictureState_ = realNext;
+
+    if (const HRESULT result = generationCommandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure("ID3D12GraphicsCommandList::Close (generated present)", result));
+    }
+
+    reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandRenderSubmitStart);
+    const std::array<ID3D12CommandList*, 1> lists{generationCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandRenderSubmitEnd);
+
+    gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
+    generationAllocatorFenceValues_.at(index) = lastSignaledFence_;
+
+    reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentStart);
+    const HRESULT presentResult = swapChain_.present(options_.timing);
+    reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentEnd);
+
+    if (FAILED(presentResult))
+    {
+        return std::unexpected(describePresentFailure(presentResult));
+    }
+
+    ++generatedFrames_;
+
+    if (metrics_ != nullptr)
+    {
+        metrics_->addGeneratedPresent(Clock::now());
+    }
+
+    spdlog::debug("frame generation: evaluated source frame {} into generated picture {}",
+                  frameId, generatedFrames_);
+    return true;
+}
+
+std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameId,
+                                                            bool secondPresent)
+{
+    if (!realPicture_)
+    {
+        return std::unexpected("Frame Generation's real picture isn't prepared");
+    }
+
+    if (secondPresent)
+    {
+        (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    }
+
+    const UINT index = swapChain_.currentIndex();
+    waitForFence(presentAllocatorFenceValues_.at(index));
+    presentAllocators_.at(index)->Reset();
+    generationCommandList_->Reset(presentAllocators_.at(index).Get(), nullptr);
+
+    ID3D12GraphicsCommandList& list = *generationCommandList_.Get();
+    ID3D12Resource* const backBuffer = swapChain_.backBuffer(index);
+
+    if (realPictureState_ != D3D12_RESOURCE_STATE_COPY_SOURCE)
+    {
+        const auto toSource =
+            transition(realPicture_.Get(), realPictureState_, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        list.ResourceBarrier(1, &toSource);
+    }
+
+    const auto toCopy = transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT,
+                                   D3D12_RESOURCE_STATE_COPY_DEST);
+    list.ResourceBarrier(1, &toCopy);
+    list.CopyResource(backBuffer, realPicture_.Get());
+
+    const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                                      D3D12_RESOURCE_STATE_PRESENT);
+    list.ResourceBarrier(1, &toPresent);
+
+    const auto toShader = transition(realPicture_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    list.ResourceBarrier(1, &toShader);
+    realPictureState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    if (const HRESULT result = generationCommandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure("ID3D12GraphicsCommandList::Close (real present)", result));
+    }
+
+    const std::array<ID3D12CommandList*, 1> lists{generationCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
+    presentAllocatorFenceValues_.at(index) = lastSignaledFence_;
+
+    if (frameId != 0)
+    {
+        reflex_.mark(frameId, LatencyMarker::PresentStart);
+    }
+
+    const HRESULT presentResult = swapChain_.present(options_.timing);
+
+    if (frameId != 0)
+    {
+        reflex_.mark(frameId, LatencyMarker::PresentEnd);
+    }
+
+    if (FAILED(presentResult))
+    {
+        return std::unexpected(describePresentFailure(presentResult));
+    }
+
+    return {};
 }
 
 bool FrameRenderer::prepareOpticalFlow()
@@ -1126,13 +1854,14 @@ bool FrameRenderer::prepareOpticalFlow()
 
 void FrameRenderer::signalCadence()
 {
-    if (cadenceSignal_ == 0 || cadenceMetric_ == nullptr)
+    cadenceFrameValue_ = std::exchange(cadenceSignal_, 0);
+
+    if (cadenceFrameValue_ == 0 || cadenceMetric_ == nullptr)
     {
         return;
     }
 
-    gpu_.queue->Signal(cadenceMetric_->fence(), cadenceSignal_);
-    cadenceSignal_ = 0;
+    gpu_.queue->Signal(cadenceMetric_->fence(), cadenceFrameValue_);
 }
 
 void FrameRenderer::drainCadence()
@@ -1218,10 +1947,10 @@ ToneMapParameters FrameRenderer::flowToneMap() const
     };
 }
 
-void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
+void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan,
+                                      const FrameTarget& target)
 {
-    ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
-    const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
+    const D3D12_CPU_DESCRIPTOR_HANDLE targetView = target.view;
 
     timer_->beginFrame(*commandList_.Get(), bufferIndex);
 
@@ -1257,9 +1986,9 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Cadence);
 
     const auto toRenderTarget =
-        transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        transition(target.resource, target.before, D3D12_RESOURCE_STATE_RENDER_TARGET);
     commandList_->ResourceBarrier(1, &toRenderTarget);
-    commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
+    commandList_->ClearRenderTargetView(targetView, kBlack.data(), 0, nullptr);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
 
@@ -1271,7 +2000,7 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
             .contentPeakNits = presentation_.contentPeakNits,
             .sdrWhiteNits = presentation_.sdrWhiteNits,
         };
-        presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(),
+        presenter_.recordScaling(*commandList_.Get(), bufferIndex, targetView, swapChain_.size(),
                                   picture, ScaledPicture::Converted, toneMap);
     }
 
@@ -1281,14 +2010,19 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
 
     if (overlay_ != nullptr)
     {
-        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
+        overlay_->render(*commandList_.Get(), targetView, overlayStats(), gamepadState());
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    const auto toPresent =
-        transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    commandList_->ResourceBarrier(1, &toPresent);
+    const auto toNext =
+        transition(target.resource, D3D12_RESOURCE_STATE_RENDER_TARGET, target.after);
+    commandList_->ResourceBarrier(1, &toNext);
+
+    if (target.resource == realPicture_.Get())
+    {
+        realPictureState_ = target.after;
+    }
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
 
@@ -1300,7 +2034,7 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
 }
 
 std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
-    UINT bufferIndex, const FramePlan& plan)
+    UINT bufferIndex, const FramePlan& plan, const FrameTarget& target)
 {
     const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
 
@@ -1418,13 +2152,12 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
                                      D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     commandList_->ResourceBarrier(1, &toShader);
 
-    ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
-    const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
+    const D3D12_CPU_DESCRIPTOR_HANDLE targetView = target.view;
 
     const auto toRenderTarget =
-        transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        transition(target.resource, target.before, D3D12_RESOURCE_STATE_RENDER_TARGET);
     commandList_->ResourceBarrier(1, &toRenderTarget);
-    commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
+    commandList_->ClearRenderTargetView(targetView, kBlack.data(), 0, nullptr);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
     const ToneMapParameters toneMap{
@@ -1432,15 +2165,15 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
         .contentPeakNits = presentation_.contentPeakNits,
         .sdrWhiteNits = presentation_.sdrWhiteNits,
     };
-    presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(), picture,
-                              ScaledPicture::VideoSuperResolution, toneMap);
+    presenter_.recordScaling(*commandList_.Get(), bufferIndex, targetView, swapChain_.size(),
+                              picture, ScaledPicture::VideoSuperResolution, toneMap);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
     if (overlay_ != nullptr)
     {
-        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
+        overlay_->render(*commandList_.Get(), targetView, overlayStats(), gamepadState());
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
@@ -1449,9 +2182,14 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
                                             D3D12_RESOURCE_STATE_COMMON);
     commandList_->ResourceBarrier(1, &pictureToCommon);
 
-    const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET,
-                                      D3D12_RESOURCE_STATE_PRESENT);
-    commandList_->ResourceBarrier(1, &toPresent);
+    const auto toNext = transition(target.resource, D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                   target.after);
+    commandList_->ResourceBarrier(1, &toNext);
+
+    if (target.resource == realPicture_.Get())
+    {
+        realPictureState_ = target.after;
+    }
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
 
@@ -1590,6 +2328,10 @@ OverlayStats FrameRenderer::overlayStats()
     {
         reflex.state = ReflexOverlayStats::State::Active;
     }
+    else
+    {
+        reflex.state = ReflexOverlayStats::State::Waiting;
+    }
 
     return stats;
 }
@@ -1659,6 +2401,20 @@ void FrameRenderer::reportStatistics()
     {
         spdlog::info("Cadence: {:.1f} fps, {} of the last {} source frames repeated",
                      cadence->framesPerSecond, cadence->repeatedFrames, cadence->windowFrames);
+    }
+
+    if (requestedFrameGenerationApplied_ == core::FrameGenerationMode::X2)
+    {
+        if (frameGenerationFailed_)
+        {
+            spdlog::info("Frame Generation: unavailable for this stream ({})",
+                         frameGenerationFailure_);
+        }
+        else if (frameGeneration_)
+        {
+            spdlog::info("Frame Generation: {} generated pictures presented, {} evaluations",
+                         generatedFrames_, frameGeneration_->evaluations());
+        }
     }
 
     reflex_.logSummary();

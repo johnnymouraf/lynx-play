@@ -59,6 +59,11 @@ constexpr Names<ReflexMode, 3> kReflexNames{{
     {"boost", ReflexMode::Boost},
 }};
 
+constexpr Names<FrameGenerationMode, 2> kFrameGenerationNames{{
+    {"off", FrameGenerationMode::Off},
+    {"2x", FrameGenerationMode::X2},
+}};
+
 template <typename Value, std::size_t Size>
 std::string nameOf(const Names<Value, Size>& names, Value value)
 {
@@ -218,6 +223,8 @@ RtxSettings readRtx(const Json& rtx)
     settings.videoSuperResolution =
         booleanAt(rtx, "videoSuperResolution", settings.videoSuperResolution);
     settings.opticalFlow = booleanAt(rtx, "opticalFlow", settings.opticalFlow);
+    settings.frameGeneration =
+        namedValue(kFrameGenerationNames, rtx, "frameGeneration", settings.frameGeneration);
 
     return settings;
 }
@@ -429,6 +436,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
              {"videoSuperResolution", rtx.videoSuperResolution},
              {"opticalFlow", rtx.opticalFlow},
+             {"frameGeneration", nameOf(kFrameGenerationNames, rtx.frameGeneration)},
          }},
         {"overlay",
          {

@@ -165,6 +165,14 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
         settings_ = store_->load();
     }
 
+    if (settings_.rtx.frameGeneration == core::FrameGenerationMode::X2 &&
+        settings_.rtx.reflex == core::ReflexMode::Off)
+    {
+        settings_.rtx.reflex = core::ReflexMode::On;
+        spdlog::info("Frame Generation requires Reflex; Reflex turned on");
+        save();
+    }
+
     reflexAvailability_ = render::ReflexSession::probe();
 
     if (reflexAvailability_.available)
@@ -196,6 +204,17 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     else
     {
         spdlog::info("Optical flow is unavailable: {}", opticalFlowAvailability_.detail);
+    }
+
+    frameGenerationAvailability_ = render::FrameGeneration::probe();
+
+    if (frameGenerationAvailability_.available)
+    {
+        spdlog::info("Frame Generation is available ({})", frameGenerationAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("Frame Generation is unavailable: {}", frameGenerationAvailability_.detail);
     }
 
     hdrDisplay_ = render::detectHdrDisplay(nullptr);
@@ -572,6 +591,13 @@ void SettingsController::setReflex(const QString& name)
         return;
     }
 
+    if (rtx.reflex == core::ReflexMode::Off &&
+        rtx.frameGeneration == core::FrameGenerationMode::X2)
+    {
+        rtx.frameGeneration = core::FrameGenerationMode::Off;
+        spdlog::info("Frame Generation turned off: it requires Reflex");
+    }
+
     applyRtx(rtx);
 }
 
@@ -672,6 +698,89 @@ QString SettingsController::opticalFlowUnavailableReason() const
         return u"O fluxo óptico parou nesta transmissão."_s;
     case render::OpticalFlowUnavailable::None:
         break;
+    }
+
+    return {};
+}
+
+QString SettingsController::frameGeneration() const
+{
+    return QString::fromLatin1(core::frameGenerationName(settings_.rtx.frameGeneration).data());
+}
+
+core::FrameGenerationMode SettingsController::frameGenerationMode() const
+{
+    return settings_.rtx.frameGeneration;
+}
+
+void SettingsController::setFrameGeneration(const QString& name)
+{
+    core::FrameGenerationMode mode = core::FrameGenerationMode::Off;
+
+    if (name == u"off"_s)
+    {
+        mode = core::FrameGenerationMode::Off;
+    }
+    else if (name == u"2x"_s)
+    {
+        mode = core::FrameGenerationMode::X2;
+    }
+    else
+    {
+        return;
+    }
+
+    core::RtxSettings rtx = settings_.rtx;
+    rtx.frameGeneration = mode;
+
+    if (mode == core::FrameGenerationMode::X2 && rtx.reflex == core::ReflexMode::Off)
+    {
+        rtx.reflex = core::ReflexMode::On;
+        spdlog::info("Frame Generation requires Reflex; Reflex turned on");
+    }
+
+    applyRtx(rtx);
+}
+
+bool SettingsController::frameGenerationAvailable() const
+{
+    return frameGenerationAvailability_.available && reflexAvailability_.available &&
+           settings_.rtx.opticalFlow;
+}
+
+QString SettingsController::frameGenerationUnavailableReason() const
+{
+    if (!frameGenerationAvailability_.available)
+    {
+        switch (frameGenerationAvailability_.reason)
+        {
+        case render::FrameGenerationUnavailable::NoNvidiaGpu:
+            return u"A GPU usada para o vídeo não é NVIDIA."_s;
+        case render::FrameGenerationUnavailable::RuntimeMissing:
+            return u"O runtime do DLSS Frame Generation (nvngx_dlssg.dll) não está instalado."_s;
+        case render::FrameGenerationUnavailable::HagsOff:
+            return u"A GPU agendada por hardware do Windows está desligada (Configurações › "
+                   u"Sistema › Tela › Gráficos › Alterar configuração de gráficos padrão)."_s;
+        case render::FrameGenerationUnavailable::DriverTooOld:
+            return u"O driver NVIDIA é anterior ao mínimo exigido pelo DLSS Frame Generation."_s;
+        case render::FrameGenerationUnavailable::NotAvailable:
+            return u"Esta GPU não suporta DLSS Frame Generation (requer uma RTX 40 ou mais "
+                   u"nova)."_s;
+        case render::FrameGenerationUnavailable::DriverFailed:
+            return u"O driver NVIDIA recusou o NGX."_s;
+        case render::FrameGenerationUnavailable::None:
+            break;
+        }
+    }
+
+    if (!reflexAvailability_.available)
+    {
+        return u"O NVIDIA Reflex não está disponível."_s;
+    }
+
+    if (!settings_.rtx.opticalFlow)
+    {
+        return u"Ligue o Optical Flow para usar o Frame Generation."_s;
     }
 
     return {};
@@ -949,17 +1058,29 @@ void SettingsController::apply(const core::ControllerSettings& controllerSetting
     save();
 }
 
-void SettingsController::applyRtx(const core::RtxSettings& rtx)
+void SettingsController::applyRtx(const core::RtxSettings& requested)
 {
+    core::RtxSettings rtx = requested;
+
+    // Reflex is a precondition of Frame Generation, whichever order the two
+    // were chosen in.
+    if (rtx.frameGeneration == core::FrameGenerationMode::X2 &&
+        rtx.reflex == core::ReflexMode::Off)
+    {
+        rtx.reflex = core::ReflexMode::On;
+        spdlog::info("Frame Generation requires Reflex; Reflex turned on");
+    }
+
     if (rtx == settings_.rtx)
     {
         return;
     }
 
     settings_.rtx = rtx;
-    spdlog::info("RTX settings: Reflex {}, VSR {}, optical flow {}",
+    spdlog::info("RTX settings: Reflex {}, VSR {}, optical flow {}, frame generation {}",
                  render::reflexModeName(rtx.reflex), rtx.videoSuperResolution ? "on" : "off",
-                 rtx.opticalFlow ? "on" : "off");
+                 rtx.opticalFlow ? "on" : "off",
+                 core::frameGenerationName(rtx.frameGeneration));
     emit rtxChanged();
     save();
 }

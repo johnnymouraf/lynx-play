@@ -49,6 +49,30 @@ jobs:
       - name: Fetch NVAPI headers
         run: ./scripts/init-nvapi-submodule.ps1
 
+      # NGX headers, the /MD loader library, the two runtimes and their
+      # license come from NVIDIA's public DLSS release, pinned by tag.
+      - name: Fetch the NVIDIA NGX runtime
+        run: |
+          $ngx = Join-Path $env:GITHUB_WORKSPACE "ngx"
+          New-Item -ItemType Directory -Force (Join-Path $ngx "include") | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $ngx "lib") | Out-Null
+          New-Item -ItemType Directory -Force (Join-Path $ngx "bin") | Out-Null
+          $base = "https://raw.githubusercontent.com/NVIDIA/DLSS/v310.9.16"
+          foreach ($header in @(
+            "nvsdk_ngx.h",
+            "nvsdk_ngx_defs.h",
+            "nvsdk_ngx_params.h",
+            "nvsdk_ngx_loader.h",
+            "nvsdk_ngx_defs_dlssg.h",
+            "nvsdk_ngx_params_dlssg.h",
+            "nvsdk_ngx_helpers_dlssg_d3d.h")) {
+            Invoke-WebRequest "$base/include/$header" -OutFile (Join-Path $ngx "include/$header")
+          }
+          Invoke-WebRequest "$base/lib/Windows_x86_64/x64/nvsdk_ngx_d.lib" -OutFile (Join-Path $ngx "lib/nvsdk_ngx_d.lib")
+          Invoke-WebRequest "$base/lib/Windows_x86_64/rel/nvngx_dlss.dll" -OutFile (Join-Path $ngx "bin/nvngx_dlss.dll")
+          Invoke-WebRequest "$base/lib/Windows_x86_64/rel/nvngx_dlssg.dll" -OutFile (Join-Path $ngx "bin/nvngx_dlssg.dll")
+          Invoke-WebRequest "$base/LICENSE.txt" -OutFile (Join-Path $ngx "LICENSE.txt")
+
       - name: Set up Python
         id: python
         uses: actions/setup-python@v7
@@ -114,6 +138,7 @@ jobs:
           cmake --preset release
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DLYNX_NGX_ROOT="${{ github.workspace }}/ngx"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'

@@ -59,6 +59,28 @@ enum class HdrMode
     return "auto";
 }
 
+// DLSS Frame Generation: one generated picture between each pair of real
+// ones, doubling the presented rate when the display allows it.
+enum class FrameGenerationMode
+{
+    Off,
+    // 2x: one generated frame per real frame.
+    X2,
+};
+
+[[nodiscard]] constexpr std::string_view frameGenerationName(FrameGenerationMode mode)
+{
+    switch (mode)
+    {
+    case FrameGenerationMode::Off:
+        return "off";
+    case FrameGenerationMode::X2:
+        return "2x";
+    }
+
+    return "off";
+}
+
 inline constexpr std::uint32_t kMinBitrateKbps = 2000;
 inline constexpr std::uint32_t kMaxBitrateKbps = 50000;
 
@@ -178,6 +200,8 @@ struct RtxSettings
     // The driver's optical flow between frames, for cadence detection now and
     // DLSS later.
     bool opticalFlow = true;
+    // DLSS Frame Generation; it needs Reflex and the optical flow.
+    FrameGenerationMode frameGeneration = FrameGenerationMode::Off;
 
     bool operator==(const RtxSettings&) const = default;
 };

@@ -26,6 +26,7 @@ add_executable(lynx_tests
     render/CadenceDetectorTests.cpp
     render/ColorConversionTests.cpp
     render/FrameMailboxTests.cpp
+    render/FrameScheduleTests.cpp
     render/GpuTimerTests.cpp
     render/HdrTests.cpp
     render/LayoutTests.cpp

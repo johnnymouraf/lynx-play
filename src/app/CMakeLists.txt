@@ -171,6 +171,17 @@ install(FILES ${lynx_licenses} DESTINATION licenses)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
         DESTINATION licenses RENAME NVAPI-License.txt)
 
+# The NGX runtimes ship next to the executable, as objects under the RTX SDKs
+# License.
+if(LYNX_NGX_ROOT)
+    install(FILES
+            "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll"
+            "${LYNX_NGX_ROOT}/bin/nvngx_dlssg.dll"
+            DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES "${LYNX_NGX_ROOT}/LICENSE.txt"
+            DESTINATION licenses RENAME NVIDIA-RTX-SDKs-License.txt)
+endif()
+
 # Dear ImGui is static inside the executable; its notice ships with it.
 find_file(LYNX_IMGUI_COPYRIGHT NAMES copyright
     PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/imgui"
