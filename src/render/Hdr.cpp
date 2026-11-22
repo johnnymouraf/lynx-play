@@ -31,7 +31,6 @@ constexpr double kPqPeakNits = 10000.0;
 constexpr double kMinSdrWhiteNits = 200.0;
 constexpr double kMaxSdrWhiteNits = 480.0;
 constexpr double kDefaultSdrWhiteNits = 200.0;
-constexpr double kDefaultContentPeakNits = 1000.0;
 constexpr UINT32 kDisplayConfigAttempts = 2;
 
 std::optional<DISPLAYCONFIG_PATH_INFO> activePathFor(std::wstring_view gdiDeviceName)
@@ -68,7 +67,7 @@ std::optional<DISPLAYCONFIG_PATH_INFO> activePathFor(std::wstring_view gdiDevice
         {
             DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
             source.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
-            source.header.size = sizeof(source);
+            source.header.size = static_cast<UINT32>(sizeof(source));
             source.header.adapterId = path.sourceInfo.adapterId;
             source.header.id = path.sourceInfo.id;
 
@@ -93,7 +92,7 @@ std::string displayNameOf(const DISPLAYCONFIG_PATH_INFO& path, std::wstring_view
 {
     DISPLAYCONFIG_TARGET_DEVICE_NAME target{};
     target.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
-    target.header.size = sizeof(target);
+    target.header.size = static_cast<UINT32>(sizeof(target));
     target.header.adapterId = path.targetInfo.adapterId;
     target.header.id = path.targetInfo.id;
 
@@ -117,7 +116,7 @@ HdrDisplayState detectHdrDisplay(HWND window)
     // In C++ the extended struct derives from MONITORINFO, so the fields are
     // inherited and can't be designated.
     MONITORINFOEXW monitorInfo{};
-    monitorInfo.cbSize = sizeof(MONITORINFOEXW);
+    monitorInfo.cbSize = static_cast<DWORD>(sizeof(MONITORINFOEXW));
 
     if (!GetMonitorInfoW(monitor, &monitorInfo))
     {
@@ -139,7 +138,7 @@ HdrDisplayState detectHdrDisplay(HWND window)
 
     DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO_2 color{};
     color.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2;
-    color.header.size = sizeof(color);
+    color.header.size = static_cast<UINT32>(sizeof(color));
     color.header.adapterId = path->targetInfo.adapterId;
     color.header.id = path->targetInfo.id;
 
@@ -156,7 +155,7 @@ HdrDisplayState detectHdrDisplay(HWND window)
 
     DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
     white.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL;
-    white.header.size = sizeof(white);
+    white.header.size = static_cast<UINT32>(sizeof(white));
     white.header.adapterId = path->targetInfo.adapterId;
     white.header.id = path->targetInfo.id;
 
