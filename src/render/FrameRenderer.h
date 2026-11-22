@@ -193,8 +193,11 @@ private:
         UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput,
         bool waitForFlow, bool reset, bool keepReal);
     // Copies the retained real picture into the current back buffer and
-    // presents it.
-    [[nodiscard]] std::expected<void, std::string> presentReal(std::uint64_t frameId);
+    // presents it. `secondPresent` waits for the slot the generated picture
+    // just took; the frame's first present uses the slot the render loop
+    // already waited for.
+    [[nodiscard]] std::expected<void, std::string> presentReal(std::uint64_t frameId,
+                                                               bool secondPresent);
     // Optical flow reads the SDR picture, so a PQ stream is tone-mapped for
     // it even when the display takes PQ.
     [[nodiscard]] ToneMapParameters flowToneMap() const;

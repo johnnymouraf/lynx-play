@@ -866,7 +866,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
         if (!generatedPresented || generation.presentReal)
         {
-            if (auto presented = presentReal(reflexFrameId); !presented)
+            if (auto presented = presentReal(reflexFrameId, generatedPresented); !presented)
             {
                 return presented;
             }
@@ -1606,9 +1606,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
         return std::unexpected("Frame Generation isn't prepared");
     }
 
-    // The generated picture is the first of the pair, so it gets its own
-    // frame slot and the real one takes the next.
-    (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    // The render loop's wait already granted this frame's first present.
     const UINT index = swapChain_.currentIndex();
     waitForFence(generationAllocatorFenceValues_.at(index));
     generationAllocators_.at(index)->Reset();
@@ -1711,14 +1709,19 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
     return true;
 }
 
-std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameId)
+std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameId,
+                                                            bool secondPresent)
 {
     if (!realPicture_)
     {
         return std::unexpected("Frame Generation's real picture isn't prepared");
     }
 
-    (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    if (secondPresent)
+    {
+        (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    }
+
     const UINT index = swapChain_.currentIndex();
     waitForFence(presentAllocatorFenceValues_.at(index));
     presentAllocators_.at(index)->Reset();
