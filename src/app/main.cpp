@@ -4,9 +4,11 @@
 #include "app/Fonts.h"
 #include "app/IconProvider.h"
 #include "app/QtLogBridge.h"
+#include "app/SettingsController.h"
 #include "app/Version.h"
 #include "core/Log.h"
 #include "core/Paths.h"
+#include "core/Settings.h"
 #include "remoteplay/ChiakiRuntime.h"
 #include "remoteplay/ConsoleStore.h"
 #include "render/AdapterSelection.h"
@@ -90,6 +92,19 @@ std::optional<lynx::remoteplay::ConsoleStore> openConsoleStore()
                                           lynx::remoteplay::dpapiProtector());
 }
 
+std::optional<lynx::core::SettingsStore> openSettingsStore()
+{
+    const auto dataDir = lynx::core::roamingDataDir();
+
+    if (!dataDir)
+    {
+        spdlog::error("Settings are unavailable: {}", dataDir.error());
+        return std::nullopt;
+    }
+
+    return lynx::core::SettingsStore(*dataDir / "settings.json");
+}
+
 QString findStreamGpu()
 {
     const auto adapters = lynx::render::listAdapters();
@@ -167,17 +182,22 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    lynx::app::SettingsController settings(openSettingsStore());
+
     if (commandLine->playFile)
     {
-        return lynx::app::playFile(*commandLine->playFile, commandLine->framesPerSecond);
+        return lynx::app::playFile(*commandLine->playFile, commandLine->framesPerSecond,
+                                   settings.presentTiming());
     }
 
     lynx::app::loadBundledFonts();
 
-    lynx::app::AppController controller({
-        .remotePlayReady = startRemotePlay(),
-        .gpuName = findStreamGpu(),
-    });
+    lynx::app::AppController controller(
+        {
+            .remotePlayReady = startRemotePlay(),
+            .gpuName = findStreamGpu(),
+        },
+        settings);
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
@@ -188,6 +208,7 @@ int main(int argc, char* argv[])
     engine.setInitialProperties({
         {QStringLiteral("controller"), QVariant::fromValue(&controller)},
         {QStringLiteral("consoles"), QVariant::fromValue(&consoles)},
+        {QStringLiteral("settings"), QVariant::fromValue(&settings)},
     });
 
     QObject::connect(

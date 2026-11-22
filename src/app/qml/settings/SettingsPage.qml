@@ -1,151 +1,99 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Templates as T
 import LynxPlay
 
-// Settings until their own screens exist: the app's state and the video test
-// window.
+// Configurações: its sections in a column of their own, the chosen one beside.
 Item {
     id: page
 
     required property AppController controller
+    required property SettingsController settings
 
-    property bool videoTestFailed: false
+    property string section: "video"
 
-    ColumnLayout {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.topMargin: Theme.space8
-        anchors.leftMargin: Theme.space10
-        anchors.rightMargin: Theme.space10
-        spacing: Theme.space2
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.bottomMargin: Theme.space3
-            spacing: Theme.space1
-
-            AppText {
-                text: "Configurações"
-                textStyle: "titleLarge"
-                Accessible.role: Accessible.Heading
-            }
-
-            AppText {
-                Layout.fillWidth: true
-                text: "Vídeo, áudio e controles ganham suas opções nas próximas versões."
-                textStyle: "bodyMedium"
-                color: Theme.textMuted
-                wrapMode: Text.WordWrap
-            }
-        }
+    RowLayout {
+        anchors.fill: parent
+        spacing: 0
 
         Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: appCard.implicitHeight + 2 * Theme.space5
-            radius: Theme.radiusLg
-            color: Theme.surface
-            border.width: 1
-            border.color: Theme.border
-
-            RowLayout {
-                id: appCard
-
-                anchors.fill: parent
-                anchors.margins: Theme.space5
-                spacing: Theme.space5
-
-                RoundedImage {
-                    Layout.preferredWidth: 72
-                    Layout.preferredHeight: 72
-                    Layout.fillWidth: false
-                    source: Theme.brandMark
-                    sourceWidth: 216
-                    topLeftRadius: 18
-                    topRightRadius: 18
-                    bottomLeftRadius: 18
-                    bottomRightRadius: 18
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: Theme.space1
-
-                    AppText {
-                        Layout.fillWidth: true
-                        text: "Lynx Play"
-                        font.family: Theme.fontDisplay
-                        font.pixelSize: 24
-                        lineHeight: 32
-                    }
-
-                    AppText {
-                        text: `Versão ${page.controller.version} · Windows x64`
-                        textStyle: "bodyMedium"
-                        color: Theme.textMuted
-                    }
-                }
-            }
-        }
-
-        Banner {
-            Layout.fillWidth: true
-            Layout.topMargin: Theme.space2
-            visible: !page.controller.remotePlayReady
-            tone: "danger"
-            title: "O Remote Play não iniciou"
-            message: "Os consoles não podem ser encontrados nem pareados. Veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: Theme.space2
-            spacing: Theme.space6
+            Layout.preferredWidth: 232
+            Layout.fillHeight: true
+            color: "transparent"
 
             ColumnLayout {
-                Layout.fillWidth: true
+                anchors.fill: parent
+                anchors.topMargin: Theme.space8
+                anchors.leftMargin: Theme.space3
+                anchors.rightMargin: Theme.space3
+                anchors.bottomMargin: Theme.space8
                 spacing: Theme.space1
 
                 AppText {
-                    Layout.fillWidth: true
-                    text: "Teste de vídeo"
-                    textStyle: "labelLarge"
+                    Layout.leftMargin: Theme.space1
+                    text: "Configurações"
+                    textStyle: "titleMedium"
+                    Accessible.role: Accessible.Heading
                 }
 
-                AppText {
+                NavItem {
                     Layout.fillWidth: true
-                    text: page.videoTestDescription()
-                    textStyle: "bodyMedium"
-                    color: page.videoTestFailed ? Theme.danger : Theme.textMuted
-                    wrapMode: Text.WordWrap
+                    text: "Vídeo"
+                    iconName: "monitor"
+                    selected: page.section === "video"
+                    onClicked: page.section = "video"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    text: "Sobre"
+                    iconName: "info"
+                    selected: page.section === "about"
+                    onClicked: page.section = "about"
+                }
+
+                Item {
+                    Layout.fillHeight: true
                 }
             }
 
-            ActionButton {
-                iconName: "monitor-play"
-                text: "Abrir teste"
-                enabled: page.controller.gpuName.length > 0
-                onClicked: page.videoTestFailed = !page.controller.openVideoTest()
+            Rectangle {
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                width: 1
+                color: Theme.border
             }
         }
 
-        Rectangle {
+        Flickable {
+            id: scroller
+
             Layout.fillWidth: true
-            Layout.topMargin: Theme.space4
-            implicitHeight: 1
-            color: Theme.border
-        }
-    }
+            Layout.fillHeight: true
+            contentWidth: width
+            contentHeight: sections.children[sections.currentIndex].implicitHeight + 2 * Theme.space8
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-    function videoTestDescription() {
-        if (page.videoTestFailed) {
-            return "Não foi possível abrir a janela de vídeo. Veja o log.";
-        }
+            T.ScrollBar.vertical: ThinScrollBar {}
 
-        if (page.controller.gpuName.length === 0) {
-            return "Nenhuma GPU compatível com Direct3D 12 foi encontrada.";
-        }
+            StackLayout {
+                id: sections
 
-        return `Abre a janela Direct3D 12 com um padrão animado na ${page.controller.gpuName}.`;
+                x: Theme.space10
+                y: Theme.space8
+                width: scroller.width - 2 * Theme.space10
+                currentIndex: page.section === "video" ? 0 : 1
+
+                VideoSettings {
+                    settings: page.settings
+                }
+
+                AboutSettings {
+                    controller: page.controller
+                }
+            }
+        }
     }
 }

@@ -1,10 +1,14 @@
 #include "app/AppController.h"
 
+#include "app/SettingsController.h"
 #include "app/Version.h"
+#include "core/Paths.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 #include "render/StreamWindow.h"
 #include "render/TestPatternSource.h"
+
+#include <QCoreApplication>
 
 #include <utility>
 
@@ -16,12 +20,15 @@ namespace lynx::app
 namespace
 {
 
+using namespace Qt::StringLiterals;
+
 constexpr auto kVideoTestTitle = L"Lynx Play — Teste de vídeo";
 
 } // namespace
 
-AppController::AppController(StartupState state, QObject* parent)
-    : QObject(parent), state_(std::move(state))
+AppController::AppController(StartupState state, const SettingsController& settings,
+                             QObject* parent)
+    : QObject(parent), state_(std::move(state)), settings_(settings)
 {
 }
 
@@ -40,6 +47,23 @@ bool AppController::remotePlayReady() const
 QString AppController::gpuName() const
 {
     return state_.gpuName;
+}
+
+QUrl AppController::licensesUrl() const
+{
+    return QUrl::fromLocalFile(QCoreApplication::applicationDirPath() + u"/licenses"_s);
+}
+
+QUrl AppController::logsUrl() const
+{
+    const auto dataDir = core::localDataDir();
+
+    if (!dataDir)
+    {
+        return {};
+    }
+
+    return QUrl::fromLocalFile(QString::fromStdWString((*dataDir / "logs").wstring()));
 }
 
 bool AppController::openVideoTest()
@@ -90,7 +114,11 @@ std::expected<void, std::string> AppController::startVideoTest()
     { QMetaObject::invokeMethod(this, &AppController::closeVideoTest, Qt::QueuedConnection); };
 
     auto window = render::StreamWindow::open(*gpu, std::move(*mailbox),
-                                             {.title = kVideoTestTitle, .onClosed = closeLater});
+                                             {
+                                                 .title = kVideoTestTitle,
+                                                 .timing = settings_.presentTiming(),
+                                                 .onClosed = closeLater,
+                                             });
 
     if (!window)
     {

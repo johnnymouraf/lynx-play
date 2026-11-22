@@ -2,6 +2,7 @@ find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(lynx_tests
     core/RateCounterTests.cpp
+    core/SettingsTests.cpp
     media/AnnexBTests.cpp
     media/FilePlayerTests.cpp
     remoteplay/AccountIdTests.cpp

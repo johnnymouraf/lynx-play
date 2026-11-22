@@ -14,7 +14,8 @@
 namespace lynx::app
 {
 
-int playFile(const std::filesystem::path& path, double framesPerSecond)
+int playFile(const std::filesystem::path& path, double framesPerSecond,
+             render::PresentTiming timing)
 {
     const auto gpu = render::createGpuDevice();
 
@@ -43,7 +44,11 @@ int playFile(const std::filesystem::path& path, double framesPerSecond)
     const auto quit = [](render::CloseReason) { QCoreApplication::quit(); };
     auto window = render::StreamWindow::open(
         *gpu, std::move(*mailbox),
-        {.title = L"Lynx Play — " + path.filename().wstring(), .onClosed = quit});
+        {
+            .title = L"Lynx Play — " + path.filename().wstring(),
+            .timing = timing,
+            .onClosed = quit,
+        });
 
     if (!window)
     {

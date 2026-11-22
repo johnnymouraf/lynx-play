@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QtQmlIntegration>
 
 #include <expected>
@@ -16,6 +17,8 @@ class TestPatternSource;
 
 namespace lynx::app
 {
+
+class SettingsController;
 
 struct StartupState
 {
@@ -35,14 +38,20 @@ class AppController : public QObject
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(bool remotePlayReady READ remotePlayReady CONSTANT)
     Q_PROPERTY(QString gpuName READ gpuName CONSTANT)
+    Q_PROPERTY(QUrl licensesUrl READ licensesUrl CONSTANT)
+    Q_PROPERTY(QUrl logsUrl READ logsUrl CONSTANT)
 
 public:
-    explicit AppController(StartupState state, QObject* parent = nullptr);
+    AppController(StartupState state, const SettingsController& settings,
+                  QObject* parent = nullptr);
     ~AppController() override;
 
     [[nodiscard]] QString version() const;
     [[nodiscard]] bool remotePlayReady() const;
     [[nodiscard]] QString gpuName() const;
+    // The third-party licenses shipped next to the executable.
+    [[nodiscard]] QUrl licensesUrl() const;
+    [[nodiscard]] QUrl logsUrl() const;
 
     // Opens the stream window with the animated test pattern, or brings it to
     // the front when it is already open. False when it can't be created.
@@ -53,6 +62,7 @@ private:
     void closeVideoTest();
 
     StartupState state_;
+    const SettingsController& settings_;
     std::unique_ptr<render::TestPatternSource> videoTestSource_;
     std::unique_ptr<render::StreamWindow> videoTestWindow_;
 };

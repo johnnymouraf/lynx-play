@@ -1,5 +1,6 @@
 #include "remoteplay/ConsoleStore.h"
 
+#include "core/Files.h"
 #include "core/Text.h"
 #include "remoteplay/Base64.h"
 
@@ -355,35 +356,7 @@ std::expected<void, std::string> ConsoleStore::save(const ConsoleFile& file) con
         return std::unexpected(written.error());
     }
 
-    std::error_code error;
-    std::filesystem::create_directories(path_.parent_path(), error);
-
-    if (error)
-    {
-        return std::unexpected("cannot create its folder: " + error.message());
-    }
-
-    std::filesystem::path temporary = path_;
-    temporary += ".tmp";
-
-    {
-        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-        output << buffer.str();
-
-        if (!output.flush())
-        {
-            return std::unexpected("cannot write " + temporary.string());
-        }
-    }
-
-    std::filesystem::rename(temporary, path_, error);
-
-    if (error)
-    {
-        return std::unexpected("cannot replace the file: " + error.message());
-    }
-
-    return {};
+    return core::replaceFile(path_, buffer.str());
 }
 
 void ConsoleStore::moveAside(const std::string& reason) const

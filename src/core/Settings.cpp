@@ -1,0 +1,202 @@
+#include "core/Settings.h"
+
+#include "core/Files.h"
+
+#include <algorithm>
+#include <array>
+#include <format>
+#include <fstream>
+#include <istream>
+#include <optional>
+#include <ostream>
+#include <sstream>
+#include <string_view>
+#include <utility>
+
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
+
+namespace lynx::core
+{
+
+namespace
+{
+
+using Json = nlohmann::ordered_json;
+
+constexpr int kJsonIndent = 2;
+
+template <typename Value, std::size_t Size>
+using Names = std::array<std::pair<std::string_view, Value>, Size>;
+
+constexpr Names<VideoResolution, 4> kResolutionNames{{
+    {"360p", VideoResolution::P360},
+    {"540p", VideoResolution::P540},
+    {"720p", VideoResolution::P720},
+    {"1080p", VideoResolution::P1080},
+}};
+
+constexpr Names<VideoCodec, 2> kCodecNames{{
+    {"h264", VideoCodec::H264},
+    {"h265", VideoCodec::H265},
+}};
+
+constexpr Names<PresentMode, 2> kPresentModeNames{{
+    {"vsync", PresentMode::VSync},
+    {"lowestLatency", PresentMode::LowestLatency},
+}};
+
+template <typename Value, std::size_t Size>
+std::string nameOf(const Names<Value, Size>& names, Value value)
+{
+    const auto found = std::ranges::find(names, value, &std::pair<std::string_view, Value>::second);
+
+    return std::string(found != names.end() ? found->first : names.front().first);
+}
+
+// The value named at `key`, or `fallback` when the name is missing or unknown.
+template <typename Value, std::size_t Size>
+Value namedValue(const Names<Value, Size>& names, const Json& object, const std::string& key,
+                 Value fallback)
+{
+    const auto entry = object.find(key);
+
+    if (entry == object.end() || !entry->is_string())
+    {
+        return fallback;
+    }
+
+    const std::string name = entry->get<std::string>();
+    const auto found = std::ranges::find(names, std::string_view(name),
+                                         &std::pair<std::string_view, Value>::first);
+
+    return found != names.end() ? found->second : fallback;
+}
+
+std::optional<std::int64_t> integerAt(const Json& object, const std::string& key)
+{
+    const auto entry = object.find(key);
+
+    if (entry == object.end() || !entry->is_number_integer())
+    {
+        return std::nullopt;
+    }
+
+    return entry->get<std::int64_t>();
+}
+
+VideoSettings readVideo(const Json& video)
+{
+    VideoSettings settings;
+
+    if (!video.is_object())
+    {
+        return settings;
+    }
+
+    settings.resolution = namedValue(kResolutionNames, video, "resolution", settings.resolution);
+    settings.codec = namedValue(kCodecNames, video, "codec", settings.codec);
+    settings.presentMode =
+        namedValue(kPresentModeNames, video, "presentMode", settings.presentMode);
+
+    const auto framesPerSecond = integerAt(video, "fps");
+
+    if (framesPerSecond == 30 || framesPerSecond == 60)
+    {
+        settings.framesPerSecond = static_cast<int>(*framesPerSecond);
+    }
+
+    const auto bitrate = integerAt(video, "bitrateKbps");
+    const bool bitrateInRange =
+        bitrate && *bitrate >= kMinBitrateKbps && *bitrate <= kMaxBitrateKbps;
+
+    if (bitrateInRange)
+    {
+        settings.bitrateKbps = static_cast<std::uint32_t>(*bitrate);
+    }
+
+    return settings;
+}
+
+} // namespace
+
+std::expected<Settings, std::string> readSettings(std::istream& input)
+{
+    const Json root = Json::parse(input, nullptr, false);
+
+    if (root.is_discarded() || !root.is_object())
+    {
+        return std::unexpected(std::string("not JSON"));
+    }
+
+    const auto version = integerAt(root, "version");
+
+    if (version != kSettingsVersion)
+    {
+        return std::unexpected(std::format("version {} instead of {}", version.value_or(0),
+                                           kSettingsVersion));
+    }
+
+    Settings settings;
+
+    if (const auto video = root.find("video"); video != root.end())
+    {
+        settings.video = readVideo(*video);
+    }
+
+    return settings;
+}
+
+void writeSettings(const Settings& settings, std::ostream& output)
+{
+    const VideoSettings& video = settings.video;
+
+    const Json root{
+        {"version", kSettingsVersion},
+        {"video",
+         {
+             {"resolution", nameOf(kResolutionNames, video.resolution)},
+             {"fps", video.framesPerSecond},
+             {"codec", nameOf(kCodecNames, video.codec)},
+             {"bitrateKbps", video.bitrateKbps},
+             {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
+         }},
+    };
+
+    output << root.dump(kJsonIndent) << '\n';
+}
+
+SettingsStore::SettingsStore(std::filesystem::path path) : path_(std::move(path))
+{
+}
+
+Settings SettingsStore::load() const
+{
+    std::ifstream input(path_, std::ios::binary);
+
+    if (!input)
+    {
+        return {};
+    }
+
+    auto settings = readSettings(input);
+
+    if (!settings)
+    {
+        spdlog::warn("{} is unreadable ({}); using the default settings", path_.string(),
+                     settings.error());
+        return {};
+    }
+
+    return *settings;
+}
+
+std::expected<void, std::string> SettingsStore::save(const Settings& settings) const
+{
+    std::ostringstream buffer;
+    writeSettings(settings, buffer);
+
+    return replaceFile(path_, buffer.str());
+}
+
+} // namespace lynx::core

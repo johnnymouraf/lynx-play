@@ -8,6 +8,7 @@ ApplicationWindow {
 
     required property AppController controller
     required property ConsolesController consoles
+    required property SettingsController settings
 
     property string section: "consoles"
 
@@ -25,6 +26,14 @@ ApplicationWindow {
 
     Connections {
         target: window.consoles
+
+        function onNotice(tone, title, message) {
+            toast.show(tone, title, message);
+        }
+    }
+
+    Connections {
+        target: window.settings
 
         function onNotice(tone, title, message) {
             toast.show(tone, title, message);
@@ -57,6 +66,7 @@ ApplicationWindow {
 
             SettingsPage {
                 controller: window.controller
+                settings: window.settings
             }
         }
     }

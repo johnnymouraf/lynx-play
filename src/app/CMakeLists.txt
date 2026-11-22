@@ -26,6 +26,8 @@ qt_add_executable(lynx-play WIN32
     PairingController.h
     QtLogBridge.cpp
     QtLogBridge.h
+    SettingsController.cpp
+    SettingsController.h
     main.cpp)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -76,11 +78,18 @@ qt_add_qml_module(lynx-play
         qml/controls/PopupMenu.qml
         qml/controls/RoundedImage.qml
         qml/controls/ScanIndicator.qml
+        qml/controls/SegmentItem.qml
+        qml/controls/SegmentedControl.qml
+        qml/controls/SettingRow.qml
         qml/controls/Spinner.qml
         qml/controls/StateBadge.qml
         qml/controls/ThinScrollBar.qml
         qml/controls/Toast.qml
+        qml/controls/ValueSlider.qml
+        qml/settings/AboutSettings.qml
+        qml/settings/SectionHeader.qml
         qml/settings/SettingsPage.qml
+        qml/settings/VideoSettings.qml
     RESOURCES
         ${lynx_fonts}
         ${lynx_licenses}
@@ -91,11 +100,14 @@ qt_add_qml_module(lynx-play
         assets/icons/circle-question-mark.svg
         assets/icons/clock.svg
         assets/icons/ellipsis.svg
+        assets/icons/external-link.svg
+        assets/icons/folder-open.svg
         assets/icons/info.svg
         assets/icons/link-2.svg
         assets/icons/loader-circle.svg
         assets/icons/lock-keyhole.svg
         assets/icons/monitor-play.svg
+        assets/icons/monitor.svg
         assets/icons/moon.svg
         assets/icons/network.svg
         assets/icons/pencil.svg
@@ -104,6 +116,7 @@ qt_add_qml_module(lynx-play
         assets/icons/power.svg
         assets/icons/refresh-cw.svg
         assets/icons/rotate-ccw.svg
+        assets/icons/scroll-text.svg
         assets/icons/settings.svg
         assets/icons/trash.svg
         assets/icons/tv-minimal-play.svg
