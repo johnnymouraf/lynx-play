@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [2.2 RTX Video Super Resolution](#22-rtx-video-super-resolution)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -34,7 +33,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [ ] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
-  - [ ] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
+  - [x] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
         and upscaling to any output (1440p/4K monitors).
   - [ ] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
   - [ ] **2.4 Optical flow and cadence detection**: find the repeated frames of
@@ -147,51 +146,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-### 2.2 RTX Video Super Resolution
-
-- **Goal:** RTX Video Super Resolution upscales and cleans the stream on RTX
-  GPUs, for the current 1080p monitor (artifact cleanup) and future 1440p/4K
-  monitors (upscaling).
-- **Guardrails:** no HDR (2.3); no DLSS (2.5, 2.6).
-- **Success criteria:**
-  1. CI green on `auto/2.2`, unit tests included.
-  2. In `--play-file` playback of a 720p stream in a 1080p window with VSR on,
-     the log shows the NVIDIA VSR extension accepted on the video processor,
-     the overlay shows the VSR stage's GPU time, and a screenshot comparison
-     with VSR off shows a visible difference.
-  3. With VSR off, or on a non-NVIDIA GPU, the pipeline scales with the
-     shader path and the setting is disabled with an explanation.
-  4. The RTX screen has the VSR setting (Desligado / Ligado, quality if the
-     API allows), saved and applied live.
-  5. Owner checks: picture quality in real games at 1080p.
-- **Deliveries:**
-  1. D3D11 interop: a D3D11 device on the same adapter, shared textures (NT
-     handles) and a shared fence with D3D12.
-  2. VSR stage: `ID3D11VideoProcessor` with NVIDIA's stream extension
-     (`VideoProcessorSetStreamExtension`), scaling to the output size.
-  3. Setting, detection (NVIDIA GPU, driver support) and the RTX screen
-     part.
-- **Settled in planning:** VSR is implemented through the driver's D3D11 video
-  processor extension, so no SDK is needed; the RTX Video SDK path is not
-  used. Confirmed by research (`scratchpad/research/rtx-vsr.md`):
-  `ID3D11VideoContext::VideoProcessorSetStreamExtension` on a **native**
-  D3D11 device on the stream's adapter (D3D11On12 returns `E_NOTIMPL`), GUID
-  `{d43ce1b3-1f4b-48ac-baee-c3c25375e6f7}`, struct
-  `{version = 1; method = 2; enable = 1}` (12 bytes, no quality field — the
-  quality and the on/off global toggle live in the NVIDIA App), NV12/P010 in
-  and R8G8B8A8 out, 1:1 clean-up supported, downscale not; textures shared
-  with NT handles plus one shared fence (D3D12 signal → D3D11 wait → blit →
-  D3D11 signal/flush → D3D12 wait), the input view must bind render target and
-  shader resource; expect ~5–8 ms per 1080p→1440p/4K frame on the 4060 and
-  measure. The extension returns `S_OK` even with the app's global toggle off,
-  so the picture is the only proof.
-- **Changes:** `src/render/` (D3D11 interop, VSR stage), `src/app/` (RTX
-  screen), tests for the pure parts (size and rectangle math).
-- **Data and interfaces:** `settings.json` gains `rtx.videoSuperResolution`.
-- **Edge cases:** the global "RTX Video Enhancement" switch in the NVIDIA App
-  off (detect if possible, explain in the setting); 1:1 scale (artifact
-  cleanup only); output smaller than input; device lost.
 
 ### Decisions to review
 
@@ -532,3 +486,66 @@ D3D12 exposes no `SetGPUThreadPriority`.
 
 **Chosen: B**, so the bitrate controller isn't disturbed. Changing it: consume
 with reset.
+
+#### D36 – VSR off by default (2.2)
+
+- A. Off by default: the stage costs ~5–7 ms a frame and the picture is a
+  taste; opt-in.
+- B. On by default, like Reflex: the GPU pays even with the NVIDIA App's
+  global toggle off.
+
+**Chosen: A**. Changing it: the default in `core/Settings.h` and the screen.
+
+#### D37 – The owner's NVIDIA App was set to enable Super Resolution (2.2)
+
+The RTX Video Enhancement global toggle was off, so VSR would return `S_OK`
+and change nothing.
+
+- A. Leave it off: the criterion's visual proof missing.
+- B. Turn it on (Sistema › Vídeo › RTX Video Enhancements › Super Resolution,
+  Automático): VSR works, for this and other video apps.
+
+**Chosen: B**; this changes a machine setting the owner should know about.
+Changing it: turn the toggle back off in the NVIDIA App.
+
+#### D38 – Two-state VSR setting, no quality control (2.2)
+
+The driver extension has no quality field; quality 1–4 lives in the NVIDIA
+App.
+
+- A. Off/On only, with a note about the NVIDIA App.
+- B. The RTX Video SDK path (proprietary DLLs, NVIDIA login in CI, an RGB
+  conversion pass) for quality levels.
+
+**Chosen: A**. Changing it: implement the SDK path.
+
+#### D39 – The VSR stage time includes the copy and the handoff (2.2)
+
+D3D12 queries don't time the D3D11 video processor.
+
+- A. Measure from the input copy to the output wait, labelled "VSR": the
+  stage's real cost to the frame.
+- B. Delta of frame-to-present with VSR on and off.
+
+**Chosen: A**. Changing it: subtract the copy or add a second measurement.
+
+#### D40 – Shared VSR textures are created in D3D11 first (2.2)
+
+The D3D11 runtime refuses NV12 shared with `SHARED_NTHANDLE` only, and a
+D3D12-created texture also failed.
+
+- A. Create in D3D11 with `SHARED | SHARED_NTHANDLE`, open the NT handle in
+  D3D12, with a D3D12-first fallback and a local copy when the input view
+  rejects the texture.
+- B. D3D12-created only: fails for NV12.
+
+**Chosen: A**. Changing it: remove the fallback.
+
+#### D41 – One native D3D11 device for GPU priority and VSR (merge 1.5 + 2.2)
+
+- A. `GpuDevice` creates one native D3D11 device with `BGRA_SUPPORT |
+  VIDEO_SUPPORT` on the stream's adapter; 1.5's GPU thread priority and
+  2.2's video processor use it; VSR's probe keeps its temporary device.
+- B. Two devices: more memory and two lifecycles.
+
+**Chosen: A**. Changing it: split the device back out of `GpuDevice`.
