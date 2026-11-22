@@ -2154,6 +2154,8 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan,
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
 
@@ -2547,6 +2549,11 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
         timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
         timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
     }
+
+    // DLSS doesn't run on the video processor's path; the stage still needs
+    // its stamps for the frame's times to be read back.
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
 
     ID3D12Resource* const output = videoSuperResolution_->output(bufferIndex);
     const auto toShader = transition(output, D3D12_RESOURCE_STATE_COMMON,
