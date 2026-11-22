@@ -25,6 +25,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\lynx-play.exe
 WizardStyle=modern
+; A personal app installs for the current user, without a UAC prompt.
+PrivilegesRequired=lowest
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
