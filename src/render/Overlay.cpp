@@ -435,6 +435,17 @@ bool toggleRow(const char* id, const Fonts& fonts, const char* label, const char
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
 
+    static bool wasHovered = false;
+
+    if (hovered != wasHovered || clicked)
+    {
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        spdlog::info("overlay toggle '{}': clicked={} hovered={} item={},{} {}x{} mouse={},{}",
+                     label, clicked, hovered, start.x, start.y, width, height, mouse.x, mouse.y);
+    }
+
+    wasHovered = hovered;
+
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
 
     if (hovered)
@@ -475,6 +486,17 @@ bool actionButton(const char* id, const Fonts& fonts, const char* label, bool da
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
+
+    static bool wasHovered = false;
+
+    if (hovered != wasHovered || clicked)
+    {
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        spdlog::info("overlay button '{}': clicked={} hovered={} item={},{} {}x{} mouse={},{}",
+                     label, clicked, hovered, start.x, start.y, width, kHeight, mouse.x, mouse.y);
+    }
+
+    wasHovered = hovered;
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     const ImVec2 bottomRight(start.x + width, start.y + kHeight);
@@ -560,6 +582,19 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
             *chosen = kModes.at(index);
             clicked = true;
         }
+
+        static int lastHovered = -1;
+
+        if ((ImGui::IsItemHovered() && lastHovered != static_cast<int>(index)) ||
+            ImGui::IsItemClicked())
+        {
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            spdlog::info("overlay segment {}: clicked={} item={},{} {}x{} mouse={},{}", index,
+                         ImGui::IsItemClicked(), segmentTop.x, segmentTop.y, width, kHeight,
+                         mouse.x, mouse.y);
+        }
+
+        lastHovered = ImGui::IsItemHovered() ? static_cast<int>(index) : lastHovered;
 
         ImGui::PopID();
 
