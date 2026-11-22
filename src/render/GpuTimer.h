@@ -22,16 +22,17 @@ using Microsoft::WRL::ComPtr;
 enum class EffectStage : std::uint32_t
 {
     ColorConversion = 0,
-    VideoSuperResolution = 1,
-    Cadence = 2,
-    Scaling = 3,
-    Overlay = 4,
+    RtxVideoHdr = 1,
+    VideoSuperResolution = 2,
+    Cadence = 3,
+    Scaling = 4,
+    Overlay = 5,
     // Timed from the main list's end to the flow engine's completion, which
     // arrives on its own fence between frames.
-    OpticalFlow = 5,
+    OpticalFlow = 6,
 };
 
-inline constexpr std::size_t kEffectStageCount = 6;
+inline constexpr std::size_t kEffectStageCount = 7;
 // The frame's first stamp, each stage's two stamps, and its last one.
 inline constexpr std::size_t kTimestampCount = 2 + 2 * kEffectStageCount;
 

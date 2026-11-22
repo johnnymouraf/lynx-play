@@ -1,8 +1,11 @@
 #include "render/Overlay.h"
 
+#include "render/Hdr.h"
+
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -98,6 +101,8 @@ const char* stageLabel(EffectStage stage)
     {
     case EffectStage::ColorConversion:
         return "Conversão de cor";
+    case EffectStage::RtxVideoHdr:
+        return "RTX HDR";
     case EffectStage::VideoSuperResolution:
         return "VSR";
     case EffectStage::Cadence:
@@ -164,14 +169,44 @@ std::string resolutionText(const core::StreamMetricsSnapshot& video, std::uint32
     return text;
 }
 
-std::string codecText(const core::StreamMetricsSnapshot& video)
+std::string codecText(const core::StreamMetricsSnapshot& video, bool hdrStream)
 {
     if (video.codec.empty())
     {
         return "—";
     }
 
-    return video.codec + " · SDR";
+    return video.codec + (hdrStream ? " · HDR" : " · SDR");
+}
+
+std::string hdrText(const OverlayStats& stats)
+{
+    if (stats.rtxVideoHdr)
+    {
+        return "RTX Video HDR";
+    }
+
+    if (!stats.hdrStream)
+    {
+        return "—";
+    }
+
+    return stats.hdrSwapChain ? "PQ → HDR10" : "PQ → SDR";
+}
+
+// Dear ImGui's 8-bit sRGB vertex color as a PQ code, keeping its alpha.
+std::uint32_t pqColor(std::uint32_t color, float sdrWhiteNits)
+{
+    const auto code = [sdrWhiteNits](std::uint32_t channel)
+    {
+        const double srgb = static_cast<double>(channel) / 255.0;
+        return static_cast<std::uint32_t>(
+            std::lround(srgbToPq(srgb, static_cast<double>(sdrWhiteNits)) * 255.0));
+    };
+
+    const std::uint32_t alpha = color & 0xFF000000U;
+    return alpha | (code((color >> 16) & 0xFFU) << 16) | (code((color >> 8) & 0xFFU) << 8) |
+           code(color & 0xFFU);
 }
 
 std::string fpsText(const core::StreamMetricsSnapshot& video, double fps)
@@ -252,13 +287,15 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
     sectionLabel(fonts, "VÍDEO");
 
     const std::string resolution = resolutionText(video, stats.outputWidth, stats.outputHeight);
-    const std::string codec = codecText(video);
+    const std::string codec = codecText(video, stats.hdrStream);
+    const std::string hdr = hdrText(stats);
     const std::string bitrate =
         video.bitrateMbps > 0.0 ? decimalText(video.bitrateMbps) + " Mbps" : "—";
     const std::string loss = video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
 
     valueRow(fonts, "Resolução", resolution.c_str());
     valueRow(fonts, "Codec", codec.c_str());
+    valueRow(fonts, "HDR", hdr.c_str());
     valueRow(fonts, "FPS recebidos", fpsText(video, video.receivedFps).c_str());
     valueRow(fonts, "FPS decodificados", fpsText(video, video.decodedFps).c_str());
     valueRow(fonts, "FPS exibidos", fpsText(video, video.presentedFps).c_str());
@@ -709,6 +746,11 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
 {
     std::unique_ptr<Overlay> overlay(new Overlay);
     overlay->device_ = &device;
+    overlay->queue_ = &queue;
+    overlay->bufferCount_ = bufferCount;
+    overlay->format_ = format;
+    overlay->hdrOutput_ = options.hdrOutput;
+    overlay->sdrWhiteNits_ = options.sdrWhiteNits;
     overlay->options_ = std::move(options);
     overlay->actions_ = std::move(actions);
     overlay->reflex_ = overlay->options_.reflex;
@@ -751,14 +793,28 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
     overlay->viewDescriptorSize_ =
         device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+    if (!overlay->createDx12Backend())
+    {
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext(std::exchange(overlay->context_, nullptr));
+        return std::unexpected("ImGui_ImplDX12_Init failed");
+    }
+
+    overlay->loadFonts(fonts);
+    applyStyle();
+    return overlay;
+}
+
+bool Overlay::createDx12Backend()
+{
     ImGui_ImplDX12_InitInfo info;
-    info.Device = &device;
-    info.CommandQueue = &queue;
-    info.NumFramesInFlight = static_cast<int>(bufferCount);
-    info.RTVFormat = format;
+    info.Device = device_;
+    info.CommandQueue = queue_;
+    info.NumFramesInFlight = static_cast<int>(bufferCount_);
+    info.RTVFormat = format_;
     info.DSVFormat = DXGI_FORMAT_UNKNOWN;
-    info.UserData = overlay.get();
-    info.SrvDescriptorHeap = overlay->viewHeap_.Get();
+    info.UserData = this;
+    info.SrvDescriptorHeap = viewHeap_.Get();
     info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* initInfo,
                                    D3D12_CPU_DESCRIPTOR_HANDLE* cpu,
                                    D3D12_GPU_DESCRIPTOR_HANDLE* gpu)
@@ -771,16 +827,32 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
         static_cast<Overlay*>(initInfo->UserData)->freeView(cpu);
     };
 
-    if (!ImGui_ImplDX12_Init(&info))
+    return ImGui_ImplDX12_Init(&info);
+}
+
+void Overlay::setOutputFormat(DXGI_FORMAT format, bool hdrOutput, float sdrWhiteNits)
+{
+    if (context_ == nullptr)
     {
-        ImGui_ImplWin32_Shutdown();
-        ImGui::DestroyContext(std::exchange(overlay->context_, nullptr));
-        return std::unexpected("ImGui_ImplDX12_Init failed");
+        return;
     }
 
-    overlay->loadFonts(fonts);
-    applyStyle();
-    return overlay;
+    if (format == format_ && hdrOutput == hdrOutput_ && sdrWhiteNits == sdrWhiteNits_)
+    {
+        return;
+    }
+
+    const std::lock_guard lock(imGuiMutex());
+    ImGui::SetCurrentContext(context_);
+    format_ = format;
+    hdrOutput_ = hdrOutput;
+    sdrWhiteNits_ = sdrWhiteNits;
+    ImGui_ImplDX12_Shutdown();
+
+    if (!createDx12Backend())
+    {
+        spdlog::error("The overlay could not switch to output format {}", static_cast<int>(format));
+    }
 }
 
 Overlay::~Overlay()
@@ -944,6 +1016,22 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
 
     reportState();
     ImGui::Render();
+
+    if (hdrOutput_)
+    {
+        ImDrawData* const drawData = ImGui::GetDrawData();
+
+        for (int index = 0; drawData != nullptr && index < drawData->CmdListsCount; ++index)
+        {
+            ImDrawList* const drawList = drawData->CmdLists[index];
+
+            for (int vertex = 0; vertex < drawList->VtxBuffer.Size; ++vertex)
+            {
+                drawList->VtxBuffer[vertex].col =
+                    pqColor(drawList->VtxBuffer[vertex].col, sdrWhiteNits_);
+            }
+        }
+    }
 
     const std::array<ID3D12DescriptorHeap*, 1> heaps{viewHeap_.Get()};
     commandList.SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());

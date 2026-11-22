@@ -28,8 +28,24 @@ struct NvidiaPpeRequest
     UINT enable = 1;
 };
 
-constexpr DXGI_FORMAT kOutputFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-constexpr DXGI_COLOR_SPACE_TYPE kOutputColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+// RTX Video HDR's extension, version 4, method 3. The driver runs it in the
+// same blit as the super resolution model, before it.
+constexpr GUID kNvidiaTrueHdr{
+    0xfdd62bb4, 0x620b, 0x4fd7, {0x9a, 0xb3, 0x1e, 0x59, 0xd0, 0xd5, 0x44, 0xb3}};
+
+struct NvidiaTrueHdrRequest
+{
+    UINT version = 4;
+    UINT method = 3;
+    UINT enable : 1;
+    UINT reserved : 31;
+};
+
+constexpr DXGI_FORMAT kSdrOutputFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+constexpr DXGI_COLOR_SPACE_TYPE kSdrOutputColorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+constexpr DXGI_FORMAT kHdrOutputFormat = DXGI_FORMAT_R10G10B10A2_UNORM;
+constexpr DXGI_COLOR_SPACE_TYPE kHdrOutputColorSpace =
+    DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
 constexpr SurfaceSize kProbeInput{.width = 1280, .height = 720};
 constexpr SurfaceSize kProbeOutput{.width = 1920, .height = 1080};
 
@@ -61,8 +77,14 @@ DXGI_FORMAT inputFormatOf(PixelFormat format)
     return format == PixelFormat::P010 ? DXGI_FORMAT_P010 : DXGI_FORMAT_NV12;
 }
 
-DXGI_COLOR_SPACE_TYPE inputColorSpaceOf(ColorMatrix matrix, ColorRange range)
+DXGI_COLOR_SPACE_TYPE inputColorSpaceOf(ColorMatrix matrix, ColorRange range,
+                                         TransferFunction transfer)
 {
+    if (transfer == TransferFunction::Pq)
+    {
+        return DXGI_COLOR_SPACE_YCBCR_STUDIO_G2084_LEFT_P2020;
+    }
+
     switch (matrix)
     {
     case ColorMatrix::Bt601:
@@ -79,12 +101,22 @@ DXGI_COLOR_SPACE_TYPE inputColorSpaceOf(ColorMatrix matrix, ColorRange range)
     return DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709;
 }
 
+DXGI_FORMAT outputFormatOf(const VsrPicture& picture)
+{
+    return picture.hdrOutput ? kHdrOutputFormat : kSdrOutputFormat;
+}
+
+DXGI_COLOR_SPACE_TYPE outputColorSpaceOf(const VsrPicture& picture)
+{
+    return picture.hdrOutput ? kHdrOutputColorSpace : kSdrOutputColorSpace;
+}
+
 std::string formatName(PixelFormat format)
 {
     return format == PixelFormat::P010 ? "P010" : "NV12";
 }
 
-std::string colorSpaceName(ColorMatrix matrix, ColorRange range)
+std::string colorSpaceName(ColorMatrix matrix, ColorRange range, TransferFunction transfer)
 {
     std::string_view matrixName = "BT.709";
 
@@ -102,8 +134,10 @@ std::string colorSpaceName(ColorMatrix matrix, ColorRange range)
     }
 
     const std::string_view rangeName = range == ColorRange::Full ? "full" : "studio";
+    const std::string_view transferText =
+        transfer == TransferFunction::Pq ? " PQ" : "";
 
-    return std::format("{} {}", matrixName, rangeName);
+    return std::format("{} {}{}", matrixName, rangeName, transferText);
 }
 
 std::expected<VideoDevice, VsrFailure> openVideoDevice(IDXGIAdapter4& adapter)
@@ -197,17 +231,21 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
 
     const DXGI_FORMAT inputFormat = inputFormatOf(picture.format);
     const DXGI_COLOR_SPACE_TYPE inputColorSpace =
-        inputColorSpaceOf(picture.matrix, picture.range);
+        inputColorSpaceOf(picture.matrix, picture.range, picture.transfer);
+    const DXGI_FORMAT outputFormat = outputFormatOf(picture);
+    const DXGI_COLOR_SPACE_TYPE outputColorSpace = outputColorSpaceOf(picture);
     BOOL supported = FALSE;
     const HRESULT conversion = enumerator1->CheckVideoProcessorFormatConversion(
-        inputFormat, inputColorSpace, kOutputFormat, kOutputColorSpace, &supported);
+        inputFormat, inputColorSpace, outputFormat, outputColorSpace, &supported);
 
     if (SUCCEEDED(conversion) && supported == FALSE)
     {
         return std::unexpected(VsrFailure{
             VsrUnavailable::FormatUnsupported,
-            std::format("the driver doesn't convert {} {} to R8G8B8A8", formatName(picture.format),
-                        colorSpaceName(picture.matrix, picture.range)),
+            std::format("the driver doesn't convert {} {} to {}",
+                        formatName(picture.format),
+                        colorSpaceName(picture.matrix, picture.range, picture.transfer),
+                        picture.hdrOutput ? "R10G10B10A2 HDR10" : "R8G8B8A8 SDR"),
         });
     }
 
@@ -231,7 +269,7 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
     videoContext.VideoProcessorSetStreamFrameFormat(videoProcessor, 0,
                                                     D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
     videoContext.VideoProcessorSetStreamColorSpace1(videoProcessor, 0, inputColorSpace);
-    videoContext.VideoProcessorSetOutputColorSpace1(videoProcessor, kOutputColorSpace);
+    videoContext.VideoProcessorSetOutputColorSpace1(videoProcessor, outputColorSpace);
 
     const RECT source{
         .left = 0,
@@ -250,25 +288,66 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
     videoContext.VideoProcessorSetStreamDestRect(videoProcessor, 0, TRUE, &destination);
     videoContext.VideoProcessorSetOutputTargetRect(videoProcessor, TRUE, nullptr);
 
-    NvidiaPpeRequest request;
-    const HRESULT extension = videoContext.VideoProcessorSetStreamExtension(
-        videoProcessor, 0, &kNvidiaPpeInterface, static_cast<UINT>(sizeof(request)), &request);
-
-    if (FAILED(extension))
+    if (picture.trueHdr)
     {
-        return std::unexpected(VsrFailure{VsrUnavailable::ExtensionRejected,
-                                          describeFailure("VideoProcessorSetStreamExtension",
-                                                          extension)});
+        // The driver reports a non-zero value through GetStreamExtension when
+        // it knows the model; SetStreamExtension alone can return S_OK and
+        // still do nothing.
+        UINT supportValue = 0;
+        const HRESULT probe = videoContext.VideoProcessorGetStreamExtension(
+            videoProcessor, 0, &kNvidiaTrueHdr, static_cast<UINT>(sizeof(supportValue)),
+            &supportValue);
+
+        if (FAILED(probe) || supportValue == 0)
+        {
+            return std::unexpected(VsrFailure{
+                VsrUnavailable::ExtensionRejected,
+                FAILED(probe) ? describeFailure("VideoProcessorGetStreamExtension (TrueHDR)", probe)
+                              : std::string("the driver doesn't report the TrueHDR extension"),
+            });
+        }
+
+        NvidiaTrueHdrRequest hdrRequest{};
+        hdrRequest.enable = 1;
+        const HRESULT hdrExtension = videoContext.VideoProcessorSetStreamExtension(
+            videoProcessor, 0, &kNvidiaTrueHdr, static_cast<UINT>(sizeof(hdrRequest)),
+            &hdrRequest);
+
+        if (FAILED(hdrExtension))
+        {
+            return std::unexpected(
+                VsrFailure{VsrUnavailable::ExtensionRejected,
+                           describeFailure("VideoProcessorSetStreamExtension (TrueHDR)",
+                                           hdrExtension)});
+        }
+
+        spdlog::info("RTX Video HDR: NVIDIA extension accepted on the video processor (version 4 "
+                     "method 3)");
     }
 
-    processor.description =
-        std::format("{}x{} {} {} -> {}x{} R8G8B8A8", picture.input.width, picture.input.height,
-                    formatName(picture.format), colorSpaceName(picture.matrix, picture.range),
-                    picture.output.width, picture.output.height);
+    if (picture.superResolution)
+    {
+        NvidiaPpeRequest request;
+        const HRESULT extension = videoContext.VideoProcessorSetStreamExtension(
+            videoProcessor, 0, &kNvidiaPpeInterface, static_cast<UINT>(sizeof(request)), &request);
 
-    spdlog::info("VSR: NVIDIA extension accepted on the video processor ({}, PPE version 1 method "
-                 "2)",
-                 processor.description);
+        if (FAILED(extension))
+        {
+            return std::unexpected(VsrFailure{VsrUnavailable::ExtensionRejected,
+                                              describeFailure("VideoProcessorSetStreamExtension",
+                                                              extension)});
+        }
+
+        spdlog::info("VSR: NVIDIA extension accepted on the video processor (PPE version 1 method "
+                     "2)");
+    }
+
+    processor.description = std::format(
+        "{}x{} {} {} -> {}x{} {}{}{}", picture.input.width, picture.input.height,
+        formatName(picture.format), colorSpaceName(picture.matrix, picture.range, picture.transfer),
+        picture.output.width, picture.output.height,
+        picture.hdrOutput ? "R10G10B10A2 HDR10" : "R8G8B8A8 SDR",
+        picture.trueHdr ? " + RTX HDR" : "", picture.superResolution ? " + VSR" : "");
 
     return processor;
 }
@@ -543,6 +622,54 @@ VsrAvailability VideoSuperResolution::probe()
     };
 }
 
+RtxHdrAvailability VideoSuperResolution::probeHdr()
+{
+    const auto adapter = findStreamAdapter();
+
+    if (!adapter)
+    {
+        return {.available = false, .detail = adapter.error()};
+    }
+
+    if (adapter->info.vendorId != kNvidiaVendorId)
+    {
+        return {.available = false,
+                .detail = std::format("the stream runs on {} (vendor 0x{:04X})",
+                                      adapter->info.name, adapter->info.vendorId)};
+    }
+
+    auto video = openVideoDevice(*adapter->adapter.Get());
+
+    if (!video)
+    {
+        return {.available = false, .detail = video.error().detail};
+    }
+
+    const VsrPicture picture{
+        .input = kProbeInput,
+        .output = kProbeOutput,
+        .format = PixelFormat::Nv12,
+        .matrix = ColorMatrix::Bt709,
+        .range = ColorRange::Limited,
+        .transfer = TransferFunction::Sdr,
+        .hdrOutput = true,
+        .trueHdr = true,
+        .superResolution = false,
+    };
+    auto processor =
+        createProcessor(*video->videoDevice.Get(), *video->videoContext.Get(), picture);
+
+    if (!processor)
+    {
+        return {.available = false, .detail = processor.error().detail};
+    }
+
+    return {
+        .available = true,
+        .detail = std::format("NVIDIA extension accepted ({})", processor->description),
+    };
+}
+
 std::expected<VideoSuperResolution, std::string> VideoSuperResolution::create(
     ID3D12Device& device12, ID3D11Device& device11, ID3D11DeviceContext& context11,
     UINT slotCount)
@@ -716,7 +843,7 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
     }
 
     auto output = createSharedTexture(
-        *device5_.Get(), *device12_.Get(), picture.output, kOutputFormat,
+        *device5_.Get(), *device12_.Get(), picture.output, outputFormatOf(picture),
         static_cast<UINT>(D3D11_BIND_RENDER_TARGET), D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
         "VSR output");
 

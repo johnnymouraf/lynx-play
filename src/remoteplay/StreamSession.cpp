@@ -101,18 +101,24 @@ ChiakiConnectVideoProfile chiakiProfileOf(const VideoProfile& profile)
     chiaki.height = profile.height;
     chiaki.max_fps = profile.framesPerSecond;
     chiaki.bitrate = profile.bitrateKbps;
-    chiaki.codec = profile.codec == core::VideoCodec::H265 ? CHIAKI_CODEC_H265 : CHIAKI_CODEC_H264;
+    chiaki.codec = profile.hdr
+                       ? CHIAKI_CODEC_H265_HDR
+                       : (profile.codec == core::VideoCodec::H265 ? CHIAKI_CODEC_H265
+                                                                  : CHIAKI_CODEC_H264);
 
     return chiaki;
 }
 
 } // namespace
 
-VideoProfile videoProfileFor(const core::VideoSettings& settings)
+VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5)
 {
     const auto size =
         std::ranges::find(kResolutionSizes, settings.resolution, &ResolutionSize::resolution);
     const ResolutionSize& chosen = size != kResolutionSizes.end() ? *size : kResolutionSizes.back();
+    // HDR is HEVC-only and PS5-only; choosing H.264 keeps the stream SDR.
+    const bool hdr = ps5 && settings.hdr == core::HdrMode::Auto &&
+                     settings.codec == core::VideoCodec::H265;
 
     return {
         .width = chosen.width,
@@ -120,6 +126,7 @@ VideoProfile videoProfileFor(const core::VideoSettings& settings)
         .framesPerSecond = static_cast<std::uint32_t>(settings.framesPerSecond),
         .bitrateKbps = settings.bitrateKbps,
         .codec = settings.codec,
+        .hdr = hdr,
     };
 }
 
@@ -655,8 +662,9 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     state->metrics = request.metrics;
     state->microphoneMuted = request.audio.microphoneMuted;
 
-    auto decoder =
-        media::VideoDecoder::create(gpu, request.video.codec, std::move(mailbox), request.metrics);
+    const VideoProfile profile = videoProfileFor(request.video, request.ps5);
+    auto decoder = media::VideoDecoder::create(gpu, profile.codec, std::move(mailbox),
+                                               request.metrics, profile.hdr);
 
     if (!decoder)
     {
@@ -695,7 +703,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     info.host = state->host.c_str();
     std::memcpy(info.regist_key, request.credentials.registKey.data(), sizeof(info.regist_key));
     std::memcpy(info.morning, request.credentials.rpKey.data(), sizeof(info.morning));
-    info.video_profile = chiakiProfileOf(videoProfileFor(request.video));
+    info.video_profile = chiakiProfileOf(profile);
     info.video_profile_auto_downgrade = true;
     info.enable_dualsense = true;
     info.audio_video_disabled = CHIAKI_NONE_DISABLED;
@@ -746,10 +754,22 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     state->started = true;
     state->startInput();
     spdlog::info("Input: the controller state is sampled right before each send, every 4 ms");
-    const VideoProfile profile = videoProfileFor(request.video);
     spdlog::info("Session started with {}: {}x{} at {} fps, {}, {} kbps", request.host,
                  profile.width, profile.height, profile.framesPerSecond,
                  core::codecName(profile.codec), profile.bitrateKbps);
+
+    if (profile.hdr)
+    {
+        spdlog::info("HDR: the session requests CHIAKI_CODEC_H265_HDR (the PS5 sends 10-bit "
+                     "P010)");
+    }
+    else if (request.video.hdr == core::HdrMode::Auto && request.ps5)
+    {
+        spdlog::info("HDR: automatic, but the stream stays SDR ({})",
+                     request.video.codec == core::VideoCodec::H264
+                         ? "HDR needs H.265"
+                         : "HDR is off for this console");
+    }
 
     return std::unique_ptr<StreamSession>(new StreamSession(std::move(state)));
 }

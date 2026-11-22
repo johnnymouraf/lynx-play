@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Settings.h"
+#include "render/Hdr.h"
 #include "render/OpticalFlow.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
@@ -31,6 +32,9 @@ class SettingsController : public QObject
     Q_PROPERTY(QString codec READ codec WRITE setCodec NOTIFY videoChanged)
     Q_PROPERTY(int bitrateMbps READ bitrateMbps WRITE setBitrateMbps NOTIFY videoChanged)
     Q_PROPERTY(bool lowestLatency READ lowestLatency WRITE setLowestLatency NOTIFY videoChanged)
+    Q_PROPERTY(QString hdr READ hdr WRITE setHdr NOTIFY videoChanged)
+    Q_PROPERTY(QString hdrDescription READ hdrDescription NOTIFY videoChanged)
+    Q_PROPERTY(bool hdrRtxAvailable READ hdrRtxAvailable NOTIFY videoChanged)
     Q_PROPERTY(int minBitrateMbps READ minBitrateMbps CONSTANT)
     Q_PROPERTY(int maxBitrateMbps READ maxBitrateMbps CONSTANT)
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY audioDevicesChanged)
@@ -69,6 +73,8 @@ public:
                                 QObject* parent = nullptr);
 
     [[nodiscard]] const core::VideoSettings& video() const;
+    [[nodiscard]] core::HdrMode hdrMode() const;
+    [[nodiscard]] bool rtxVideoHdrAvailable() const;
     [[nodiscard]] const core::AudioSettings& audio() const;
     [[nodiscard]] const core::ControllerSettings& controller() const;
     [[nodiscard]] const core::OverlaySettings& overlay() const;
@@ -92,6 +98,13 @@ public:
 
     [[nodiscard]] bool lowestLatency() const;
     void setLowestLatency(bool lowest);
+
+    // "off", "auto" or "rtx".
+    [[nodiscard]] QString hdr() const;
+    void setHdr(const QString& name);
+    // What this display can show and why RTX Video HDR may be unavailable.
+    [[nodiscard]] QString hdrDescription() const;
+    [[nodiscard]] bool hdrRtxAvailable() const;
 
     [[nodiscard]] int minBitrateMbps() const;
     [[nodiscard]] int maxBitrateMbps() const;
@@ -183,6 +196,8 @@ private:
     render::ReflexAvailability reflexAvailability_;
     render::VsrAvailability videoSuperResolutionAvailability_;
     render::OpticalFlowAvailability opticalFlowAvailability_;
+    render::HdrDisplayState hdrDisplay_;
+    render::RtxHdrAvailability rtxHdrAvailability_;
     QStringList outputDevices_;
     QStringList microphoneDevices_;
     bool devicesLogged_ = false;

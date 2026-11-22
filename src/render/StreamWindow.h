@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ReflexMode.h"
+#include "core/Settings.h"
 #include "render/FrameMailbox.h"
 #include "render/FrameRenderer.h"
 #include "render/GpuDevice.h"
@@ -45,6 +46,8 @@ struct StreamWindowOptions
     core::ReflexMode reflex = core::ReflexMode::Off;
     bool videoSuperResolution = false;
     bool opticalFlow = true;
+    core::HdrMode hdr = core::HdrMode::Auto;
+    bool rtxVideoHdrAvailable = false;
     WindowMode mode = WindowMode::Windowed;
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
@@ -86,6 +89,7 @@ public:
     void setReflexMode(core::ReflexMode mode);
     void setVideoSuperResolution(bool enabled);
     void setOpticalFlow(bool enabled);
+    void setHdrMode(core::HdrMode mode);
     // Ends the stream as the player would with Esc.
     void close();
 

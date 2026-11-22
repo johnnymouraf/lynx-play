@@ -20,10 +20,13 @@ namespace lynx::media
 class VideoDecoder
 {
 public:
+    // `hdrExpected` is the session's HDR request: when the bitstream leaves
+    // its transfer unspecified, the pictures are taken as BT.2020/PQ, which
+    // is what the console sends for CHIAKI_CODEC_H265_HDR.
     [[nodiscard]] static std::expected<std::unique_ptr<VideoDecoder>, std::string> create(
         const render::GpuDevice& gpu, core::VideoCodec codec,
         std::shared_ptr<render::FrameMailbox> mailbox,
-        std::shared_ptr<core::StreamMetrics> metrics);
+        std::shared_ptr<core::StreamMetrics> metrics, bool hdrExpected = false);
 
     VideoDecoder(const VideoDecoder&) = delete;
     VideoDecoder& operator=(const VideoDecoder&) = delete;

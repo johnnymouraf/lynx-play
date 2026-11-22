@@ -51,11 +51,13 @@ struct VideoProfile
     std::uint32_t framesPerSecond = 0;
     std::uint32_t bitrateKbps = 0;
     core::VideoCodec codec = core::VideoCodec::H265;
+    // The stream asks for HDR through CHIAKI_CODEC_H265_HDR, not a flag.
+    bool hdr = false;
 
     bool operator==(const VideoProfile&) const = default;
 };
 
-[[nodiscard]] VideoProfile videoProfileFor(const core::VideoSettings& settings);
+[[nodiscard]] VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5 = true);
 
 struct SessionRequest
 {

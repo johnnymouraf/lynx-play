@@ -126,6 +126,15 @@ StreamController::StreamController(SettingsController& settings, InputController
                 }
             });
 
+    connect(&settings_, &SettingsController::videoChanged, this,
+            [this]
+            {
+                if (window_ != nullptr)
+                {
+                    window_->setHdrMode(settings_.hdrMode());
+                }
+            });
+
     connect(&settings_, &SettingsController::audioChanged, this,
             [this]
             {
@@ -391,6 +400,9 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .videoSuperResolution =
                                                      settings_.videoSuperResolution(),
                                                  .opticalFlow = settings_.opticalFlow(),
+                                                 .hdr = settings_.hdrMode(),
+                                                 .rtxVideoHdrAvailable =
+                                                     settings_.rtxVideoHdrAvailable(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
                                                  .overlayFonts = overlayFonts(),

@@ -39,8 +39,17 @@ struct VsrAvailability
     std::string detail;
 };
 
-// The picture the video processor is built for: the source size and format
-// and the size it scales to.
+// Whether RTX Video HDR's extension is accepted on the stream's adapter. The
+// NVIDIA App's own toggle and the display's HDR state are separate.
+struct RtxHdrAvailability
+{
+    bool available = false;
+    // For the log; English, like every other log line.
+    std::string detail;
+};
+
+// The picture the video processor is built for: the source size, format and
+// colour space, and the size and colour space it writes.
 struct VsrPicture
 {
     SurfaceSize input;
@@ -48,6 +57,13 @@ struct VsrPicture
     PixelFormat format = PixelFormat::Nv12;
     ColorMatrix matrix = ColorMatrix::Bt709;
     ColorRange range = ColorRange::Limited;
+    TransferFunction transfer = TransferFunction::Sdr;
+    // R10G10B10A2_UNORM tagged HDR10, rather than R8G8B8A8 tagged sRGB.
+    bool hdrOutput = false;
+    // NVIDIA's TrueHDR model on the same processor; it takes an SDR picture.
+    bool trueHdr = false;
+    // Whether the super resolution model runs; off when only HDR was asked.
+    bool superResolution = true;
 
     bool operator==(const VsrPicture&) const = default;
 };
@@ -58,17 +74,21 @@ struct VsrPicture
 [[nodiscard]] bool videoSuperResolutionEligible(bool enabled, std::uint32_t vendorId,
                                                 SurfaceSize input, SurfaceSize output);
 
-// NVIDIA's RTX Video Super Resolution through the driver's D3D11 video
-// processor extension, fed by textures shared with the Direct3D 12 renderer:
-// the renderer copies each decoded frame into an NV12/P010 input texture and
-// the processor writes R8G8B8A8 at the output size, ordered by one fence
-// shared between both devices. One instance per stream window.
+// NVIDIA's RTX Video Super Resolution and RTX Video HDR through the driver's
+// D3D11 video processor extensions, fed by textures shared with the Direct3D
+// 12 renderer: the renderer copies each decoded frame into an NV12/P010 input
+// texture and the processor writes 8-bit SDR or 10-bit HDR10 at the output
+// size, ordered by one fence shared between both devices. Both models run in
+// the same blit. One instance per stream window.
 class VideoSuperResolution
 {
 public:
     // Checks the extension on the stream's adapter without touching a stream;
     // never fails the app on a machine without an NVIDIA GPU.
     [[nodiscard]] static VsrAvailability probe();
+
+    // The same check for RTX Video HDR's extension.
+    [[nodiscard]] static RtxHdrAvailability probeHdr();
 
     // Uses the renderer's D3D11 device, a native device on the stream's
     // adapter (D3D11On12 returns E_NOTIMPL for the extension).

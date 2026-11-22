@@ -17,6 +17,8 @@ add_library(lynx_render STATIC
     GpuDevice.h
     GpuTimer.cpp
     GpuTimer.h
+    Hdr.cpp
+    Hdr.h
     Layout.cpp
     Layout.h
     OpticalFlow.cpp

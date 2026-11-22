@@ -35,6 +35,7 @@ Rectangle {
 
                 text: modelData.label
                 selected: modelData.value === control.currentValue
+                optionEnabled: modelData.enabled !== undefined ? modelData.enabled : true
                 onClicked: control.activated(modelData.value)
             }
         }

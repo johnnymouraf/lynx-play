@@ -32,6 +32,33 @@ enum class PresentMode
     LowestLatency,
 };
 
+// What is asked of the PS5's HDR and what the renderer does with it.
+enum class HdrMode
+{
+    // SDR from end to end.
+    Off,
+    // Ask the PS5 for HDR; present HDR on an HDR display and tone-map it on an
+    // SDR one.
+    Auto,
+    // Ask the PS5 for SDR and let RTX Video HDR convert it on an HDR display.
+    RtxVideoHdr,
+};
+
+[[nodiscard]] constexpr std::string_view hdrModeName(HdrMode mode)
+{
+    switch (mode)
+    {
+    case HdrMode::Off:
+        return "off";
+    case HdrMode::Auto:
+        return "auto";
+    case HdrMode::RtxVideoHdr:
+        return "rtx";
+    }
+
+    return "auto";
+}
+
 inline constexpr std::uint32_t kMinBitrateKbps = 2000;
 inline constexpr std::uint32_t kMaxBitrateKbps = 50000;
 
@@ -44,6 +71,7 @@ struct VideoSettings
     VideoCodec codec = VideoCodec::H265;
     std::uint32_t bitrateKbps = kMaxBitrateKbps;
     PresentMode presentMode = PresentMode::VSync;
+    HdrMode hdr = HdrMode::Auto;
 
     bool operator==(const VideoSettings&) const = default;
 };

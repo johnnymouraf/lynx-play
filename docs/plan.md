@@ -11,8 +11,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [2.3 HDR](#23-hdr)
   - [2.4 Optical flow and cadence detection](#24-optical-flow-and-cadence-detection)
+  - [2.5 DLSS Frame Generation 2x](#25-dlss-frame-generation-2x)
+  - [2.6 DLSS Super Resolution (experimental)](#26-dlss-super-resolution-experimental)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -37,7 +38,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         per stage.
   - [x] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
         and upscaling to any output (1440p/4K monitors).
-  - [ ] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
+  - [x] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
   - [ ] **2.4 Optical flow and cadence detection**: find the repeated frames of
         30 fps games inside the 60 fps stream.
   - [ ] **2.5 DLSS Frame Generation 2x**: 30→60 and 60→120 fps, with Reflex.
@@ -150,64 +151,6 @@ the step is done and green.
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
 
-
-### 2.3 HDR
-
-- **Goal:** the PS5's native HDR stream plays with correct BT.2020/PQ color on
-  an HDR display and tone-maps on an SDR one, and RTX Video HDR can turn an
-  SDR stream into HDR when the display and the NVIDIA App allow.
-- **Guardrails:** no DLSS (2.5, 2.6); the SDR path stays exactly as it is
-  when HDR is off; no capture card.
-- **Success criteria:**
-  1. CI green on `auto/2.3`, unit tests included.
-  2. `--play-file` with an HDR10 HEVC file (P010, BT.2020/PQ) plays; the log
-     shows P010, the stream's `color_trc`/`color_primaries` (and mastering
-     data when present), the display's HDR state, and which presentation path
-     ran; a screenshot shows a correctly tone-mapped picture on this SDR panel
-     (no washed-out or crushed frame).
-  3. The HDR setting (Desligado / Automático / RTX Video HDR) exists on
-     Configurações › Vídeo, is saved in `settings.json`, and applies live
-     where it can.
-  4. With HDR on for the session, the stream request uses
-     `CHIAKI_CODEC_H265_HDR` (the log shows it); P010 reaches the decoder
-     (owner check for a real session).
-  5. On this machine, display detection reports SDR and the app chooses the
-     SDR swap chain; RTX Video HDR is disabled with an explanation. On an HDR
-     display (owner check), the PQ swap chain and the TrueHDR extension run.
-- **Deliveries:**
-  1. HDR capture and presentation: P010 through the decoder and the shader
-     (BT.2020 matrix, PQ), a 10-bit intermediate, the R10G10B10A2_UNORM swap
-     chain with `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020` on HDR displays,
-     and tone mapping PQ→SDR for SDR ones; the ImGui overlay converts sRGB→PQ
-     on an HDR chain.
-  2. Stream profile and settings: `CHIAKI_CODEC_H265_HDR` when the setting
-     asks for the stream's own HDR; `video.hdr` (off/auto/rtx) in
-     `settings.json`; the Vídeo screen row.
-  3. RTX Video HDR through the D3D11 extension already in place (`GUID
-     {fdd62bb4-620b-4fd7-9ab3-1e59d0d544b3}`, struct `{version 4, method 3,
-     enable 1}`), ordered before VSR in the same blit, with its own stage time
-     in `GpuTimer` and the overlay.
-  4. Display HDR detection: `DisplayConfigGetDeviceInfo` with
-     `GET_ADVANCED_COLOR_INFO_2` (or matching the HMONITOR across adapters,
-     since `GetContainingOutput` misses a panel on another GPU) and the
-     setting's enabled/disabled explanation.
-- **Settled in planning:** research in `scratchpad/research/hdr.md`: chiaki
-  1.10.1 requests HDR purely through the video profile's codec
-  (`CHIAKI_CODEC_H265_HDR`), with no callback flag, and FFmpeg supplies the
-  color metadata; this laptop's panel is SDR and owned by the Intel GPU, so
-  RTX Video HDR's picture is an owner check on an HDR display; the NVIDIA App
-  needs its HDR/Video Enhancements toggle on.
-- **Changes:** `src/render/` (shader, swap chain color space, HDR stage,
-  overlay), `src/media/` (P010 metadata), `src/remoteplay/` (profile),
-  `src/core/` (settings), `src/app/` (Vídeo screen), tests.
-- **Data and interfaces:** `settings.json` gains `video.hdr`
-  (`off`/`auto`/`rtx`); the decoded frame carries its color space and
-  mastering data; the presentation layer reports the display's color mode.
-- **Edge cases:** SDR display with HDR off and on; HDR display with Windows
-  HDR off (Windows tone maps; the log says which path); P010 decode failure
-  (fall back to 8-bit with a logged reason); overlay legibility on HDR;
-  non-NVIDIA GPU (RTX HDR disabled).
-
 ### 2.4 Optical flow and cadence detection
 
 - **Goal:** the renderer computes optical flow on the GPU and marks every
@@ -258,6 +201,119 @@ the step is done and green.
   logged reason; cadence falls back to the block-difference metric alone);
   30 fps source (no repeats); scene cuts; dropped frames; resize; HDR frames
   (flow on the 8-bit SDR-converted intermediate).
+
+### 2.5 DLSS Frame Generation 2x
+
+- **Goal:** DLSS Frame Generation doubles the presented rate (a 30 fps game
+  reaches 60, a 60 fps one 120) by interpolating between distinct real frames
+  with the optical flow from 2.4, with Reflex on; off by default.
+- **Guardrails:** no DLSS Super Resolution (2.6); off by default because it
+  adds about one source frame of latency; NGX runtimes downloaded in CI, never
+  committed; needs 2.4's flow and cadence.
+- **Success criteria:**
+  1. CI green on `auto/2.5`, unit tests included (the frame schedule: which
+     frames generate, the multiplier, cadence 30 vs 60, pause on repeats).
+  2. `--play-file` of the 30 fps stream in a 60 fps container with Frame
+     Generation on: the log shows the DLSS-G feature created and evaluated
+     per frame, and the overlay's presented fps around 60 from 30 distinct;
+     with a true 60 fps file, around 120 from 60 distinct (screenshots and
+     the present counters).
+  3. Reflex is on whenever Frame Generation is on (the log shows the sleep
+     mode active and markers for both real and generated presents), and the
+     overlay shows the generated-frame count.
+  4. The RTX screen has the Frame Generation setting (Desligado / Ligado 2x)
+     with the latency note, saved in `settings.json` and applied live; on a
+     GPU below Ada or without the runtime, it is disabled with an
+     explanation.
+  5. Owner check: smoothness gain and added latency in a real 30 fps game,
+     and the artifacts in motion.
+- **Deliveries:**
+  1. NGX core (`NVSDK_NGX_D3D12_Init` with the stream's device and an app
+     id, `nvngx_dlss.dll`/`nvngx_dlssg.dll` 310.9.16 and the import library
+     downloaded in CI from NVIDIA's public release, with the license notices),
+     the DLSS-G feature (`NVSDK_NGX_Feature_FrameGeneration` = 11,
+     `NGX_D3D12_CREATE_DLSSG`/`NGX_D3D12_EVALUATE_DLSSG`), resources
+     declared as never provided (HUD-less, UI, UI alpha, distortion).
+  2. Inputs per frame: the real back buffer, a constant depth (`R32_FLOAT`
+     0.9, never 1.0 — the runtime linearizes as `1/(1 - depth)`), motion
+     vectors densified from 2.4's flow, and the
+     `MultiFrameCount = 1`/`MultiFrameIndex = 1` 2x call. The DLSSG
+     `MvecScaleX/Y` meaning is contested (the header says normalize; the
+     guide says rescale to pixels): start at `1/W`, `1/H`, validate the sign
+     on a real pan, and negate as Veyra does (`-1/W`, `-1/H`) if needed.
+  3. Present scheduling: generate only after distinct frames (2.4's flag,
+     no generation after a repeat), present real and generated frames with
+     the Reflex out-of-band notification
+     (`NvAPI_D3D12_NotifyOutOfBandCommandQueue(OUT_OF_BAND_RENDER_PRESENT = 3)`,
+     since the queue carries both real and generated presents; the
+     notification gates FG), latency markers on the out-of-band queue
+     (`NvAPI_D3D_SetLatencyMarker`, markers 9–12 — `SetAsyncFrameMarker`
+     returned -1 in practice), and count both in the overlay.
+  4. Setting, RTX row, overlay (presented vs real fps, generated count) and
+     the failure paths.
+- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
+  feature id 11, Ada supports at most 2x (`MultiFrameCount = 1`; multi-frame
+  needs RTX 50), the DLLs are redistributable in object form under the RTX
+  SDKs license and can be fetched in CI without a login; estimated 2–4 ms a
+  frame on the 4060; the out-of-band queue is what the generated presents
+  need, and Reflex markers must cover both real and generated presents.
+  Further research (addendum, same file): hardware GPU scheduling (HAGS) must
+  be on (read `HwSchMode`); the NGX project id must be GUID-like; and
+  Streamline advises against `GetFrameLatencyWaitableObject`/`SetMaximumFrameLatency`
+  with FG — Lynx Play uses both, so the frame pacer is the prototype's first
+  risk (Veyra keeps three buffers and latency 1 without Streamline and it
+  works, so this may survive).
+- **Changes:** `src/render/` (NGX host, DLSS-G stage, present scheduling),
+  `src/core/` (settings), `src/app/` (RTX row), CI workflow, tests.
+- **Data and interfaces:** `settings.json` gains `rtx.frameGeneration`
+  (off/2x); the pipeline's frame schedule exposes real vs generated frames;
+  the overlay shows both rates.
+- **Edge cases:** GPU below Ada; the NGX runtime missing or refused; flow or
+  cadence off (disable with an explanation); HDR (generate in the same
+  10-bit space, per 2.3); resize; device lost; a 30 fps stream where every
+  other frame repeats (no generation after repeats).
+
+### 2.6 DLSS Super Resolution (experimental)
+
+- **Goal:** DLSS Super Resolution upscales the stream (1080p to 1440p/4K) fed
+  by the optical-flow motion vectors, shown side by side with RTX VSR in the
+  settings and the overlay.
+- **Guardrails:** experimental, off by default; may not beat VSR on video
+  content; needs 2.4's flow; the VSR path stays the default.
+- **Success criteria:**
+  1. CI green on `auto/2.6`, unit tests included (the size/ratio math and
+     the setting).
+  2. `--play-file` of 1080p in a 1440p window with DLSS SR on: the log
+     shows the feature created and evaluated with the flow's motion vectors,
+     the overlay shows its stage time, and screenshots compare DLSS SR vs
+     VSR vs the shader scale, with the differences described.
+  3. The RTX screen offers the upscaling choice (Shader / RTX Video Super
+     Resolution / DLSS Super Resolution) with DLSS marked experimental,
+     saved in `settings.json` and applied live.
+  4. With flow off, below Ada, or with the runtime missing, DLSS SR is
+     disabled with an explanation and VSR remains the default.
+  5. Owner check: real-game picture quality versus VSR at 1440p/4K.
+- **Deliveries:**
+  1. The NGX DLSS feature (`NVSDK_NGX_Feature_SuperSampling` = 1,
+     `NGX_D3D12_CREATE_DLSS_EXT`/`EVALUATE_DLSS_EXT`, `nvngx_dlss.dll`
+     310.9.16) in the same NGX host 2.5 built, with jitter 0 and sharpness 0.
+  2. Inputs: the current real frame at 1080p, constant depth, motion
+     vectors from the flow scaled to the output/render ratio, Width/OutWidth
+     for the 1.33x and 2x ratios.
+  3. The upscaling selector (shader / VSR / DLSS SR), the stage in
+     `GpuTimer` and the overlay, and the comparison screenshots.
+- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
+  the render ratio comes from Width/OutWidth (the performance/quality label
+  is cosmetic); the estimated cost is 1.5–2.2 ms at 1080p→1440p and
+  3.5–4.5 ms at 1080p→4K; video content lacks the game's temporal data, so
+  artifacts are expected — hence experimental.
+- **Changes:** `src/render/` (DLSS stage, selector), `src/core/` (settings),
+  `src/app/` (RTX row), tests.
+- **Data and interfaces:** `settings.json`'s `rtx.videoSuperResolution`
+  becomes `rtx.upscaling` (`shader`/`vsr`/`dlss`) with the old field
+  migrated.
+- **Edge cases:** ratios outside DLSS's range (fall back to VSR); flow off;
+  non-Ada GPU; HDR; resize; the runtime missing.
 
 ### Decisions to review
 
@@ -673,3 +729,46 @@ The owner asked about DLSS and frame generation, so the run no longer stops at
 - B. Stop at 2.2 and hand the rest over.
 
 **Chosen: A**. Changing it: nothing is redone; the run just stops earlier.
+
+#### D43 – HDR in "Automático" asks the PS5 for HDR even on an SDR panel (2.3)
+
+- A. Auto is the default and asks for HDR (H.265) whenever the console offers
+  it, tone-mapping to SDR here: the native path runs on this machine.
+- B. Off by default: nothing changes, but the native stream only runs when
+  chosen.
+- C. Auto asks only on an HDR display: on this panel Auto equals Off.
+
+**Chosen: A**. Changing it: the default in `core::VideoSettings` and
+`videoProfileFor`.
+
+#### D44 – The HDR setting is a three-state row on Vídeo (2.3)
+
+- A. One three-state row (Desligado / Automático / RTX Video HDR) under Vídeo.
+- B. Only the sketch's two-state toggle under RTX.
+- C. Both: two controls for one setting.
+
+**Chosen: A**. Changing it: add a toggle to `RtxSettings.qml` bound to `hdr`.
+
+#### D45 – Display HDR detection through DisplayConfig (2.3)
+
+The panel belongs to the Intel GPU and the NVIDIA adapter enumerates no
+outputs, so `GetContainingOutput` finds nothing.
+
+- A. `DisplayConfigGetDeviceInfo` with `GET_ADVANCED_COLOR_INFO_2` on the
+  window's monitor.
+- B. Enumerate outputs of every adapter and match the `HMONITOR` (gives
+  luminance but not the HDR state).
+- C. `GetContainingOutput` (fails here).
+
+**Chosen: A**. Changing it: use B for the panel's luminance.
+
+#### D46 – RTX Video HDR and VSR share the blit's timing (2.3)
+
+Both run in one `VideoProcessorBlt`.
+
+- A. A separate `RtxVideoHdr` stage; when both run, both report the shared
+  blit's time.
+- B. Attribute the blit to one and show 0 for the other.
+
+**Chosen: A**, each feature shows its real cost and the frame total doesn't
+change. Changing it: measure separately if the driver exposes it.

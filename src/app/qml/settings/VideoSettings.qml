@@ -110,4 +110,25 @@ ColumnLayout {
             onActivated: value => section.settings.lowestLatency = value
         }
     }
+
+    SettingRow {
+        Layout.fillWidth: true
+        label: "HDR"
+        description: section.settings.hdrDescription
+
+        SegmentedControl {
+            name: "HDR"
+            options: [
+                { label: "Desligado", value: "off" },
+                { label: "Automático", value: "auto" },
+                {
+                    label: "RTX Video HDR",
+                    value: "rtx",
+                    enabled: section.settings.hdrRtxAvailable
+                }
+            ]
+            currentValue: section.settings.hdr
+            onActivated: value => section.settings.hdr = value
+        }
+    }
 }

@@ -14,9 +14,29 @@ TEST_CASE("videoProfileFor asks for 1080p60 H.265 at the chosen bitrate by defau
         .framesPerSecond = 60,
         .bitrateKbps = core::kMaxBitrateKbps,
         .codec = core::VideoCodec::H265,
+        .hdr = true,
     };
 
     CHECK(videoProfileFor(core::VideoSettings{}) == fullHd);
+}
+
+TEST_CASE("HDR is asked for only with the automatic setting, H.265 and a PS5")
+{
+    core::VideoSettings settings;
+
+    settings.hdr = core::HdrMode::Off;
+    CHECK_FALSE(videoProfileFor(settings).hdr);
+
+    settings.hdr = core::HdrMode::RtxVideoHdr;
+    CHECK_FALSE(videoProfileFor(settings).hdr);
+
+    settings.hdr = core::HdrMode::Auto;
+    CHECK(videoProfileFor(settings).hdr);
+    CHECK_FALSE(videoProfileFor(settings, false).hdr);
+
+    settings.codec = core::VideoCodec::H264;
+    CHECK_FALSE(videoProfileFor(settings).hdr);
+    CHECK_FALSE(videoProfileFor(settings, false).hdr);
 }
 
 TEST_CASE("videoProfileFor turns each resolution into its 16:9 size")
