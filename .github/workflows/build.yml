@@ -133,7 +133,7 @@ jobs:
           cmake --preset release
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
-          -DLYNX_NGX_ROOT="${{ github.workspace }}/ngx"
+          -DLYNX_NGX_ROOT="${{ github.workspace }}/.ngx"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'
