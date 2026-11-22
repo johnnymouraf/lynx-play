@@ -344,7 +344,11 @@ void StreamSession::State::inputLoop(const std::stop_token& stop)
 
         if (gamepads != nullptr)
         {
-            if (const std::optional<input::GamepadSample> sample = gamepads->sample(); sample)
+            if (gamepads->overlayOpen())
+            {
+                chiaki_controller_state_set_idle(&controllerState);
+            }
+            else if (const std::optional<input::GamepadSample> sample = gamepads->sample(); sample)
             {
                 controllerState = input::toChiakiControllerState(*sample);
             }

@@ -85,6 +85,11 @@ const core::ControllerSettings& SettingsController::controller() const
     return settings_.controller;
 }
 
+const core::OverlaySettings& SettingsController::overlay() const
+{
+    return settings_.overlay;
+}
+
 render::PresentTiming SettingsController::presentTiming() const
 {
     const bool lowest = settings_.video.presentMode == PresentMode::LowestLatency;
@@ -361,6 +366,18 @@ QString SettingsController::reflexUnavailableReason() const
     return {};
 }
 
+bool SettingsController::overlayStatisticsVisible() const
+{
+    return settings_.overlay.statisticsVisible;
+}
+
+void SettingsController::setOverlayStatisticsVisible(bool visible)
+{
+    core::OverlaySettings overlay = settings_.overlay;
+    overlay.statisticsVisible = visible;
+    applyOverlay(overlay);
+}
+
 void SettingsController::apply(const core::VideoSettings& video)
 {
     if (video == settings_.video)
@@ -417,6 +434,19 @@ void SettingsController::applyRtx(const core::RtxSettings& rtx)
     settings_.rtx = rtx;
     spdlog::info("RTX settings: Reflex {}", render::reflexModeName(rtx.reflex));
     emit rtxChanged();
+    save();
+}
+
+void SettingsController::applyOverlay(const core::OverlaySettings& overlay)
+{
+    if (overlay == settings_.overlay)
+    {
+        return;
+    }
+
+    settings_.overlay = overlay;
+    spdlog::info("Overlay settings: statistics {}", overlay.statisticsVisible ? "shown" : "hidden");
+    emit overlayChanged();
     save();
 }
 

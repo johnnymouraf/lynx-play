@@ -6,6 +6,7 @@
 #include "core/Paths.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
+#include "render/ReflexSession.h"
 #include "render/StreamWindow.h"
 #include "render/TestPatternSource.h"
 
@@ -27,7 +28,7 @@ constexpr auto kVideoTestTitle = L"Lynx Play — Teste de vídeo";
 
 } // namespace
 
-AppController::AppController(StartupState state, const SettingsController& settings,
+AppController::AppController(StartupState state, SettingsController& settings,
                              QObject* parent)
     : QObject(parent), state_(std::move(state)), settings_(settings)
 {
@@ -127,7 +128,39 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .title = kVideoTestTitle,
                                                  .timing = settings_.presentTiming(),
                                                  .reflex = settings_.reflexMode(),
-                                                 .overlayFont = overlayFont(),
+                                                 .overlayFonts = overlayFonts(),
+                                                 .overlay =
+                                                     {
+                                                         .statisticsVisible =
+                                                             settings_.overlayStatisticsVisible(),
+                                                         .reflex = settings_.reflexMode(),
+                                                         .microphoneMuted =
+                                                             settings_.microphoneMuted(),
+                                                         .sessionName = "Teste de vídeo",
+                                                     },
+                                                 .overlayActions =
+                                                     {
+                                                         .reflexChanged = [this](core::ReflexMode mode)
+                                                         {
+                                                             settings_.setReflex(QString::fromLatin1(
+                                                                 render::reflexModeName(mode)));
+                                                         },
+                                                         .microphoneMutedChanged =
+                                                             [this](bool muted)
+                                                         { settings_.setMicrophoneMuted(muted); },
+                                                         .statisticsVisibleChanged =
+                                                             [this](bool visible)
+                                                         {
+                                                             settings_.setOverlayStatisticsVisible(
+                                                                 visible);
+                                                         },
+                                                         .disconnect = [this]
+                                                         {
+                                                             QMetaObject::invokeMethod(
+                                                                 this, &AppController::closeVideoTest,
+                                                                 Qt::QueuedConnection);
+                                                         },
+                                                     },
                                                  .onClosed = closeLater,
                                              });
 

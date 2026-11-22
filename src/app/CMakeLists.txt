@@ -24,6 +24,7 @@ qt_add_executable(lynx-play WIN32
     IconProvider.h
     InputController.cpp
     InputController.h
+    OverlayInput.h
     PairingController.cpp
     PairingController.h
     QtLogBridge.cpp

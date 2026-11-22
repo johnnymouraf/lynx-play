@@ -4,6 +4,7 @@
 #include "render/FrameMailbox.h"
 #include "render/FrameRenderer.h"
 #include "render/GpuDevice.h"
+#include "render/Overlay.h"
 #include "render/SwapChain.h"
 
 #include <cstdint>
@@ -41,8 +42,12 @@ struct StreamWindowOptions
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
     HWND monitorOf = nullptr;
-    // The font the statistics overlay draws with; empty uses Dear ImGui's.
-    std::shared_ptr<const std::vector<std::uint8_t>> overlayFont;
+    // The overlay's fonts and its initial state and actions.
+    OverlayFonts overlayFonts;
+    OverlayOptions overlay;
+    OverlayActions overlayActions;
+    // The controller the overlay's menu navigates with; may be empty.
+    std::function<OverlayGamepad()> gamepad;
     // Called once when the window closes by itself, never when its owner
     // destroys it. It runs inside the window's message handling, so it must
     // not destroy the StreamWindow; defer that to the event loop.
@@ -68,6 +73,8 @@ public:
     [[nodiscard]] bool isOpen() const;
     void bringToFront();
     void setReflexMode(core::ReflexMode mode);
+    // Ends the stream as the player would with Esc.
+    void close();
 
 private:
     explicit StreamWindow(std::function<void(CloseReason)> onClosed);
@@ -78,12 +85,14 @@ private:
     void toggleFullscreen();
     void enterFullscreen();
     void leaveFullscreen();
+    void setCursorVisible(bool visible);
     void close(CloseReason reason);
 
     HWND window_ = nullptr;
     std::unique_ptr<FrameRenderer> renderer_;
     std::function<void(CloseReason)> onClosed_;
     bool fullscreen_ = false;
+    bool cursorVisible_ = true;
     WINDOWPLACEMENT windowedPlacement_{.length = sizeof(WINDOWPLACEMENT)};
 };
 

@@ -22,6 +22,8 @@ constexpr DWORD kFullscreenStyle = WS_POPUP;
 
 // Posted by the renderer's thread when it stops for good.
 constexpr UINT kRenderFailedMessage = WM_APP + 1;
+// Posted when the overlay's menu opens or closes, from the renderer's thread.
+constexpr UINT kOverlayMenuMessage = WM_APP + 2;
 
 // Bit 29 of a key message's lParam: the Alt key was down.
 constexpr LPARAM kAltDownFlag = LPARAM{1} << 29;
@@ -112,9 +114,27 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     FrameRenderer::Options rendererOptions{
         .timing = options.timing,
         .reflex = options.reflex,
-        .overlayFont = std::move(options.overlayFont),
+        .overlayFonts = std::move(options.overlayFonts),
+        .overlay = std::move(options.overlay),
+        .overlayActions = std::move(options.overlayActions),
+        .gamepad = std::move(options.gamepad),
         .onFailure = [window] { PostMessageW(window, kRenderFailedMessage, 0, 0); },
     };
+
+    // The menu's cursor belongs to the window's thread, which owns the
+    // message loop.
+    const std::function<void(bool)> userMenuChanged =
+        std::move(rendererOptions.overlayActions.menuOpenChanged);
+    rendererOptions.overlayActions.menuOpenChanged = [window, userMenuChanged](bool open)
+    {
+        PostMessageW(window, kOverlayMenuMessage, open ? 1 : 0, 0);
+
+        if (userMenuChanged)
+        {
+            userMenuChanged(open);
+        }
+    };
+
     auto renderer = FrameRenderer::start(gpu, window, clientSize(window), std::move(mailbox),
                                          std::move(rendererOptions));
 
@@ -128,6 +148,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     stream->renderer_ = std::move(*renderer);
     ShowWindow(window, SW_SHOW);
     SetForegroundWindow(window);
+    stream->setCursorVisible(false);
 
     return stream;
 }
@@ -167,6 +188,11 @@ void StreamWindow::setReflexMode(core::ReflexMode mode)
     }
 }
 
+void StreamWindow::close()
+{
+    close(CloseReason::User);
+}
+
 LRESULT CALLBACK StreamWindow::windowProc(HWND window, UINT message, WPARAM wParam,
                                           LPARAM lParam)
 {
@@ -197,6 +223,11 @@ LRESULT CALLBACK StreamWindow::windowProc(HWND window, UINT message, WPARAM wPar
 
 LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (renderer_ != nullptr)
+    {
+        renderer_->handleOverlayMessage(window_, message, wParam, lParam);
+    }
+
     switch (message)
     {
     case WM_SIZE:
@@ -229,6 +260,10 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         close(CloseReason::RenderFailed);
         return 0;
 
+    case kOverlayMenuMessage:
+        setCursorVisible(wParam != 0);
+        return 0;
+
     default:
         break;
     }
@@ -241,7 +276,27 @@ void StreamWindow::handleKey(WPARAM key)
     switch (key)
     {
     case VK_ESCAPE:
+        if (renderer_ != nullptr && renderer_->overlayMenuOpen())
+        {
+            renderer_->toggleOverlayMenu();
+            break;
+        }
+
         close(CloseReason::User);
+        break;
+
+    case VK_F1:
+        if (renderer_ != nullptr)
+        {
+            renderer_->toggleOverlayMenu();
+        }
+        break;
+
+    case VK_F2:
+        if (renderer_ != nullptr)
+        {
+            renderer_->toggleOverlayStatistics();
+        }
         break;
 
     case VK_F11:
@@ -251,6 +306,17 @@ void StreamWindow::handleKey(WPARAM key)
     default:
         break;
     }
+}
+
+void StreamWindow::setCursorVisible(bool visible)
+{
+    if (cursorVisible_ == visible)
+    {
+        return;
+    }
+
+    ShowCursor(visible ? TRUE : FALSE);
+    cursorVisible_ = visible;
 }
 
 void StreamWindow::toggleFullscreen()
@@ -304,6 +370,7 @@ void StreamWindow::leaveFullscreen()
 // it presents to is destroyed.
 void StreamWindow::close(CloseReason reason)
 {
+    setCursorVisible(true);
     renderer_.reset();
 
     if (window_ != nullptr)

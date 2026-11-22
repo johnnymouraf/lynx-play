@@ -154,6 +154,32 @@ void FrameRenderer::setReflexMode(core::ReflexMode mode)
     SetEvent(wakeEvent_.get());
 }
 
+void FrameRenderer::toggleOverlayMenu()
+{
+    menuToggleRequested_.store(true);
+    redrawRequested_.store(true);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::toggleOverlayStatistics()
+{
+    statisticsToggleRequested_.store(true);
+    redrawRequested_.store(true);
+    SetEvent(wakeEvent_.get());
+}
+
+bool FrameRenderer::overlayMenuOpen() const
+{
+    const Overlay* const overlay = overlayForMessages_.load();
+    return overlay != nullptr && overlay->menuOpen();
+}
+
+bool FrameRenderer::handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    Overlay* const overlay = overlayForMessages_.load();
+    return overlay != nullptr && overlay->handleMessage(window, message, wParam, lParam);
+}
+
 std::expected<void, std::string> FrameRenderer::createFrameResources()
 {
     for (auto& allocator : allocators_)
@@ -223,13 +249,23 @@ void FrameRenderer::run(const std::stop_token& stop)
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
 
-    const std::span<const std::uint8_t> font =
-        options_.overlayFont ? std::span<const std::uint8_t>(*options_.overlayFont)
-                             : std::span<const std::uint8_t>{};
+    OverlayActions actions = options_.overlayActions;
+    const std::function<void(core::ReflexMode)> appReflex = actions.reflexChanged;
 
-    std::unique_ptr<Overlay> overlay;
+    actions.reflexChanged = [this, appReflex](core::ReflexMode mode)
+    {
+        requestedReflex_.store(mode);
+        SetEvent(wakeEvent_.get());
+
+        if (appReflex)
+        {
+            appReflex(mode);
+        }
+    };
+
     auto created = Overlay::create(*gpu_.device.Get(), *gpu_.queue.Get(), window_,
-                                   SwapChain::kBufferCount, SwapChain::kFormat, font);
+                                   SwapChain::kBufferCount, SwapChain::kFormat,
+                                   options_.overlayFonts, options_.overlay, std::move(actions));
 
     if (!created)
     {
@@ -237,15 +273,17 @@ void FrameRenderer::run(const std::stop_token& stop)
     }
     else
     {
-        overlay = std::move(*created);
+        overlay_ = std::move(*created);
+        overlayForMessages_.store(overlay_.get());
     }
 
     const std::stop_callback wakeOnStop(stop, [this] { SetEvent(wakeEvent_.get()); });
     const std::array events{mailbox_->frameReadyEvent(), wakeEvent_.get()};
+    const DWORD timeout = options_.gamepad ? 16 : INFINITE;
 
     while (true)
     {
-        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE, INFINITE);
+        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE, timeout);
 
         if (stop.stop_requested())
         {
@@ -253,8 +291,10 @@ void FrameRenderer::run(const std::stop_token& stop)
         }
 
         applyRequestedReflex();
+        applyOverlayToggles();
+        pollGamepad();
 
-        if (auto frame = renderFrame(overlay.get()); !frame)
+        if (auto frame = renderFrame(); !frame)
         {
             spdlog::error("Rendering stopped: {}", frame.error());
 
@@ -266,15 +306,67 @@ void FrameRenderer::run(const std::stop_token& stop)
             break;
         }
 
+        if (overlay_ != nullptr && overlay_->visible())
+        {
+            redrawRequested_.store(true);
+            SetEvent(wakeEvent_.get());
+        }
+
         reportStatistics();
     }
+
+    overlayForMessages_.store(nullptr);
 
     // The overlay's buffers and the frames in flight are released below, so
     // the GPU must be done with them first.
     waitForGpu();
 }
 
-std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
+void FrameRenderer::applyOverlayToggles()
+{
+    if (overlay_ == nullptr)
+    {
+        return;
+    }
+
+    if (menuToggleRequested_.exchange(false))
+    {
+        overlay_->toggleMenu();
+        redrawRequested_.store(true);
+    }
+
+    if (statisticsToggleRequested_.exchange(false))
+    {
+        overlay_->toggleStatistics();
+        redrawRequested_.store(true);
+    }
+}
+
+OverlayGamepad FrameRenderer::gamepadState() const
+{
+    return options_.gamepad ? options_.gamepad() : OverlayGamepad{};
+}
+
+void FrameRenderer::pollGamepad()
+{
+    if (overlay_ == nullptr)
+    {
+        return;
+    }
+
+    const OverlayGamepad gamepad = gamepadState();
+    const bool chord = gamepad.connected && gamepad.create && gamepad.options;
+
+    if (chord && !chordHeld_)
+    {
+        overlay_->toggleMenu();
+        redrawRequested_.store(true);
+    }
+
+    chordHeld_ = chord;
+}
+
+std::expected<void, std::string> FrameRenderer::renderFrame()
 {
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
@@ -367,7 +459,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
     auto& allocator = allocators_.at(bufferIndex);
     allocator->Reset();
     commandList_->Reset(allocator.Get(), nullptr);
-    recordFrame(bufferIndex, overlay);
+    recordFrame(bufferIndex);
     commandList_->Close();
 
     if (shownFrame_ && shownFrame_->fence)
@@ -438,7 +530,7 @@ void FrameRenderer::applyRequestedReflex()
     reflex_.configure(requested, gpu_.device.Get());
 }
 
-void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
+void FrameRenderer::recordFrame(UINT bufferIndex)
 {
     ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
     const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
@@ -470,9 +562,9 @@ void FrameRenderer::recordFrame(UINT bufferIndex, Overlay* overlay)
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay != nullptr)
+    if (overlay_ != nullptr)
     {
-        overlay->render(*commandList_.Get(), target, overlayStats());
+        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);

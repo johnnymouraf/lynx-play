@@ -1,10 +1,13 @@
 #pragma once
 
+#include "core/ReflexMode.h"
 #include "render/GpuTimer.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -15,6 +18,7 @@
 #include <wrl/client.h>
 
 struct ImGuiContext;
+struct ImFont;
 
 namespace lynx::render
 {
@@ -60,16 +64,74 @@ struct OverlayStats
     ReflexOverlayStats reflex;
 };
 
-// The minimal in-stream panel: the GPU time of each pipeline stage and
-// Reflex's latency report, drawn with Dear ImGui into the stream's back
-// buffer. It only shows statistics; the full menu belongs to the overlay's
-// own milestone.
+// The font files the overlay draws with; a missing one falls back to Dear
+// ImGui's built-in font.
+struct OverlayFonts
+{
+    std::shared_ptr<const std::vector<std::uint8_t>> body;
+    std::shared_ptr<const std::vector<std::uint8_t>> label;
+    std::shared_ptr<const std::vector<std::uint8_t>> title;
+    std::shared_ptr<const std::vector<std::uint8_t>> mono;
+};
+
+// What the overlay starts with, before the player changes anything.
+struct OverlayOptions
+{
+    bool statisticsVisible = false;
+    core::ReflexMode reflex = core::ReflexMode::On;
+    bool microphoneMuted = false;
+    // The controller the microphone toggle names, if any.
+    std::string microphoneDetail;
+    // The console (or file) being played; the quick menu's session line.
+    std::string sessionName;
+};
+
+// What the overlay asks the app to do; each runs on the renderer's thread, so
+// the app must defer anything that touches its own threads.
+struct OverlayActions
+{
+    std::function<void(core::ReflexMode)> reflexChanged;
+    std::function<void(bool)> microphoneMutedChanged;
+    std::function<void(bool)> statisticsVisibleChanged;
+    std::function<void(bool)> menuOpenChanged;
+    std::function<void()> disconnect;
+};
+
+// The controller state the overlay navigates with while its menu is open.
+struct OverlayGamepad
+{
+    bool connected = false;
+    bool cross = false;
+    bool circle = false;
+    bool square = false;
+    bool triangle = false;
+    bool dpadUp = false;
+    bool dpadDown = false;
+    bool dpadLeft = false;
+    bool dpadRight = false;
+    bool l1 = false;
+    bool r1 = false;
+    bool l3 = false;
+    bool r3 = false;
+    bool options = false;
+    bool create = false;
+    bool touchpad = false;
+    bool ps = false;
+    float leftX = 0.0F;
+    float leftY = 0.0F;
+    float rightX = 0.0F;
+    float rightY = 0.0F;
+};
+
+// The in-stream overlay, drawn with Dear ImGui into the stream's back buffer:
+// the statistics panel on the left and the quick menu on the right, both
+// hidden until F1 (menu) or F2 (statistics) asks for them.
 class Overlay
 {
 public:
     [[nodiscard]] static std::expected<std::unique_ptr<Overlay>, std::string> create(
         ID3D12Device& device, ID3D12CommandQueue& queue, HWND window, UINT bufferCount,
-        DXGI_FORMAT format, std::span<const std::uint8_t> font);
+        DXGI_FORMAT format, OverlayFonts fonts, OverlayOptions options, OverlayActions actions);
 
     Overlay(const Overlay&) = delete;
     Overlay& operator=(const Overlay&) = delete;
@@ -79,13 +141,27 @@ public:
 
     // The target must be in the RENDER_TARGET state.
     void render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTOR_HANDLE target,
-                const OverlayStats& stats);
+                const OverlayStats& stats, const OverlayGamepad& gamepad);
+
+    // Safe from the interface's thread; applied by the next frame.
+    void toggleMenu();
+    void toggleStatistics();
+    [[nodiscard]] bool menuOpen() const;
+    [[nodiscard]] bool statisticsVisible() const;
+    // Whether anything is on screen, so the renderer keeps drawing.
+    [[nodiscard]] bool visible() const;
+
+    // Feeds Dear ImGui's Win32 backend; safe to call beside render().
+    bool handleMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
     Overlay() = default;
 
     void allocateView(D3D12_CPU_DESCRIPTOR_HANDLE* cpu, D3D12_GPU_DESCRIPTOR_HANDLE* gpu);
     void freeView(D3D12_CPU_DESCRIPTOR_HANDLE cpu);
+    void loadFonts(const OverlayFonts& fonts);
+    void sendGamepad(const OverlayGamepad& gamepad);
+    void reportState();
 
     ID3D12Device* device_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> viewHeap_;
@@ -93,7 +169,23 @@ private:
     std::vector<bool> viewsUsed_;
     ImGuiContext* context_ = nullptr;
     // The atlas keeps pointing at these bytes; they must outlive the context.
-    std::vector<std::uint8_t> fontData_;
+    OverlayFonts fontData_;
+    ImFont* bodyFont_ = nullptr;
+    ImFont* labelFont_ = nullptr;
+    ImFont* captionFont_ = nullptr;
+    ImFont* overlineFont_ = nullptr;
+    ImFont* buttonFont_ = nullptr;
+    ImFont* titleFont_ = nullptr;
+    ImFont* monoFont_ = nullptr;
+
+    OverlayOptions options_;
+    OverlayActions actions_;
+    std::atomic<bool> menuOpen_{false};
+    std::atomic<bool> statisticsVisible_{false};
+    bool reportedMenuOpen_ = false;
+    bool reportedStatisticsVisible_ = false;
+    core::ReflexMode reflex_ = core::ReflexMode::Off;
+    bool microphoneMuted_ = false;
 };
 
 } // namespace lynx::render

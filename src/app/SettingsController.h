@@ -44,6 +44,8 @@ class SettingsController : public QObject
     Q_PROPERTY(QString reflex READ reflex WRITE setReflex NOTIFY rtxChanged)
     Q_PROPERTY(bool reflexAvailable READ reflexAvailable CONSTANT)
     Q_PROPERTY(QString reflexUnavailableReason READ reflexUnavailableReason CONSTANT)
+    Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
+                   setOverlayStatisticsVisible NOTIFY overlayChanged)
 
 public:
     // Without a store, changes last until the app closes.
@@ -53,6 +55,7 @@ public:
     [[nodiscard]] const core::VideoSettings& video() const;
     [[nodiscard]] const core::AudioSettings& audio() const;
     [[nodiscard]] const core::ControllerSettings& controller() const;
+    [[nodiscard]] const core::OverlaySettings& overlay() const;
     [[nodiscard]] render::PresentTiming presentTiming() const;
 
     // The lines of the resolution asked of the PS5: 360, 540, 720 or 1080.
@@ -107,12 +110,16 @@ public:
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
 
+    [[nodiscard]] bool overlayStatisticsVisible() const;
+    void setOverlayStatisticsVisible(bool visible);
+
 signals:
     void videoChanged();
     void audioChanged();
     void audioDevicesChanged();
     void controllerChanged();
     void rtxChanged();
+    void overlayChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 
@@ -121,6 +128,7 @@ private:
     void apply(const core::AudioSettings& audio);
     void apply(const core::ControllerSettings& controller);
     void applyRtx(const core::RtxSettings& rtx);
+    void applyOverlay(const core::OverlaySettings& overlay);
     void save();
 
     std::optional<core::SettingsStore> store_;

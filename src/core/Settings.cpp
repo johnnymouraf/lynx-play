@@ -199,6 +199,21 @@ RtxSettings readRtx(const Json& rtx)
     return settings;
 }
 
+OverlaySettings readOverlay(const Json& overlay)
+{
+    OverlaySettings settings;
+
+    if (!overlay.is_object())
+    {
+        return settings;
+    }
+
+    settings.statisticsVisible =
+        booleanAt(overlay, "statisticsVisible", settings.statisticsVisible);
+
+    return settings;
+}
+
 } // namespace
 
 std::expected<Settings, std::string> readSettings(std::istream& input)
@@ -240,6 +255,11 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.rtx = readRtx(*rtx);
     }
 
+    if (const auto overlay = root.find("overlay"); overlay != root.end())
+    {
+        settings.overlay = readOverlay(*overlay);
+    }
+
     return settings;
 }
 
@@ -249,6 +269,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
     const AudioSettings& audio = settings.audio;
     const ControllerSettings& controller = settings.controller;
     const RtxSettings& rtx = settings.rtx;
+    const OverlaySettings& overlay = settings.overlay;
 
     const Json root{
         {"version", kSettingsVersion},
@@ -274,6 +295,10 @@ void writeSettings(const Settings& settings, std::ostream& output)
         {"rtx",
          {
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
+         }},
+        {"overlay",
+         {
+             {"statisticsVisible", overlay.statisticsVisible},
          }},
     };
 

@@ -67,6 +67,14 @@ struct ControllerSettings
     bool operator==(const ControllerSettings&) const = default;
 };
 
+// What the in-stream overlay shows without being asked.
+struct OverlaySettings
+{
+    bool statisticsVisible = false;
+
+    bool operator==(const OverlaySettings&) const = default;
+};
+
 // The NVIDIA features applied to the stream.
 struct RtxSettings
 {
@@ -82,6 +90,7 @@ struct Settings
     AudioSettings audio;
     ControllerSettings controller;
     RtxSettings rtx;
+    OverlaySettings overlay;
 
     bool operator==(const Settings&) const = default;
 };

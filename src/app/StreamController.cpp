@@ -2,8 +2,10 @@
 
 #include "app/Fonts.h"
 #include "app/InputController.h"
+#include "app/OverlayInput.h"
 #include "app/SettingsController.h"
 #include "input/GamepadManager.h"
+#include "render/ReflexSession.h"
 
 #include <QGuiApplication>
 #include <QWindow>
@@ -324,6 +326,40 @@ void StreamController::onFirstPicture(std::uint64_t session)
     const auto closed = [this, session](render::CloseReason reason)
     { post([this, session, reason] { onWindowClosed(session, reason); }); };
 
+    const render::OverlayActions overlayActions{
+        .reflexChanged = [this](core::ReflexMode mode)
+        {
+            const QString name = QString::fromLatin1(render::reflexModeName(mode));
+            post([this, name] { settings_.setReflex(name); });
+        },
+        .microphoneMutedChanged = [this](bool muted)
+        { post([this, muted] { settings_.setMicrophoneMuted(muted); }); },
+        .statisticsVisibleChanged = [this](bool visible)
+        { post([this, visible] { settings_.setOverlayStatisticsVisible(visible); }); },
+        .menuOpenChanged = [this](bool open)
+        {
+            post(
+                [this, open]
+                {
+                    if (input_.gamepads() != nullptr)
+                    {
+                        input_.gamepads()->setOverlayOpen(open);
+                    }
+                });
+        },
+        .disconnect = [this]
+        {
+            post(
+                [this]
+                {
+                    if (window_ != nullptr)
+                    {
+                        window_->close();
+                    }
+                });
+        },
+    };
+
     auto window = render::StreamWindow::open(*gpu_, mailbox_,
                                              {
                                                  .title = L"Lynx Play — " +
@@ -332,7 +368,38 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .reflex = settings_.reflexMode(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
-                                                 .overlayFont = overlayFont(),
+                                                 .overlayFonts = overlayFonts(),
+                                                 .overlay =
+                                                     {
+                                                         .statisticsVisible =
+                                                             settings_.overlayStatisticsVisible(),
+                                                         .reflex = settings_.reflexMode(),
+                                                         .microphoneMuted =
+                                                             settings_.microphoneMuted(),
+                                                         .microphoneDetail =
+                                                             input_.controllerConnected()
+                                                                 ? "DualSense"
+                                                                 : "Sem controle",
+                                                         .sessionName =
+                                                             target_->name.toStdString(),
+                                                     },
+                                                 .overlayActions = overlayActions,
+                                                 .gamepad = [this]
+                                                 {
+                                                     const input::GamepadManager* gamepads =
+                                                         input_.gamepads();
+
+                                                     if (gamepads == nullptr)
+                                                     {
+                                                         return render::OverlayGamepad{};
+                                                     }
+
+                                                     const std::optional<input::GamepadSample>
+                                                         sample = gamepads->sample();
+
+                                                     return sample ? overlayGamepad(*sample)
+                                                                   : render::OverlayGamepad{};
+                                                 },
                                                  .onClosed = closed,
                                              });
 
@@ -395,6 +462,12 @@ void StreamController::onWindowClosed(std::uint64_t session, render::CloseReason
 void StreamController::stop()
 {
     ++sessionNumber_;
+
+    if (input_.gamepads() != nullptr)
+    {
+        input_.gamepads()->setOverlayOpen(false);
+    }
+
     window_.reset();
     session_.reset();
     mailbox_.reset();

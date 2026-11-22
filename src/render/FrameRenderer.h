@@ -36,8 +36,11 @@ public:
     {
         PresentTiming timing = PresentTiming::VSync;
         core::ReflexMode reflex = core::ReflexMode::Off;
-        // The font the overlay's text is drawn with; empty uses Dear ImGui's.
-        std::shared_ptr<const std::vector<std::uint8_t>> overlayFont;
+        OverlayFonts overlayFonts;
+        OverlayOptions overlay;
+        OverlayActions overlayActions;
+        // The controller the quick menu navigates with; may be empty.
+        std::function<OverlayGamepad()> gamepad;
         // Called once on the renderer's thread when it stops for good (the
         // GPU was removed or reset).
         std::function<void()> onFailure;
@@ -63,13 +66,25 @@ public:
     // the stream.
     void setReflexMode(core::ReflexMode mode);
 
+    // Safe from any thread; the overlay opens or closes on the next frame.
+    void toggleOverlayMenu();
+    void toggleOverlayStatistics();
+    [[nodiscard]] bool overlayMenuOpen() const;
+
+    // Feeds Dear ImGui's Win32 backend from the window's message loop. The
+    // overlay may not exist yet.
+    bool handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+
 private:
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
                   std::shared_ptr<FrameMailbox> mailbox, Options options);
 
     [[nodiscard]] std::expected<void, std::string> createFrameResources();
     void run(const std::stop_token& stop);
-    [[nodiscard]] std::expected<void, std::string> renderFrame(Overlay* overlay);
+    void applyOverlayToggles();
+    void pollGamepad();
+    [[nodiscard]] OverlayGamepad gamepadState() const;
+    [[nodiscard]] std::expected<void, std::string> renderFrame();
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
     void recordFrame(UINT bufferIndex, Overlay* overlay);
@@ -84,6 +99,8 @@ private:
     HWND window_ = nullptr;
     SwapChain swapChain_;
     FramePresenter presenter_;
+    std::unique_ptr<Overlay> overlay_;
+    std::atomic<Overlay*> overlayForMessages_{nullptr};
     std::optional<GpuTimer> timer_;
     std::optional<FrameGpuTimes> lastGpuTimes_;
     ReflexSession reflex_;
@@ -108,6 +125,9 @@ private:
     core::UniqueHandle wakeEvent_;
     std::atomic<SurfaceSize> requestedSize_;
     std::atomic<bool> redrawRequested_ = false;
+    std::atomic<bool> menuToggleRequested_ = false;
+    std::atomic<bool> statisticsToggleRequested_ = false;
+    bool chordHeld_ = false;
     core::RateCounter presented_;
     // Last, so the thread starts after every member exists and stops first.
     std::jthread thread_;
