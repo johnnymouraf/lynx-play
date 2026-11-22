@@ -122,3 +122,4 @@ jobs:
           name: lynx-play-windows-x64
           path: dist/lynx-play
           if-no-files-found: error
+          retention-days: 1
