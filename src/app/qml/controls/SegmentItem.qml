@@ -7,6 +7,11 @@ T.Button {
     id: control
 
     property bool selected: false
+    // A choice the control offers but can't take right now.
+    property bool optionEnabled: true
+
+    enabled: optionEnabled
+    opacity: enabled ? 1 : 0.5
 
     implicitWidth: implicitContentWidth + leftPadding + rightPadding
     implicitHeight: 36
