@@ -11,6 +11,8 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
+  - [2.3 HDR](#23-hdr)
+  - [2.4 Optical flow and cadence detection](#24-optical-flow-and-cadence-detection)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -147,6 +149,115 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
+
+
+### 2.3 HDR
+
+- **Goal:** the PS5's native HDR stream plays with correct BT.2020/PQ color on
+  an HDR display and tone-maps on an SDR one, and RTX Video HDR can turn an
+  SDR stream into HDR when the display and the NVIDIA App allow.
+- **Guardrails:** no DLSS (2.5, 2.6); the SDR path stays exactly as it is
+  when HDR is off; no capture card.
+- **Success criteria:**
+  1. CI green on `auto/2.3`, unit tests included.
+  2. `--play-file` with an HDR10 HEVC file (P010, BT.2020/PQ) plays; the log
+     shows P010, the stream's `color_trc`/`color_primaries` (and mastering
+     data when present), the display's HDR state, and which presentation path
+     ran; a screenshot shows a correctly tone-mapped picture on this SDR panel
+     (no washed-out or crushed frame).
+  3. The HDR setting (Desligado / Automático / RTX Video HDR) exists on
+     Configurações › Vídeo, is saved in `settings.json`, and applies live
+     where it can.
+  4. With HDR on for the session, the stream request uses
+     `CHIAKI_CODEC_H265_HDR` (the log shows it); P010 reaches the decoder
+     (owner check for a real session).
+  5. On this machine, display detection reports SDR and the app chooses the
+     SDR swap chain; RTX Video HDR is disabled with an explanation. On an HDR
+     display (owner check), the PQ swap chain and the TrueHDR extension run.
+- **Deliveries:**
+  1. HDR capture and presentation: P010 through the decoder and the shader
+     (BT.2020 matrix, PQ), a 10-bit intermediate, the R10G10B10A2_UNORM swap
+     chain with `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020` on HDR displays,
+     and tone mapping PQ→SDR for SDR ones; the ImGui overlay converts sRGB→PQ
+     on an HDR chain.
+  2. Stream profile and settings: `CHIAKI_CODEC_H265_HDR` when the setting
+     asks for the stream's own HDR; `video.hdr` (off/auto/rtx) in
+     `settings.json`; the Vídeo screen row.
+  3. RTX Video HDR through the D3D11 extension already in place (`GUID
+     {fdd62bb4-620b-4fd7-9ab3-1e59d0d544b3}`, struct `{version 4, method 3,
+     enable 1}`), ordered before VSR in the same blit, with its own stage time
+     in `GpuTimer` and the overlay.
+  4. Display HDR detection: `DisplayConfigGetDeviceInfo` with
+     `GET_ADVANCED_COLOR_INFO_2` (or matching the HMONITOR across adapters,
+     since `GetContainingOutput` misses a panel on another GPU) and the
+     setting's enabled/disabled explanation.
+- **Settled in planning:** research in `scratchpad/research/hdr.md`: chiaki
+  1.10.1 requests HDR purely through the video profile's codec
+  (`CHIAKI_CODEC_H265_HDR`), with no callback flag, and FFmpeg supplies the
+  color metadata; this laptop's panel is SDR and owned by the Intel GPU, so
+  RTX Video HDR's picture is an owner check on an HDR display; the NVIDIA App
+  needs its HDR/Video Enhancements toggle on.
+- **Changes:** `src/render/` (shader, swap chain color space, HDR stage,
+  overlay), `src/media/` (P010 metadata), `src/remoteplay/` (profile),
+  `src/core/` (settings), `src/app/` (Vídeo screen), tests.
+- **Data and interfaces:** `settings.json` gains `video.hdr`
+  (`off`/`auto`/`rtx`); the decoded frame carries its color space and
+  mastering data; the presentation layer reports the display's color mode.
+- **Edge cases:** SDR display with HDR off and on; HDR display with Windows
+  HDR off (Windows tone maps; the log says which path); P010 decode failure
+  (fall back to 8-bit with a logged reason); overlay legibility on HDR;
+  non-NVIDIA GPU (RTX HDR disabled).
+
+### 2.4 Optical flow and cadence detection
+
+- **Goal:** the renderer computes optical flow on the GPU and marks every
+  source frame as distinct or repeated, estimating the stream's cadence
+  (30/60 fps), shown in the overlay; the flow is exposed for DLSS in 2.5 and
+  2.6.
+- **Guardrails:** no DLSS or frame generation yet; with optical flow off, the
+  pipeline behaves exactly as 2.2's; no capture card.
+- **Success criteria:**
+  1. CI green on `auto/2.4`, unit tests included (cadence state machine:
+     windows, period, thresholds, resets; flow-vector scaling/densify math).
+  2. `--play-file` with a 30 fps stream carried in a 60 fps container: the
+     log and the overlay report cadence 30 and the repeated frames, the flow
+     stage's time, and the picture is unchanged; with a true 60 fps file:
+     cadence 60 and no repeated frames (screenshots of the overlay).
+  3. The overlay shows the optical-flow stage's GPU time and the cadence with
+     its repeated-frame count.
+  4. `rtx.opticalFlow` (Ligado/Desligado, default on) on the RTX screen,
+     saved and applied live.
+  5. Owner check: a real 30 fps game reports cadence 30.
+- **Deliveries:**
+  1. NVIDIA Optical Flow: headers vendored from SDK 5.0.7 into
+     `third_party/nvof` (MIT per file, with the license; the SDK zip needs a
+     login, so commit the headers, never the DLL), the D3D12 session
+     (`NvOFAPICreateInstanceD3D12(0x50, …)`, `nvCreateOpticalFlowD3D12`,
+     `nvOFRegisterResourceD3D12`/`nvOFExecuteD3D12`, fence points), input
+     BGRA8 S10.5 flow `R16G16_SINT` and cost `R8_UINT` at grid 4×4, loaded
+     from `System32\nvofapi64.dll`.
+  2. Flow stage in the pipeline (the presenter's intermediate becomes BGRA8),
+     with its time in `GpuTimer` and the overlay.
+  3. Cadence detection: a compute shader comparing the current and previous
+     luma in 4×4 blocks with a group reduction and one atomic, a 16-byte
+     readback fenced and read on the next frame; the state machine (a
+     repeated frame when under ~1% of blocks change; a 60-flag window, at
+     least 30 flags and 12 distinct, two windows agreeing within 1.6 fps;
+     reset on scene cut, resize, source change and dropped frames).
+  4. Setting, the RTX screen row and the overlay's cadence line.
+- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
+  the flow is only computed on `B8G8R8A8_UNORM` inputs at a 4×4 grid; the
+  estimated cost at 1080p on a 4060 is ~1.0–1.3 ms (medium) and ~2.0–2.4 ms
+  (slow); cadence needs a one-frame decision latency and no present stall.
+- **Changes:** `src/render/` (flow, cadence shader and state), `third_party/nvof`,
+  `src/core/` (settings), `src/app/` (RTX row), tests.
+- **Data and interfaces:** `settings.json` gains `rtx.opticalFlow`; each
+  frame carries a distinct/repeated flag and the window's cadence estimate;
+  the flow texture and cost are available to the DLSS steps.
+- **Edge cases:** `nvofapi64.dll` absent or too old (flow disabled with a
+  logged reason; cadence falls back to the block-difference metric alone);
+  30 fps source (no repeats); scene cuts; dropped frames; resize; HDR frames
+  (flow on the 8-bit SDR-converted intermediate).
 
 ### Decisions to review
 
