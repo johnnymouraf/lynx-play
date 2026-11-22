@@ -88,7 +88,9 @@ ColumnLayout {
 
                 AppText {
                     Layout.fillWidth: true
-                    text: "Vibração fina e gatilhos adaptáveis completos. Por Bluetooth, a vibração pode ficar mais simples."
+                    text: section.input.controllerConnected
+                          ? "Vibração fina e gatilhos adaptáveis completos. Por Bluetooth, a vibração pode ficar mais simples."
+                          : "Conecte um DualSense por USB ou Bluetooth. Sem controle, o teclado e o mouse fazem o papel dele."
                     textStyle: "bodyMedium"
                     color: Theme.textMuted
                     wrapMode: Text.WordWrap
