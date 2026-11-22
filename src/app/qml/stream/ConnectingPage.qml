@@ -28,6 +28,12 @@ FocusScope {
         }
     }
 
+    onVisibleChanged: {
+        if (page.visible) {
+            page.focusAction();
+        }
+    }
+
     Keys.onEscapePressed: page.stream.cancel()
 
     Rectangle {

@@ -9,8 +9,12 @@ ApplicationWindow {
     required property AppController controller
     required property ConsolesController consoles
     required property SettingsController settings
+    required property StreamController stream
 
     property string section: "consoles"
+
+    readonly property bool connecting: window.stream.phase !== StreamController.Idle
+                                        && window.stream.phase !== StreamController.Streaming
 
     width: 1280
     height: 800
@@ -40,34 +44,59 @@ ApplicationWindow {
         }
     }
 
-    RowLayout {
-        anchors.fill: parent
-        spacing: 0
+    Connections {
+        target: window.stream
 
-        AppRail {
-            Layout.fillHeight: true
-            section: window.section
-            onSectionRequested: requested => window.section = requested
+        function onNotice(tone, title, message) {
+            toast.show(tone, title, message);
         }
 
-        StackLayout {
-            id: sections
+        function onChanged() {
+            if (window.stream.phase === StreamController.Idle) {
+                consolesPage.focusFirstControl();
+            }
+        }
+    }
 
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: window.section === "consoles" ? 0 : 1
+    Item {
+        anchors.fill: parent
 
-            ConsolesPage {
-                id: consolesPage
+        RowLayout {
+            anchors.fill: parent
+            spacing: 0
 
-                consoles: window.consoles
-                onToastRequested: (tone, title, message) => toast.show(tone, title, message)
+            AppRail {
+                Layout.fillHeight: true
+                section: window.section
+                onSectionRequested: requested => window.section = requested
             }
 
-            SettingsPage {
-                controller: window.controller
-                settings: window.settings
+            StackLayout {
+                id: sections
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                currentIndex: window.section === "consoles" ? 0 : 1
+
+                ConsolesPage {
+                    id: consolesPage
+
+                    consoles: window.consoles
+                    onToastRequested: (tone, title, message) => toast.show(tone, title, message)
+                }
+
+                SettingsPage {
+                    controller: window.controller
+                    settings: window.settings
+                }
             }
+        }
+
+        ConnectingPage {
+            anchors.fill: parent
+            visible: window.connecting
+            stream: window.stream
+            controller: window.controller
         }
     }
 

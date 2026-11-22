@@ -20,7 +20,7 @@ namespace lynx::remoteplay
 namespace
 {
 
-using Clock = std::chrono::steady_clock;
+using SteadyClock = std::chrono::steady_clock;
 
 // chiaki-ng's default: the packet loss reported to the console tops out here.
 constexpr double kPacketLossMax = 0.05;
@@ -119,7 +119,9 @@ struct StreamSession::State
     std::atomic<bool> loginPinRequested = false;
     // Only touched on chiaki's video thread.
     std::uint32_t decodeFailuresInRow = 0;
-    Clock::time_point lastKeyframeRequest{};
+    SteadyClock::time_point lastKeyframeRequest{};
+    // The end reaches the interface once, whichever thread sees it first.
+    std::atomic<bool> endReported = false;
 
     State() = default;
     State(const State&) = delete;
@@ -131,6 +133,7 @@ struct StreamSession::State
     bool decode(std::span<const std::uint8_t> sample);
     void requestKeyframe();
     void handle(const ChiakiEvent& event);
+    void reportEnd(SessionEnd end, std::string detail);
     [[nodiscard]] SessionEnd endOf(ChiakiQuitReason reason) const;
 
     static bool onVideoSample(std::uint8_t* buffer, std::size_t size, std::int32_t framesLost,
@@ -186,7 +189,9 @@ bool StreamSession::State::decode(std::span<const std::uint8_t> sample)
     {
         spdlog::error("The video doesn't decode; ending the session");
         videoFailed = true;
-        chiaki_session_stop(&session);
+        // Stopping here would race chiaki's own shutdown on its video thread;
+        // the interface stops the session after this report.
+        reportEnd(SessionEnd::VideoFailed, "the video doesn't decode");
     }
 
     return false;
@@ -194,7 +199,7 @@ bool StreamSession::State::decode(std::span<const std::uint8_t> sample)
 
 void StreamSession::State::requestKeyframe()
 {
-    const Clock::time_point now = Clock::now();
+    const SteadyClock::time_point now = SteadyClock::now();
 
     if (now - lastKeyframeRequest < kKeyframeRequestInterval)
     {
@@ -235,13 +240,23 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         const std::string detail = event.quit.reason_str != nullptr ? event.quit.reason_str : "";
         spdlog::info("Session ended: {}{}{}", chiaki_quit_reason_string(event.quit.reason),
                      detail.empty() ? "" : ", ", detail);
-        events.onEnded(endOf(event.quit.reason), detail);
+        reportEnd(endOf(event.quit.reason), detail);
         return;
     }
 
     default:
         return;
     }
+}
+
+void StreamSession::State::reportEnd(SessionEnd end, std::string detail)
+{
+    if (endReported.exchange(true))
+    {
+        return;
+    }
+
+    events.onEnded(end, std::move(detail));
 }
 
 SessionEnd StreamSession::State::endOf(ChiakiQuitReason reason) const
