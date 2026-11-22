@@ -235,7 +235,7 @@ void applyStyle()
     style.Colors[ImGuiCol_Button] = ImVec4(0.1216F, 0.1490F, 0.1922F, 1.0F);
     style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.1569F, 0.1922F, 0.2588F, 1.0F);
     style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.2275F, 0.2706F, 0.3333F, 1.0F);
-    style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.9608F, 0.7137F, 0.3647F, 1.0F);
+    style.Colors[ImGuiCol_NavCursor] = ImVec4(0.9608F, 0.7137F, 0.3647F, 1.0F);
     style.Colors[ImGuiCol_PlotLines] = ImVec4(0.9608F, 0.6353F, 0.2275F, 1.0F);
 }
 

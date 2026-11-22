@@ -129,13 +129,13 @@ GamepadSample KeyboardMouseInput::sample()
 {
     const std::scoped_lock lock(mutex_);
 
-    GamepadSample sample;
+    GamepadSample result;
 
     if (overlayOpen_.load())
     {
         deltaX_ = 0.0;
         deltaY_ = 0.0;
-        return sample;
+        return result;
     }
 
     for (std::size_t index = 0; index < core::kKeyboardControlCount; ++index)
@@ -150,8 +150,8 @@ GamepadSample KeyboardMouseInput::sample()
                 const double scale = kMousePixelsToStick * settings_.mouseSensitivity;
                 const double y = settings_.invertY ? -deltaY_ : deltaY_;
 
-                sample.rightX = stickValue(deltaX_ * scale);
-                sample.rightY = stickValue(y * scale);
+                result.rightX = stickValue(deltaX_ * scale);
+                result.rightY = stickValue(y * scale);
             }
 
             continue;
@@ -165,25 +165,25 @@ GamepadSample KeyboardMouseInput::sample()
         switch (control)
         {
         case KeyboardControl::LeftStickUp:
-            sample.leftY = static_cast<std::int16_t>(sample.leftY - 32767);
+            result.leftY = static_cast<std::int16_t>(result.leftY - 32767);
             break;
         case KeyboardControl::LeftStickDown:
-            sample.leftY = static_cast<std::int16_t>(sample.leftY + 32767);
+            result.leftY = static_cast<std::int16_t>(result.leftY + 32767);
             break;
         case KeyboardControl::LeftStickLeft:
-            sample.leftX = static_cast<std::int16_t>(sample.leftX - 32767);
+            result.leftX = static_cast<std::int16_t>(result.leftX - 32767);
             break;
         case KeyboardControl::LeftStickRight:
-            sample.leftX = static_cast<std::int16_t>(sample.leftX + 32767);
+            result.leftX = static_cast<std::int16_t>(result.leftX + 32767);
             break;
         case KeyboardControl::L2:
-            sample.leftTrigger = 255;
+            result.leftTrigger = 255;
             break;
         case KeyboardControl::R2:
-            sample.rightTrigger = 255;
+            result.rightTrigger = 255;
             break;
         default:
-            sample.buttons |= keyMask(control);
+            result.buttons |= keyMask(control);
             break;
         }
     }
@@ -191,7 +191,7 @@ GamepadSample KeyboardMouseInput::sample()
     deltaX_ = 0.0;
     deltaY_ = 0.0;
 
-    return sample;
+    return result;
 }
 
 void KeyboardMouseInput::rebuildBindings()
@@ -231,3 +231,4 @@ bool KeyboardMouseInput::pressed(const Binding& binding) const
 }
 
 } // namespace lynx::input
+
