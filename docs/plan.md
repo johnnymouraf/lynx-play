@@ -13,6 +13,8 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [Shared by every step](#shared-by-every-step)
   - [2.3 HDR](#23-hdr)
   - [2.4 Optical flow and cadence detection](#24-optical-flow-and-cadence-detection)
+  - [2.5 DLSS Frame Generation 2x](#25-dlss-frame-generation-2x)
+  - [2.6 DLSS Super Resolution (experimental)](#26-dlss-super-resolution-experimental)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -258,6 +260,106 @@ the step is done and green.
   logged reason; cadence falls back to the block-difference metric alone);
   30 fps source (no repeats); scene cuts; dropped frames; resize; HDR frames
   (flow on the 8-bit SDR-converted intermediate).
+
+### 2.5 DLSS Frame Generation 2x
+
+- **Goal:** DLSS Frame Generation doubles the presented rate (a 30 fps game
+  reaches 60, a 60 fps one 120) by interpolating between distinct real frames
+  with the optical flow from 2.4, with Reflex on; off by default.
+- **Guardrails:** no DLSS Super Resolution (2.6); off by default because it
+  adds about one source frame of latency; NGX runtimes downloaded in CI, never
+  committed; needs 2.4's flow and cadence.
+- **Success criteria:**
+  1. CI green on `auto/2.5`, unit tests included (the frame schedule: which
+     frames generate, the multiplier, cadence 30 vs 60, pause on repeats).
+  2. `--play-file` of the 30 fps stream in a 60 fps container with Frame
+     Generation on: the log shows the DLSS-G feature created and evaluated
+     per frame, and the overlay's presented fps around 60 from 30 distinct;
+     with a true 60 fps file, around 120 from 60 distinct (screenshots and
+     the present counters).
+  3. Reflex is on whenever Frame Generation is on (the log shows the sleep
+     mode active and markers for both real and generated presents), and the
+     overlay shows the generated-frame count.
+  4. The RTX screen has the Frame Generation setting (Desligado / Ligado 2x)
+     with the latency note, saved in `settings.json` and applied live; on a
+     GPU below Ada or without the runtime, it is disabled with an
+     explanation.
+  5. Owner check: smoothness gain and added latency in a real 30 fps game,
+     and the artifacts in motion.
+- **Deliveries:**
+  1. NGX core (`NVSDK_NGX_D3D12_Init` with the stream's device and an app
+     id, `nvngx_dlss.dll`/`nvngx_dlssg.dll` 310.9.16 and the import library
+     downloaded in CI from NVIDIA's public release, with the license notices),
+     the DLSS-G feature (`NVSDK_NGX_Feature_FrameGeneration` = 11,
+     `NGX_D3D12_CREATE_DLSSG`/`NGX_D3D12_EVALUATE_DLSSG`), resources
+     declared as never provided (HUD-less, UI, UI alpha, distortion).
+  2. Inputs per frame: the real back buffer, a constant depth (`R32_FLOAT`
+     0.9), motion vectors densified from 2.4's flow at scale 1, and the
+     `MultiFrameCount = 1`/`MultiFrameIndex = 1` 2x call.
+  3. Present scheduling: generate only after distinct frames (2.4's flag,
+     no generation after a repeat), present real and generated frames with
+     the Reflex out-of-band notifications (`NvAPI_D3D12_NotifyOutOfBandCommandQueue`,
+     `SetAsyncFrameMarker`) if the driver asks for them, and count them in
+     the overlay.
+  4. Setting, RTX row, overlay (presented vs real fps, generated count) and
+     the failure paths.
+- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
+  feature id 11, Ada supports at most 2x (`MultiFrameCount = 1`; multi-frame
+  needs RTX 50), the DLLs are redistributable in object form under the RTX
+  SDKs license and can be fetched in CI without a login; estimated 2–4 ms a
+  frame on the 4060; the out-of-band queue is what the generated presents
+  need, and Reflex markers must cover both real and generated presents.
+- **Changes:** `src/render/` (NGX host, DLSS-G stage, present scheduling),
+  `src/core/` (settings), `src/app/` (RTX row), CI workflow, tests.
+- **Data and interfaces:** `settings.json` gains `rtx.frameGeneration`
+  (off/2x); the pipeline's frame schedule exposes real vs generated frames;
+  the overlay shows both rates.
+- **Edge cases:** GPU below Ada; the NGX runtime missing or refused; flow or
+  cadence off (disable with an explanation); HDR (generate in the same
+  10-bit space, per 2.3); resize; device lost; a 30 fps stream where every
+  other frame repeats (no generation after repeats).
+
+### 2.6 DLSS Super Resolution (experimental)
+
+- **Goal:** DLSS Super Resolution upscales the stream (1080p to 1440p/4K) fed
+  by the optical-flow motion vectors, shown side by side with RTX VSR in the
+  settings and the overlay.
+- **Guardrails:** experimental, off by default; may not beat VSR on video
+  content; needs 2.4's flow; the VSR path stays the default.
+- **Success criteria:**
+  1. CI green on `auto/2.6`, unit tests included (the size/ratio math and
+     the setting).
+  2. `--play-file` of 1080p in a 1440p window with DLSS SR on: the log
+     shows the feature created and evaluated with the flow's motion vectors,
+     the overlay shows its stage time, and screenshots compare DLSS SR vs
+     VSR vs the shader scale, with the differences described.
+  3. The RTX screen offers the upscaling choice (Shader / RTX Video Super
+     Resolution / DLSS Super Resolution) with DLSS marked experimental,
+     saved in `settings.json` and applied live.
+  4. With flow off, below Ada, or with the runtime missing, DLSS SR is
+     disabled with an explanation and VSR remains the default.
+  5. Owner check: real-game picture quality versus VSR at 1440p/4K.
+- **Deliveries:**
+  1. The NGX DLSS feature (`NVSDK_NGX_Feature_SuperSampling` = 1,
+     `NGX_D3D12_CREATE_DLSS_EXT`/`EVALUATE_DLSS_EXT`, `nvngx_dlss.dll`
+     310.9.16) in the same NGX host 2.5 built, with jitter 0 and sharpness 0.
+  2. Inputs: the current real frame at 1080p, constant depth, motion
+     vectors from the flow scaled to the output/render ratio, Width/OutWidth
+     for the 1.33x and 2x ratios.
+  3. The upscaling selector (shader / VSR / DLSS SR), the stage in
+     `GpuTimer` and the overlay, and the comparison screenshots.
+- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
+  the render ratio comes from Width/OutWidth (the performance/quality label
+  is cosmetic); the estimated cost is 1.5–2.2 ms at 1080p→1440p and
+  3.5–4.5 ms at 1080p→4K; video content lacks the game's temporal data, so
+  artifacts are expected — hence experimental.
+- **Changes:** `src/render/` (DLSS stage, selector), `src/core/` (settings),
+  `src/app/` (RTX row), tests.
+- **Data and interfaces:** `settings.json`'s `rtx.videoSuperResolution`
+  becomes `rtx.upscaling` (`shader`/`vsr`/`dlss`) with the old field
+  migrated.
+- **Edge cases:** ratios outside DLSS's range (fall back to VSR); flow off;
+  non-Ada GPU; HDR; resize; the runtime missing.
 
 ### Decisions to review
 
