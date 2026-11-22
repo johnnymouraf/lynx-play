@@ -1608,7 +1608,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
 
     // The generated picture is the first of the pair, so it gets its own
     // frame slot and the real one takes the next.
-    swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
     const UINT index = swapChain_.currentIndex();
     waitForFence(generationAllocatorFenceValues_.at(index));
     generationAllocators_.at(index)->Reset();
@@ -1616,7 +1616,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
 
     ID3D12GraphicsCommandList& list = *generationCommandList_.Get();
 
-    if (waitForFlow && opticalFlow_ != nullptr)
+    if (waitForFlow && opticalFlow_)
     {
         gpu_.queue->Wait(opticalFlow_->fence(), flowOutput);
     }
@@ -1718,7 +1718,7 @@ std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameI
         return std::unexpected("Frame Generation's real picture isn't prepared");
     }
 
-    swapChain_.waitForFrameSlot(kFrameSlotTimeout);
+    (void)swapChain_.waitForFrameSlot(kFrameSlotTimeout);
     const UINT index = swapChain_.currentIndex();
     waitForFence(presentAllocatorFenceValues_.at(index));
     presentAllocators_.at(index)->Reset();
