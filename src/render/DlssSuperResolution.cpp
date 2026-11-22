@@ -649,12 +649,8 @@ std::expected<void, std::string> DlssSuperResolution::record(
     const NVSDK_NGX_Result evaluated =
         NGX_D3D12_EVALUATE_DLSS_EXT(&commandList, impl.handle, impl.parameters, &params);
 
-    if (NVSDK_NGX_FAILED(evaluated))
-    {
-        return std::unexpected(
-            std::format("NGX_D3D12_EVALUATE_DLSS_EXT: {}", ngxResult(evaluated)));
-    }
-
+    // The barriers are recorded even when the feature refused the frame, so
+    // the pictures return to the states the next frame expects.
     const auto outputToShader =
         transition(entry.output.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -669,6 +665,12 @@ std::expected<void, std::string> DlssSuperResolution::record(
     commandList.ResourceBarrier(static_cast<UINT>(afterBarriers.size()), afterBarriers.data());
 
     entry.outputState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    if (NVSDK_NGX_FAILED(evaluated))
+    {
+        return std::unexpected(
+            std::format("NGX_D3D12_EVALUATE_DLSS_EXT: {}", ngxResult(evaluated)));
+    }
 
     if (!impl.evaluatedOnce)
     {
