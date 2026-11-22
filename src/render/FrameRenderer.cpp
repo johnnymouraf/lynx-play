@@ -2338,14 +2338,14 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
     if (!flowFailed)
     {
         ID3D12Resource* const color = presenter_.flowIntermediate(bufferIndex);
-        ID3D12Resource* const flow = opticalFlow_->flow(bufferIndex);
+        ID3D12Resource* const flowGrid = opticalFlow_->flow(bufferIndex);
 
-        if (color != nullptr && flow != nullptr)
+        if (color != nullptr && flowGrid != nullptr)
         {
             const bool reset = std::exchange(dlssResetPending_, false);
 
             if (auto recorded = dlssSuperResolution_->record(*commandList_.Get(), bufferIndex,
-                                                             *color, *flow, reset);
+                                                             *color, *flowGrid, reset);
                 recorded)
             {
                 drewDlss = true;
