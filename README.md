@@ -66,6 +66,16 @@ ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=60 -t 20 `
   -c:v libx265 -x265-params "keyint=60:bframes=0" test1080p60.h265
 ```
 
+An HDR10 file (10-bit P010, BT.2020/PQ) follows the same path and is
+tone-mapped on an SDR display:
+
+```powershell
+ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=60 -t 20 `
+  -vf "zscale=min=bt709:tin=bt709:pin=bt709:m=bt2020nc:t=smpte2084:p=bt2020:r=limited:npl=1000,format=yuv420p10le" `
+  -c:v libx265 -x265-params "keyint=60:bframes=0:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc" `
+  test-hdr10.h265
+```
+
 ## Requirements
 
 - Windows 11 x64.
