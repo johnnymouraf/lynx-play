@@ -26,14 +26,14 @@ TEST_CASE("selectAdapter prefers the NVIDIA GPU even when another comes first")
 {
     const std::array adapters{kIntelIntegrated, kRtx4060, kBasicRender};
 
-    CHECK(selectAdapter(adapters) == 1);
+    CHECK(selectAdapter(adapters) == 1U);
 }
 
 TEST_CASE("selectAdapter falls back to the first hardware adapter without NVIDIA")
 {
     const std::array adapters{kBasicRender, kRadeon, kIntelIntegrated};
 
-    CHECK(selectAdapter(adapters) == 1);
+    CHECK(selectAdapter(adapters) == 1U);
 }
 
 TEST_CASE("selectAdapter finds nothing when only software adapters exist")
