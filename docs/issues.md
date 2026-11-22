@@ -41,3 +41,14 @@
 - **Actual:** occasionally one gamepad is enumerated and removed about 0.5 s
   later (`SDL reports 1 gamepad(s)` then `Gamepad disconnected`); later runs
   report none. Seen once; likely SDL/Windows behavior with a paired HID device.
+
+## A paired but sleeping DualSense isn't listed by SDL while Windows lists it
+
+- **Where:** `GamepadManager::openAll` at startup.
+- **Steps:** leave a paired DualSense asleep (not connected to the PC) and
+  start the app; compare with the Windows game controllers list.
+- **Expected:** either the controller is listed as connected, or it isn't
+  listed in both places.
+- **Actual:** Windows lists the paired controller and SDL reports 0 gamepads,
+  so the rail shows "Desconectado" and the controller can't be used until it
+  wakes.
