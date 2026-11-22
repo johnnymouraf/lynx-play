@@ -8,6 +8,7 @@
 #include <functional>
 #include <mutex>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <thread>
 

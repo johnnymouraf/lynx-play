@@ -22,6 +22,14 @@ ColumnLayout {
 
     spacing: Theme.space2
 
+    Connections {
+        target: section.settings
+
+        function onAudioChanged() {
+            muteToggle.checked = section.settings.microphoneMuted;
+        }
+    }
+
     SectionHeader {
         Layout.fillWidth: true
         title: "Áudio e microfone"
@@ -76,6 +84,8 @@ ColumnLayout {
         description: "Também pelo botão de mudo do DualSense, a qualquer momento."
 
         Toggle {
+            id: muteToggle
+
             checked: section.settings.microphoneMuted
             Accessible.name: "Silenciar microfone"
             onToggled: section.settings.microphoneMuted = checked

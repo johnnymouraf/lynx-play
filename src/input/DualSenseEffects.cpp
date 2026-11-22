@@ -87,7 +87,8 @@ void DualSenseEffects::apply(const DualSenseCommand& command)
 
     if (command.microphoneMuted)
     {
-        bytes_[kEnableBits2] |= kMicrophoneLightEnabled | kMicrophoneEnabled;
+        bytes_[kEnableBits2] |=
+            static_cast<std::uint8_t>(kMicrophoneLightEnabled | kMicrophoneEnabled);
         bytes_[kMicrophoneLight] = *command.microphoneMuted ? 0x01 : 0x00;
         bytes_[kAudioMute] = *command.microphoneMuted ? 0x08 : 0x00;
     }

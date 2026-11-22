@@ -23,9 +23,14 @@ FocusScope {
 
         return -1;
     }
-    readonly property string currentLabel: control.currentIndex >= 0
-                                           ? control.options[control.currentIndex].label
-                                           : ""
+    readonly property string currentLabel: {
+        if (control.currentIndex >= 0) {
+            return control.options[control.currentIndex].label;
+        }
+
+        return control.currentValue !== undefined && control.currentValue !== null
+                ? String(control.currentValue) : "";
+    }
 
     function openMenu() {
         menu.highlightedIndex = Math.max(0, control.currentIndex);

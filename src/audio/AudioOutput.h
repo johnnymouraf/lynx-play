@@ -66,6 +66,7 @@ private:
     SDL_AudioStream* stream_ = nullptr;
     SDL_AudioDeviceID deviceId_ = 0;
     std::chrono::steady_clock::time_point nextOpenAttempt_{};
+    bool resumePending_ = true;
     bool dropLogged_ = false;
     bool writeErrorLogged_ = false;
     std::function<void()> onLost_;

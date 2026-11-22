@@ -2,6 +2,7 @@
 
 #include "app/SettingsController.h"
 #include "audio/Devices.h"
+#include "input/DualSenseEffects.h"
 #include "input/GamepadManager.h"
 
 #include <QStringList>
@@ -96,7 +97,22 @@ InputController::InputController(SettingsController& settings,
                 }
 
                 refreshStatus();
+                emit changed();
             });
+
+    connect(&settings_, &SettingsController::audioChanged, this,
+            [this]
+            {
+                if (gamepads_ != nullptr)
+                {
+                    gamepads_->submit(input::microphoneCommand(settings_.microphoneMuted()));
+                }
+            });
+
+    if (gamepads_ != nullptr)
+    {
+        gamepads_->submit(input::microphoneCommand(settings_.microphoneMuted()));
+    }
 
     refreshStatus();
 }

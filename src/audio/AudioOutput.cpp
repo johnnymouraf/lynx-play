@@ -137,6 +137,18 @@ void AudioOutput::push(const std::int16_t* samples, std::size_t frames, std::uin
         spdlog::warn("Cannot queue game audio: {}", SDL_GetError());
         writeErrorLogged_ = true;
     }
+
+    if (resumePending_)
+    {
+        const std::size_t prefill = audioQueueCap(rate_, channels_) / 3;
+        const int queued = SDL_GetAudioStreamQueued(stream_);
+
+        if (queued > 0 && static_cast<std::size_t>(queued) >= prefill)
+        {
+            SDL_ResumeAudioStreamDevice(stream_);
+            resumePending_ = false;
+        }
+    }
 }
 
 void AudioOutput::setVolumePercent(int percent)
@@ -211,7 +223,9 @@ bool AudioOutput::openLocked()
 
     deviceId_ = SDL_GetAudioStreamDevice(stream_);
     SDL_SetAudioStreamGain(stream_, static_cast<float>(volumePercent_) / 100.0f);
-    SDL_ResumeAudioStreamDevice(stream_);
+    // The device starts paused; the first frames fill a small prefill so it
+    // does not underrun at once.
+    resumePending_ = true;
     dropLogged_ = false;
     writeErrorLogged_ = false;
 
