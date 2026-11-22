@@ -27,6 +27,7 @@ TEST_CASE("Settings survive a write and a read")
         .codec = VideoCodec::H264,
         .bitrateKbps = 12000,
         .presentMode = PresentMode::LowestLatency,
+        .hdr = HdrMode::RtxVideoHdr,
     };
     settings.audio = {
         .outputDevice = "Fone de ouvido (Arctis 7)",
@@ -59,6 +60,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.video.codec == VideoCodec::H265);
     CHECK(defaults.video.bitrateKbps == kMaxBitrateKbps);
     CHECK(defaults.video.presentMode == PresentMode::VSync);
+    CHECK(defaults.video.hdr == HdrMode::Auto);
     CHECK(defaults.rtx.reflex == ReflexMode::On);
     CHECK_FALSE(defaults.rtx.videoSuperResolution);
 }
@@ -84,7 +86,8 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
             "fps": 45,
             "codec": "h265",
             "bitrateKbps": 900000,
-            "presentMode": true
+            "presentMode": true,
+            "hdr": "hdr10"
         },
         "audio": {
             "outputDevice": 4,

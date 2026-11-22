@@ -34,6 +34,33 @@ enum class ColorRange
     Full,
 };
 
+// The picture's transfer function: how its RGB codes map to light.
+enum class TransferFunction
+{
+    // BT.709 (or BT.1886) gamma, as SDR video uses.
+    Sdr,
+    // SMPTE ST.2084, as HDR10 uses.
+    Pq,
+};
+
+enum class ColorPrimaries
+{
+    Bt709,
+    Bt2020,
+};
+
+// The stream's HDR10 metadata, when it carries it; zero means unknown.
+struct HdrMetadata
+{
+    // MaxCLL and MaxFALL from the content light level information.
+    double maxContentLightNits = 0.0;
+    double maxFrameAverageNits = 0.0;
+    // The mastering display's peak luminance.
+    double maxMasteringLuminanceNits = 0.0;
+
+    bool operator==(const HdrMetadata&) const = default;
+};
+
 // A picture on the renderer's GPU, ready to draw. Every video source (the test
 // pattern, the decoder fed by a file or the PS5, later a capture card) hands
 // these to the renderer through a FrameMailbox.
@@ -45,6 +72,9 @@ struct VideoFrame
     PixelFormat format = PixelFormat::Nv12;
     ColorMatrix matrix = ColorMatrix::Bt709;
     ColorRange range = ColorRange::Limited;
+    TransferFunction transfer = TransferFunction::Sdr;
+    ColorPrimaries primaries = ColorPrimaries::Bt709;
+    HdrMetadata hdr;
     // The visible picture, from the texture's top-left corner; the texture may
     // be larger (codecs pad to whole macroblocks).
     std::uint32_t width = 0;

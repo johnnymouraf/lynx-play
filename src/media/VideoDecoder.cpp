@@ -4,6 +4,7 @@
 #include "core/Latency.h"
 #include "core/Windows.h"
 #include "render/GpuDevice.h"
+#include "render/Hdr.h"
 
 #include <algorithm>
 #include <array>
@@ -25,6 +26,9 @@ extern "C"
 #include <libavcodec/avcodec.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_d3d12va.h>
+#include <libavutil/mastering_display_metadata.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/rational.h>
 }
 
 namespace lynx::media
@@ -86,6 +90,15 @@ struct StreamFormat
     render::PixelFormat pixelFormat = render::PixelFormat::Nv12;
     render::ColorMatrix matrix = render::ColorMatrix::Bt709;
     render::ColorRange range = render::ColorRange::Limited;
+    render::TransferFunction transfer = render::TransferFunction::Sdr;
+    render::ColorPrimaries primaries = render::ColorPrimaries::Bt709;
+    render::HdrMetadata hdr;
+    // FFmpeg's own names for the stream's tags, for the log.
+    std::string transferTag = "unspecified";
+    std::string primariesTag = "unspecified";
+    std::string spaceTag = "unspecified";
+    // The session asked for HDR and FFmpeg had no transfer to report.
+    bool forcedHdr = false;
 
     bool operator==(const StreamFormat&) const = default;
 };
@@ -203,11 +216,50 @@ render::ColorMatrix matrixOf(AVColorSpace space)
     }
 }
 
-StreamFormat formatOf(const AVFrame& frame)
+std::string colorName(const char* name)
+{
+    return name != nullptr ? name : "unspecified";
+}
+
+render::HdrMetadata hdrMetadataOf(const AVFrame& frame)
+{
+    render::HdrMetadata metadata;
+
+    if (const AVFrameSideData* mastering =
+            av_frame_get_side_data(&frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+        mastering != nullptr)
+    {
+        const auto* data =
+            reinterpret_cast<const AVMasteringDisplayMetadata*>(mastering->data);
+
+        if (data->has_luminance != 0)
+        {
+            metadata.maxMasteringLuminanceNits = av_q2d(data->max_luminance);
+        }
+    }
+
+    if (const AVFrameSideData* light =
+            av_frame_get_side_data(&frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+        light != nullptr)
+    {
+        const auto* data = reinterpret_cast<const AVContentLightMetadata*>(light->data);
+        metadata.maxContentLightNits = static_cast<double>(data->MaxCLL);
+        metadata.maxFrameAverageNits = static_cast<double>(data->MaxFALL);
+    }
+
+    return metadata;
+}
+
+StreamFormat formatOf(const AVFrame& frame, bool hdrExpected)
 {
     const auto* frames = reinterpret_cast<const AVHWFramesContext*>(frame.hw_frames_ctx->data);
     const bool tenBit = frames->sw_format == AV_PIX_FMT_P010;
     const bool fullRange = frame.color_range == AVCOL_RANGE_JPEG;
+    const bool forcedHdr = hdrExpected && frame.color_trc == AVCOL_TRC_UNSPECIFIED;
+    const bool pq = forcedHdr || frame.color_trc == AVCOL_TRC_SMPTE2084;
+    const render::TransferFunction transfer =
+        pq ? render::TransferFunction::Pq : render::TransferFunction::Sdr;
+    const bool bt2020Primaries = forcedHdr || frame.color_primaries == AVCOL_PRI_BT2020;
 
     return {
         .width = static_cast<std::uint32_t>(frame.width),
@@ -215,6 +267,14 @@ StreamFormat formatOf(const AVFrame& frame)
         .pixelFormat = tenBit ? render::PixelFormat::P010 : render::PixelFormat::Nv12,
         .matrix = matrixOf(frame.colorspace),
         .range = fullRange ? render::ColorRange::Full : render::ColorRange::Limited,
+        .transfer = transfer,
+        .primaries =
+            bt2020Primaries ? render::ColorPrimaries::Bt2020 : render::ColorPrimaries::Bt709,
+        .hdr = hdrMetadataOf(frame),
+        .transferTag = colorName(av_color_transfer_name(frame.color_trc)),
+        .primariesTag = colorName(av_color_primaries_name(frame.color_primaries)),
+        .spaceTag = colorName(av_color_space_name(frame.colorspace)),
+        .forcedHdr = forcedHdr,
     };
 }
 
@@ -235,10 +295,28 @@ std::string_view matrixName(render::ColorMatrix matrix)
 
 void logFormat(const StreamFormat& format)
 {
-    spdlog::info("Video stream: {}x{}, {}, {}, {} range", format.width, format.height,
+    spdlog::info("Video stream: {}x{}, {}, {} matrix, {} range, transfer {} (color_trc {}), "
+                 "primaries {} (color_primaries {}), colorspace {}",
+                 format.width, format.height,
                  format.pixelFormat == render::PixelFormat::P010 ? "P010" : "NV12",
                  matrixName(format.matrix),
-                 format.range == render::ColorRange::Full ? "full" : "limited");
+                 format.range == render::ColorRange::Full ? "full" : "limited",
+                 render::transferName(format.transfer), format.transferTag,
+                 render::primariesName(format.primaries), format.primariesTag, format.spaceTag);
+
+    if (format.forcedHdr)
+    {
+        spdlog::info("HDR: the stream's color metadata is unspecified; the session asked for HDR, "
+                     "so the pictures are taken as BT.2020/PQ");
+    }
+
+    if (format.hdr.maxContentLightNits > 0.0 || format.hdr.maxMasteringLuminanceNits > 0.0)
+    {
+        spdlog::info("HDR metadata: mastering {:.0f} nits, MaxCLL {:.0f} nits, MaxFALL {:.0f} "
+                     "nits",
+                     format.hdr.maxMasteringLuminanceNits, format.hdr.maxContentLightNits,
+                     format.hdr.maxFrameAverageNits);
+    }
 }
 
 } // namespace
@@ -246,6 +324,7 @@ void logFormat(const StreamFormat& format)
 struct VideoDecoder::Context
 {
     core::VideoCodec codec = core::VideoCodec::H265;
+    bool hdrExpected = false;
     std::shared_ptr<render::FrameMailbox> mailbox;
     std::shared_ptr<core::StreamMetrics> metrics;
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
@@ -269,7 +348,8 @@ struct VideoDecoder::Context
 
 std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
     const render::GpuDevice& gpu, core::VideoCodec codec,
-    std::shared_ptr<render::FrameMailbox> mailbox, std::shared_ptr<core::StreamMetrics> metrics)
+    std::shared_ptr<render::FrameMailbox> mailbox, std::shared_ptr<core::StreamMetrics> metrics,
+    bool hdrExpected)
 {
     forwardFfmpegLogOnce();
 
@@ -291,6 +371,7 @@ std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
 
     auto context = std::make_unique<Context>();
     context->codec = codec;
+    context->hdrExpected = hdrExpected;
     context->mailbox = std::move(mailbox);
     context->metrics = std::move(metrics);
     context->dxgiDevice = gpu.dxgiDevice;
@@ -453,7 +534,7 @@ std::expected<void, std::string> VideoDecoder::Context::publish(const AVFrame& p
         metrics->addDecoded(now, milliseconds);
     }
 
-    const StreamFormat current = formatOf(picture);
+    const StreamFormat current = formatOf(picture, hdrExpected);
 
     if (format != current)
     {
@@ -481,6 +562,9 @@ std::expected<void, std::string> VideoDecoder::Context::publish(const AVFrame& p
         .format = current.pixelFormat,
         .matrix = current.matrix,
         .range = current.range,
+        .transfer = current.transfer,
+        .primaries = current.primaries,
+        .hdr = current.hdr,
         .width = current.width,
         .height = current.height,
         .fence = surface.sync_ctx.fence,

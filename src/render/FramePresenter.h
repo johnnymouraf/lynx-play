@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/Hdr.h"
 #include "render/Layout.h"
 #include "render/VideoFrame.h"
 
@@ -29,9 +30,12 @@ class FramePresenter
 {
 public:
     // Keeps a set of views and an intermediate picture per back buffer, since
-    // each frame in flight reads and writes its own.
+    // each frame in flight reads and writes its own. The intermediate holds
+    // the converted picture, at 10 bits when it carries PQ; the target is the
+    // back buffer's format.
     [[nodiscard]] static std::expected<FramePresenter, std::string> create(
-        ID3D12Device& device, UINT bufferCount, DXGI_FORMAT targetFormat);
+        ID3D12Device& device, UINT bufferCount, DXGI_FORMAT intermediateFormat,
+        DXGI_FORMAT targetFormat);
 
     // Whether the decoded picture's size differs from the intermediate's.
     [[nodiscard]] bool needsPicture(SurfaceSize picture) const;
@@ -48,10 +52,12 @@ public:
 
     // Draws `picture`'s scaled image over the fit rectangle of `targetSize`;
     // `target` is back buffer `bufferIndex`'s render target view, already in
-    // the RENDER_TARGET state and cleared to black.
+    // the RENDER_TARGET state and cleared to black. A tone map converts a PQ
+    // intermediate to the SDR gamma target.
     void recordScaling(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
                        D3D12_CPU_DESCRIPTOR_HANDLE target, SurfaceSize targetSize,
-                       SurfaceSize pictureSize, ScaledPicture picture);
+                       SurfaceSize pictureSize, ScaledPicture picture,
+                       const ToneMapParameters& toneMap);
 
 private:
     FramePresenter() = default;
@@ -71,6 +77,7 @@ private:
     UINT viewDescriptorSize_ = 0;
     UINT intermediateTargetDescriptorSize_ = 0;
     UINT bufferCount_ = 0;
+    DXGI_FORMAT intermediateFormat_ = DXGI_FORMAT_R8G8B8A8_UNORM;
     std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> intermediates_;
     SurfaceSize pictureSize_;
 };

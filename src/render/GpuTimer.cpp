@@ -26,6 +26,8 @@ std::string_view stageName(EffectStage stage)
     {
     case EffectStage::ColorConversion:
         return "color conversion";
+    case EffectStage::RtxVideoHdr:
+        return "RTX HDR";
     case EffectStage::VideoSuperResolution:
         return "VSR";
     case EffectStage::Scaling:

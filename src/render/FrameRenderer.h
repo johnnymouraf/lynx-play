@@ -1,12 +1,14 @@
 #pragma once
 
 #include "core/RateCounter.h"
+#include "core/Settings.h"
 #include "core/StreamMetrics.h"
 #include "core/Windows.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
 #include "render/GpuDevice.h"
 #include "render/GpuTimer.h"
+#include "render/Hdr.h"
 #include "render/Overlay.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
@@ -42,6 +44,10 @@ public:
         // Runs the stream through RTX Video Super Resolution when the GPU
         // and the driver support it, instead of the shader's scaling pass.
         bool videoSuperResolution = false;
+        // What to ask of HDR and what to do with the stream's PQ pictures.
+        core::HdrMode hdr = core::HdrMode::Auto;
+        // Whether the driver accepted RTX Video HDR's extension.
+        bool rtxVideoHdrAvailable = false;
         OverlayFonts overlayFonts;
         OverlayOptions overlay;
         OverlayActions overlayActions;
@@ -78,6 +84,10 @@ public:
     // processor and the shader's path before the next frame.
     void setVideoSuperResolution(bool enabled);
 
+    // Safe from any thread; the HDR path switches before the next frame,
+    // recreating the swap chain when the display can show HDR.
+    void setHdrMode(core::HdrMode mode);
+
     // Safe from any thread; the overlay opens or closes on the next frame.
     void toggleOverlayMenu();
     void toggleOverlayStatistics();
@@ -88,11 +98,29 @@ public:
     bool handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
+    // What the pipeline does with the frame on screen.
+    struct Presentation
+    {
+        DXGI_FORMAT targetFormat = SwapChain::kSdrFormat;
+        DXGI_FORMAT intermediateFormat = SwapChain::kSdrFormat;
+        bool hdrSwapChain = false;
+        bool toneMap = false;
+        bool rtxVideoHdr = false;
+        bool hdrStream = false;
+        float contentPeakNits = 1000.0F;
+        float sdrWhiteNits = 200.0F;
+    };
+
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
-                  std::shared_ptr<FrameMailbox> mailbox, Options options);
+                  HdrDisplayState display, std::shared_ptr<FrameMailbox> mailbox,
+                  Options options);
 
     [[nodiscard]] std::expected<void, std::string> createFrameResources();
     void run(const std::stop_token& stop);
+    [[nodiscard]] Presentation presentationFor(const VideoFrame* frame) const;
+    [[nodiscard]] std::expected<void, std::string> applyPresentation(
+        const Presentation& presentation);
+    void logPresentation(const Presentation& presentation) const;
     void applyOverlayToggles();
     void pollGamepad();
     [[nodiscard]] OverlayGamepad gamepadState() const;
@@ -100,6 +128,7 @@ private:
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
     void applyRequestedVideoSuperResolution();
+    void applyRequestedHdr();
     // Configures the video processor for the picture on screen and the
     // window it fits; false means the shader's path draws this frame.
     [[nodiscard]] bool prepareVideoSuperResolution();
@@ -120,6 +149,9 @@ private:
     HWND window_ = nullptr;
     SwapChain swapChain_;
     FramePresenter presenter_;
+    HdrDisplayState display_;
+    Presentation presentation_;
+    bool presentationLogged_ = false;
     std::unique_ptr<Overlay> overlay_;
     std::atomic<Overlay*> overlayForMessages_{nullptr};
     std::optional<GpuTimer> timer_;
@@ -130,15 +162,25 @@ private:
     core::ReflexMode requestedReflexApplied_ = core::ReflexMode::Off;
     std::atomic<bool> requestedVideoSuperResolution_;
     bool requestedVideoSuperResolutionApplied_ = false;
+    // The processor model that the current frame was prepared with, for the
+    // stage stamps.
+    bool preparedSuperResolution_ = false;
+    bool preparedTrueHdr_ = false;
     // Built the first time the setting is on with a picture that can use it;
     // a failure falls back to the shader until the setting changes.
     std::optional<VideoSuperResolution> videoSuperResolution_;
     bool videoSuperResolutionFailed_ = false;
+    std::atomic<core::HdrMode> requestedHdr_;
+    core::HdrMode requestedHdrApplied_ = core::HdrMode::Auto;
+    // Set when the driver accepted the extension but failed to run it; the
+    // pipeline then presents the SDR shader path.
+    bool rtxVideoHdrFailed_ = false;
     // The Reflex frame id of a source frame taken but not presented yet; it
     // survives a frame-slot timeout so the retry reuses its one sleep.
     std::optional<std::uint64_t> reflexFrameId_;
     std::shared_ptr<FrameMailbox> mailbox_;
     Options options_;
+    OverlayActions overlayActions_;
     std::shared_ptr<core::StreamMetrics> metrics_;
     std::optional<std::chrono::steady_clock::time_point> lastNewFramePresentTime_;
     ComPtr<ID3D12GraphicsCommandList> commandList_;

@@ -150,6 +150,8 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
         .timing = options.timing,
         .reflex = options.reflex,
         .videoSuperResolution = options.videoSuperResolution,
+        .hdr = options.hdr,
+        .rtxVideoHdrAvailable = options.rtxVideoHdrAvailable,
         .overlayFonts = std::move(options.overlayFonts),
         .overlay = std::move(options.overlay),
         .overlayActions = std::move(options.overlayActions),
@@ -230,6 +232,14 @@ void StreamWindow::setVideoSuperResolution(bool enabled)
     if (renderer_ != nullptr)
     {
         renderer_->setVideoSuperResolution(enabled);
+    }
+}
+
+void StreamWindow::setHdrMode(core::HdrMode mode)
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setHdrMode(mode);
     }
 }
 

@@ -15,58 +15,20 @@ constexpr UINT kMaxQueuedFrames = 1;
 } // namespace
 
 std::expected<SwapChain, std::string> SwapChain::create(const GpuDevice& gpu, HWND window,
-                                                        SurfaceSize size)
+                                                        SurfaceSize size, DXGI_FORMAT format)
 {
     SwapChain chain;
     chain.device_ = gpu.device;
+    chain.factory_ = gpu.factory;
+    chain.queue_ = gpu.queue;
+    chain.window_ = window;
     chain.tearing_ = gpu.supportsTearing;
     chain.size_ = size;
 
-    const DXGI_SWAP_CHAIN_DESC1 description{
-        .Width = size.width,
-        .Height = size.height,
-        .Format = kFormat,
-        .SampleDesc = {.Count = 1, .Quality = 0},
-        .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
-        .BufferCount = kBufferCount,
-        .Scaling = DXGI_SCALING_STRETCH,
-        .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
-        .AlphaMode = DXGI_ALPHA_MODE_IGNORE,
-        .Flags = chain.flags(),
-    };
-
-    ComPtr<IDXGISwapChain1> swapChain1;
-
-    if (const HRESULT result = gpu.factory->CreateSwapChainForHwnd(
-            gpu.queue.Get(), window, &description, nullptr, nullptr, &swapChain1);
-        FAILED(result))
+    if (auto created = chain.createChain(size, format); !created)
     {
-        return std::unexpected(describeFailure("CreateSwapChainForHwnd", result));
+        return std::unexpected(created.error());
     }
-
-    // Fullscreen is borderless and handled by the window; DXGI's exclusive mode
-    // would fight it.
-    if (const HRESULT result = gpu.factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER);
-        FAILED(result))
-    {
-        spdlog::warn("{}", describeFailure("MakeWindowAssociation", result));
-    }
-
-    if (const HRESULT result = swapChain1.As(&chain.swapChain_); FAILED(result))
-    {
-        return std::unexpected(describeFailure("IDXGISwapChain3 query", result));
-    }
-
-    if (const HRESULT result = chain.swapChain_->SetMaximumFrameLatency(kMaxQueuedFrames);
-        FAILED(result))
-    {
-        return std::unexpected(describeFailure("SetMaximumFrameLatency", result));
-    }
-
-    spdlog::info("Presentation: frame queue depth {} (one frame at most waits for the display)",
-                 kMaxQueuedFrames);
-
-    chain.frameLatencyWaitable_.reset(chain.swapChain_->GetFrameLatencyWaitableObject());
 
     const D3D12_DESCRIPTOR_HEAP_DESC heapDescription{
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
@@ -93,19 +55,42 @@ std::expected<SwapChain, std::string> SwapChain::create(const GpuDevice& gpu, HW
 
 std::expected<void, std::string> SwapChain::resize(SurfaceSize size)
 {
+    return resize(size, format_);
+}
+
+std::expected<void, std::string> SwapChain::resize(SurfaceSize size, DXGI_FORMAT format)
+{
     for (auto& buffer : buffers_)
     {
         buffer.Reset();
     }
 
-    if (const HRESULT result = swapChain_->ResizeBuffers(kBufferCount, size.width, size.height,
-                                                         DXGI_FORMAT_UNKNOWN, flags());
-        FAILED(result))
+    if (format != format_)
     {
-        return std::unexpected(describeFailure("ResizeBuffers", result));
+        swapChain_.Reset();
+
+        if (auto created = createChain(size, format); !created)
+        {
+            return created;
+        }
+    }
+    else
+    {
+        if (const HRESULT result = swapChain_->ResizeBuffers(kBufferCount, size.width,
+                                                             size.height, format_, flags());
+            FAILED(result))
+        {
+            return std::unexpected(describeFailure("ResizeBuffers", result));
+        }
+
+        size_ = size;
+
+        if (auto applied = applyColorSpace(); !applied)
+        {
+            return applied;
+        }
     }
 
-    size_ = size;
     return createRenderTargets();
 }
 
@@ -149,6 +134,102 @@ D3D12_CPU_DESCRIPTOR_HANDLE SwapChain::renderTargetView(UINT index) const
 SurfaceSize SwapChain::size() const
 {
     return size_;
+}
+
+DXGI_FORMAT SwapChain::format() const
+{
+    return format_;
+}
+
+std::expected<void, std::string> SwapChain::createChain(SurfaceSize size, DXGI_FORMAT format)
+{
+    const DXGI_SWAP_CHAIN_DESC1 description{
+        .Width = size.width,
+        .Height = size.height,
+        .Format = format,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+        .BufferCount = kBufferCount,
+        .Scaling = DXGI_SCALING_STRETCH,
+        .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+        .AlphaMode = DXGI_ALPHA_MODE_IGNORE,
+        .Flags = flags(),
+    };
+
+    ComPtr<IDXGISwapChain1> swapChain1;
+
+    if (const HRESULT result = factory_->CreateSwapChainForHwnd(
+            queue_.Get(), window_, &description, nullptr, nullptr, &swapChain1);
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("CreateSwapChainForHwnd", result));
+    }
+
+    // Fullscreen is borderless and handled by the window; DXGI's exclusive mode
+    // would fight it.
+    if (const HRESULT result = factory_->MakeWindowAssociation(window_, DXGI_MWA_NO_ALT_ENTER);
+        FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("MakeWindowAssociation", result));
+    }
+
+    if (const HRESULT result = swapChain1.As(&swapChain_); FAILED(result))
+    {
+        return std::unexpected(describeFailure("IDXGISwapChain3 query", result));
+    }
+
+    if (const HRESULT result = swapChain_->SetMaximumFrameLatency(kMaxQueuedFrames);
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("SetMaximumFrameLatency", result));
+    }
+
+    spdlog::info("Presentation: frame queue depth {} (one frame at most waits for the display)",
+                 kMaxQueuedFrames);
+
+    frameLatencyWaitable_.reset(swapChain_->GetFrameLatencyWaitableObject());
+    size_ = size;
+    format_ = format;
+
+    return applyColorSpace();
+}
+
+std::expected<void, std::string> SwapChain::applyColorSpace()
+{
+    const bool hdr = format_ == kHdrFormat;
+    const DXGI_COLOR_SPACE_TYPE colorSpace =
+        hdr ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+            : DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+
+    UINT support = 0;
+
+    if (const HRESULT result = swapChain_->CheckColorSpaceSupport(colorSpace, &support);
+        FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("CheckColorSpaceSupport", result));
+    }
+    else if ((support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) == 0)
+    {
+        spdlog::warn("The swap chain doesn't report color space {} as presentable; setting it "
+                     "anyway",
+                     static_cast<unsigned>(colorSpace));
+    }
+
+    if (const HRESULT result = swapChain_->SetColorSpace1(colorSpace); FAILED(result))
+    {
+        return std::unexpected(describeFailure("SetColorSpace1", result));
+    }
+
+    if (hdr)
+    {
+        spdlog::info("Swap chain: HDR10 (R10G10B10A2_UNORM, RGB_FULL_G2084_NONE_P2020)");
+    }
+    else
+    {
+        spdlog::debug("Swap chain: SDR (R8G8B8A8_UNORM, RGB_FULL_G22_NONE_P709)");
+    }
+
+    return {};
 }
 
 std::expected<void, std::string> SwapChain::createRenderTargets()

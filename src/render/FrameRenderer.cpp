@@ -71,6 +71,23 @@ std::string reflexUnavailableReason(ReflexUnavailable reason)
     return "indisponível";
 }
 
+float contentPeakNitsOf(const VideoFrame& frame)
+{
+    double peak = frame.hdr.maxContentLightNits;
+
+    if (peak <= 0.0)
+    {
+        peak = frame.hdr.maxMasteringLuminanceNits;
+    }
+
+    if (peak <= 0.0)
+    {
+        peak = 1000.0;
+    }
+
+    return static_cast<float>(std::clamp(peak, 100.0, 10000.0));
+}
+
 } // namespace
 
 std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
@@ -84,8 +101,8 @@ std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
         return std::unexpected(swapChain.error());
     }
 
-    auto presenter =
-        FramePresenter::create(*gpu.device.Get(), SwapChain::kBufferCount, SwapChain::kFormat);
+    auto presenter = FramePresenter::create(*gpu.device.Get(), SwapChain::kBufferCount,
+                                            SwapChain::kSdrFormat, SwapChain::kSdrFormat);
 
     if (!presenter)
     {
@@ -94,8 +111,8 @@ std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
 
     // The constructor is private, out of make_unique's reach.
     std::unique_ptr<FrameRenderer> renderer(new FrameRenderer(
-        gpu, window, std::move(*swapChain), std::move(*presenter), std::move(mailbox),
-        std::move(options)));
+        gpu, window, std::move(*swapChain), std::move(*presenter), detectHdrDisplay(window),
+        std::move(mailbox), std::move(options)));
 
     if (auto resources = renderer->createFrameResources(); !resources)
     {
@@ -113,12 +130,13 @@ std::expected<std::unique_ptr<FrameRenderer>, std::string> FrameRenderer::start(
 }
 
 FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
-                             FramePresenter presenter, std::shared_ptr<FrameMailbox> mailbox,
-                             Options options)
+                             FramePresenter presenter, HdrDisplayState display,
+                             std::shared_ptr<FrameMailbox> mailbox, Options options)
     : gpu_(std::move(gpu)),
       window_(window),
       swapChain_(std::move(swapChain)),
       presenter_(std::move(presenter)),
+      display_(std::move(display)),
       mailbox_(std::move(mailbox)),
       options_(std::move(options)),
       metrics_(options_.metrics),
@@ -127,6 +145,34 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
 {
     requestedReflex_.store(options_.reflex);
     requestedVideoSuperResolution_.store(options_.videoSuperResolution);
+    requestedHdr_.store(options_.hdr);
+    requestedHdrApplied_ = options_.hdr;
+
+    spdlog::info("Display for the stream: '{}', HDR supported {}, HDR active {}, SDR white "
+                 "{:.0f} nits (DisplayConfig)",
+                 display_.name.empty() ? "unknown" : display_.name,
+                 display_.hdrSupported ? "yes" : "no", display_.hdrActive ? "yes" : "no",
+                 display_.sdrWhiteNits);
+
+    if (display_.hdrSupported && !display_.hdrActive)
+    {
+        spdlog::info("HDR display with Windows HDR off; HDR streams are tone-mapped to SDR. Turn "
+                     "HDR on in Windows Settings > System > Display > HDR.");
+    }
+
+    if (options_.hdr == core::HdrMode::RtxVideoHdr)
+    {
+        if (!display_.hdrActive)
+        {
+            spdlog::info("RTX Video HDR: requested, but the display isn't in HDR; the SDR shader "
+                         "path draws the stream");
+        }
+        else if (!options_.rtxVideoHdrAvailable)
+        {
+            spdlog::info("RTX Video HDR: requested, but the driver extension isn't available; the "
+                         "SDR shader path draws the stream");
+        }
+    }
 }
 
 FrameRenderer::~FrameRenderer()
@@ -162,6 +208,12 @@ void FrameRenderer::setReflexMode(core::ReflexMode mode)
 void FrameRenderer::setVideoSuperResolution(bool enabled)
 {
     requestedVideoSuperResolution_.store(enabled);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::setHdrMode(core::HdrMode mode)
+{
+    requestedHdr_.store(mode);
     SetEvent(wakeEvent_.get());
 }
 
@@ -286,10 +338,10 @@ void FrameRenderer::run(const std::stop_token& stop)
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
 
-    OverlayActions actions = options_.overlayActions;
-    const std::function<void(core::ReflexMode)> appReflex = actions.reflexChanged;
+    overlayActions_ = options_.overlayActions;
+    const std::function<void(core::ReflexMode)> appReflex = overlayActions_.reflexChanged;
 
-    actions.reflexChanged = [this, appReflex](core::ReflexMode mode)
+    overlayActions_.reflexChanged = [this, appReflex](core::ReflexMode mode)
     {
         requestedReflex_.store(mode);
         SetEvent(wakeEvent_.get());
@@ -300,9 +352,13 @@ void FrameRenderer::run(const std::stop_token& stop)
         }
     };
 
+    OverlayOptions overlayOptions = options_.overlay;
+    overlayOptions.hdrOutput = presentation_.hdrSwapChain;
+    overlayOptions.sdrWhiteNits = presentation_.sdrWhiteNits;
+
     auto created = Overlay::create(*gpu_.device.Get(), *gpu_.queue.Get(), window_,
-                                   SwapChain::kBufferCount, SwapChain::kFormat,
-                                   options_.overlayFonts, options_.overlay, std::move(actions));
+                                   SwapChain::kBufferCount, swapChain_.format(),
+                                   options_.overlayFonts, overlayOptions, overlayActions_);
 
     if (!created)
     {
@@ -329,6 +385,7 @@ void FrameRenderer::run(const std::stop_token& stop)
 
         applyRequestedReflex();
         applyRequestedVideoSuperResolution();
+        applyRequestedHdr();
         applyOverlayToggles();
         pollGamepad();
 
@@ -456,6 +513,13 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     if (auto resized = applyRequestedSize(); !resized)
     {
         return resized;
+    }
+
+    const Presentation presentation = presentationFor(shownFrame_ ? &*shownFrame_ : nullptr);
+
+    if (auto applied = applyPresentation(presentation); !applied)
+    {
+        return applied;
     }
 
     if (shownFrame_)
@@ -619,9 +683,126 @@ void FrameRenderer::applyRequestedVideoSuperResolution()
     spdlog::info("VSR: {}", requested ? "on" : "off");
 }
 
+void FrameRenderer::applyRequestedHdr()
+{
+    const core::HdrMode requested = requestedHdr_.load();
+
+    if (requested == requestedHdrApplied_)
+    {
+        return;
+    }
+
+    requestedHdrApplied_ = requested;
+    rtxVideoHdrFailed_ = false;
+    spdlog::info("HDR: {}", core::hdrModeName(requested));
+}
+
+FrameRenderer::Presentation FrameRenderer::presentationFor(const VideoFrame* frame) const
+{
+    const TransferFunction transfer = frame != nullptr ? frame->transfer : TransferFunction::Sdr;
+    const bool rtxAvailable = options_.rtxVideoHdrAvailable && !rtxVideoHdrFailed_;
+    const HdrPresentation chosen =
+        hdrPresentationFor(requestedHdr_.load(), display_, transfer, rtxAvailable);
+
+    return {
+        .targetFormat = chosen.hdrSwapChain ? SwapChain::kHdrFormat : SwapChain::kSdrFormat,
+        .intermediateFormat =
+            (chosen.hdrStream || chosen.rtxVideoHdr) ? SwapChain::kHdrFormat : SwapChain::kSdrFormat,
+        .hdrSwapChain = chosen.hdrSwapChain,
+        .toneMap = chosen.toneMap,
+        .rtxVideoHdr = chosen.rtxVideoHdr,
+        .hdrStream = chosen.hdrStream,
+        .contentPeakNits = frame != nullptr ? contentPeakNitsOf(*frame) : 1000.0F,
+        .sdrWhiteNits = static_cast<float>(display_.sdrWhiteNits),
+    };
+}
+
+std::expected<void, std::string> FrameRenderer::applyPresentation(
+    const Presentation& presentation)
+{
+    const bool targetChanged = presentation.targetFormat != presentation_.targetFormat;
+    const bool intermediateChanged =
+        presentation.intermediateFormat != presentation_.intermediateFormat;
+    const bool pathChanged = presentation.hdrSwapChain != presentation_.hdrSwapChain ||
+                             presentation.toneMap != presentation_.toneMap ||
+                             presentation.rtxVideoHdr != presentation_.rtxVideoHdr;
+
+    if (targetChanged || intermediateChanged)
+    {
+        waitForGpu();
+
+        if (targetChanged)
+        {
+            if (auto resized = swapChain_.resize(swapChain_.size(), presentation.targetFormat);
+                !resized)
+            {
+                return resized;
+            }
+        }
+
+        auto created =
+            FramePresenter::create(*gpu_.device.Get(), SwapChain::kBufferCount,
+                                   presentation.intermediateFormat, presentation.targetFormat);
+
+        if (!created)
+        {
+            return std::unexpected(created.error());
+        }
+
+        presenter_ = std::move(*created);
+
+        if (videoSuperResolution_)
+        {
+            for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+            {
+                presenter_.writeVideoSuperResolutionView(
+                    index, *videoSuperResolution_->output(index));
+            }
+        }
+
+        if (targetChanged && overlay_ != nullptr)
+        {
+            overlay_->setOutputFormat(presentation.targetFormat, presentation.hdrSwapChain,
+                                      presentation.sdrWhiteNits);
+        }
+    }
+
+    if (pathChanged || !presentationLogged_)
+    {
+        logPresentation(presentation);
+        presentationLogged_ = true;
+    }
+
+    presentation_ = presentation;
+    return {};
+}
+
+void FrameRenderer::logPresentation(const Presentation& presentation) const
+{
+    if (presentation.hdrSwapChain)
+    {
+        spdlog::info("Presentation: HDR10 swap chain (R10G10B10A2_UNORM, "
+                     "RGB_FULL_G2084_NONE_P2020), {}",
+                     presentation.rtxVideoHdr ? "SDR stream converted by RTX Video HDR"
+                                               : "PQ stream passed through");
+        return;
+    }
+
+    if (presentation.toneMap)
+    {
+        spdlog::info("Presentation: SDR swap chain (R8G8B8A8_UNORM, "
+                     "RGB_FULL_G22_NONE_P709), PQ stream tone-mapped to SDR (content peak {:.0f} "
+                     "nits, SDR white {:.0f} nits)",
+                     presentation.contentPeakNits, presentation.sdrWhiteNits);
+        return;
+    }
+
+    spdlog::info("Presentation: SDR swap chain (R8G8B8A8_UNORM, RGB_FULL_G22_NONE_P709)");
+}
+
 bool FrameRenderer::prepareVideoSuperResolution()
 {
-    if (!shownFrame_ || !requestedVideoSuperResolutionApplied_ || videoSuperResolutionFailed_)
+    if (!shownFrame_)
     {
         return false;
     }
@@ -629,18 +810,32 @@ bool FrameRenderer::prepareVideoSuperResolution()
     const SurfaceSize input{.width = shownFrame_->width, .height = shownFrame_->height};
     const PixelRect area = fitPicture(swapChain_.size(), input);
     const SurfaceSize output{.width = area.width, .height = area.height};
+    const bool superResolution =
+        requestedVideoSuperResolutionApplied_ && !videoSuperResolutionFailed_ &&
+        videoSuperResolutionEligible(true, gpu_.info.vendorId, input, output);
+    const bool trueHdr = presentation_.rtxVideoHdr;
 
-    if (!videoSuperResolutionEligible(requestedVideoSuperResolutionApplied_,
-                                       gpu_.info.vendorId, input, output))
+    if (!superResolution && !trueHdr)
     {
         return false;
     }
 
     if (gpu_.d3d11Device.Get() == nullptr || gpu_.d3d11Context.Get() == nullptr)
     {
-        videoSuperResolutionFailed_ = true;
-        spdlog::error("VSR is unavailable; the shader path scales the stream: the stream "
-                      "adapter has no D3D11 device");
+        if (superResolution)
+        {
+            videoSuperResolutionFailed_ = true;
+            spdlog::error("VSR is unavailable; the shader path scales the stream: the stream "
+                          "adapter has no D3D11 device");
+        }
+
+        if (trueHdr)
+        {
+            rtxVideoHdrFailed_ = true;
+            spdlog::error("RTX Video HDR is unavailable; the SDR shader path draws the stream: "
+                          "the stream adapter has no D3D11 device");
+        }
+
         return false;
     }
 
@@ -650,10 +845,16 @@ bool FrameRenderer::prepareVideoSuperResolution()
         .format = shownFrame_->format,
         .matrix = shownFrame_->matrix,
         .range = shownFrame_->range,
+        .transfer = shownFrame_->transfer,
+        .hdrOutput = presentation_.hdrStream || presentation_.rtxVideoHdr,
+        .trueHdr = trueHdr,
+        .superResolution = superResolution,
     };
 
     if (videoSuperResolution_ && videoSuperResolution_->configuredFor(picture))
     {
+        preparedSuperResolution_ = superResolution;
+        preparedTrueHdr_ = trueHdr;
         return true;
     }
 
@@ -667,8 +868,18 @@ bool FrameRenderer::prepareVideoSuperResolution()
 
         if (!created)
         {
-            videoSuperResolutionFailed_ = true;
-            spdlog::error("VSR is unavailable; the shader path scales the stream: {}",
+            if (superResolution)
+            {
+                videoSuperResolutionFailed_ = true;
+            }
+
+            if (trueHdr)
+            {
+                rtxVideoHdrFailed_ = true;
+            }
+
+            spdlog::error("The video processor is unavailable; the shader path draws the stream: "
+                          "{}",
                           created.error());
             return false;
         }
@@ -678,8 +889,19 @@ bool FrameRenderer::prepareVideoSuperResolution()
 
     if (auto configured = videoSuperResolution_->configure(picture); !configured)
     {
-        videoSuperResolutionFailed_ = true;
-        spdlog::error("VSR is unavailable; the shader path scales the stream: {}",
+        if (superResolution)
+        {
+            videoSuperResolutionFailed_ = true;
+        }
+
+        if (trueHdr)
+        {
+            rtxVideoHdrFailed_ = true;
+            redrawRequested_.store(true);
+            SetEvent(wakeEvent_.get());
+        }
+
+        spdlog::error("The video processor is unavailable; the shader path draws the stream: {}",
                       configured.error());
         return false;
     }
@@ -689,6 +911,8 @@ bool FrameRenderer::prepareVideoSuperResolution()
         presenter_.writeVideoSuperResolutionView(index, *videoSuperResolution_->output(index));
     }
 
+    preparedSuperResolution_ = superResolution;
+    preparedTrueHdr_ = trueHdr;
     return true;
 }
 
@@ -699,8 +923,10 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex)
 
     timer_->beginFrame(*commandList_.Get(), bufferIndex);
 
-    // The shader path doesn't run the video processor; its stage still needs
-    // valid stamps for the frame's times to be read back.
+    // The shader path doesn't run the video processor; those stages still
+    // need valid stamps for the frame's times to be read back.
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
 
@@ -723,8 +949,13 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex)
     if (shownFrame_)
     {
         const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+        const ToneMapParameters toneMap{
+            .enabled = presentation_.toneMap,
+            .contentPeakNits = presentation_.contentPeakNits,
+            .sdrWhiteNits = presentation_.sdrWhiteNits,
+        };
         presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(),
-                                  picture, ScaledPicture::Converted);
+                                  picture, ScaledPicture::Converted, toneMap);
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
@@ -752,7 +983,20 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
     copyAllocators_.at(bufferIndex)->Reset();
     copyCommandList_->Reset(copyAllocators_.at(bufferIndex).Get(), nullptr);
     timer_->beginFrame(*copyCommandList_.Get(), bufferIndex);
-    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+
+    // Each model's stage runs from the copy that feeds it to the blit that
+    // applies it; both models share one blit when both are on.
+    if (preparedTrueHdr_)
+    {
+        timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    }
+
+    if (preparedSuperResolution_)
+    {
+        timer_->beginStage(*copyCommandList_.Get(), bufferIndex,
+                           EffectStage::VideoSuperResolution);
+    }
+
     recordInputCopy(*copyCommandList_.Get(), bufferIndex);
 
     if (const HRESULT result = copyCommandList_->Close(); FAILED(result))
@@ -777,10 +1021,20 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 
     if (!outputReady)
     {
-        videoSuperResolutionFailed_ = true;
+        if (preparedSuperResolution_)
+        {
+            videoSuperResolutionFailed_ = true;
+        }
+
+        if (preparedTrueHdr_)
+        {
+            rtxVideoHdrFailed_ = true;
+        }
+
         redrawRequested_.store(true);
         SetEvent(wakeEvent_.get());
-        spdlog::error("VSR stopped on this frame; the shader path draws the next one: {}",
+        spdlog::error("The video processor stopped on this frame; the shader path draws the next "
+                      "one: {}",
                       outputReady.error());
         return false;
     }
@@ -789,11 +1043,32 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
     allocator->Reset();
     commandList_->Reset(allocator.Get(), nullptr);
 
-    // The processor's work happened between the two lists: this stamp closes
-    // the stage after the queue has waited for it.
-    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    // The processor's work happened between the two lists: these stamps close
+    // the stages after the queue has waited for it.
+    if (preparedSuperResolution_)
+    {
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    }
+
+    if (preparedTrueHdr_)
+    {
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    }
+
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    if (!preparedTrueHdr_)
+    {
+        timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    }
+
+    if (!preparedSuperResolution_)
+    {
+        timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    }
 
     ID3D12Resource* const output = videoSuperResolution_->output(bufferIndex);
     const auto toShader = transition(output, D3D12_RESOURCE_STATE_COMMON,
@@ -809,8 +1084,13 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
     commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+    const ToneMapParameters toneMap{
+        .enabled = presentation_.toneMap,
+        .contentPeakNits = presentation_.contentPeakNits,
+        .sdrWhiteNits = presentation_.sdrWhiteNits,
+    };
     presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(), picture,
-                              ScaledPicture::VideoSuperResolution);
+                              ScaledPicture::VideoSuperResolution, toneMap);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
@@ -899,6 +1179,9 @@ OverlayStats FrameRenderer::overlayStats()
 
     stats.outputWidth = swapChain_.size().width;
     stats.outputHeight = swapChain_.size().height;
+    stats.hdrStream = presentation_.hdrStream;
+    stats.hdrSwapChain = presentation_.hdrSwapChain;
+    stats.rtxVideoHdr = presentation_.rtxVideoHdr;
 
     if (lastGpuTimes_)
     {
