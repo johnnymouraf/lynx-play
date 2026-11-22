@@ -151,6 +151,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
             .timing = settings.presentTiming(),
             .reflex = settings.reflexMode(),
             .videoSuperResolution = settings.videoSuperResolution(),
+            .hdr = settings.hdrMode(),
+            .rtxVideoHdrAvailable = settings.rtxVideoHdrAvailable(),
             .overlayFonts = overlayFonts(),
             .overlay =
                 {

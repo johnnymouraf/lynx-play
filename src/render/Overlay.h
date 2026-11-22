@@ -63,6 +63,10 @@ struct OverlayStats
     core::StreamMetricsSnapshot video;
     std::uint32_t outputWidth = 0;
     std::uint32_t outputHeight = 0;
+    // The stream carries PQ, the surface is HDR10 and RTX Video HDR ran.
+    bool hdrStream = false;
+    bool hdrSwapChain = false;
+    bool rtxVideoHdr = false;
 
     bool gpuTimingsValid = false;
     std::array<double, kEffectStageCount> stageMilliseconds{};
@@ -90,6 +94,10 @@ struct OverlayOptions
     std::string microphoneDetail;
     // The console (or file) being played; the quick menu's session line.
     std::string sessionName;
+    // The back buffer is HDR10: Dear ImGui's sRGB colors are converted to PQ
+    // at this SDR white level.
+    bool hdrOutput = false;
+    float sdrWhiteNits = 200.0F;
 };
 
 // What the overlay asks the app to do; each runs on the renderer's thread, so
@@ -149,6 +157,10 @@ public:
     void render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTOR_HANDLE target,
                 const OverlayStats& stats, const OverlayGamepad& gamepad);
 
+    // Rebuilds the Direct3D 12 backend for a new back buffer format; safe to
+    // call while handleMessage() runs on the window's thread.
+    void setOutputFormat(DXGI_FORMAT format, bool hdrOutput, float sdrWhiteNits);
+
     // Safe from the interface's thread; applied by the next frame.
     void toggleMenu();
     void toggleStatistics();
@@ -166,10 +178,12 @@ private:
     void allocateView(D3D12_CPU_DESCRIPTOR_HANDLE* cpu, D3D12_GPU_DESCRIPTOR_HANDLE* gpu);
     void freeView(D3D12_CPU_DESCRIPTOR_HANDLE cpu);
     void loadFonts(const OverlayFonts& fonts);
+    [[nodiscard]] bool createDx12Backend();
     void sendGamepad(const OverlayGamepad& gamepad);
     void reportState();
 
     ID3D12Device* device_ = nullptr;
+    ID3D12CommandQueue* queue_ = nullptr;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> viewHeap_;
     UINT viewDescriptorSize_ = 0;
     std::vector<bool> viewsUsed_;
@@ -186,6 +200,10 @@ private:
 
     OverlayOptions options_;
     OverlayActions actions_;
+    UINT bufferCount_ = 0;
+    DXGI_FORMAT format_ = DXGI_FORMAT_R8G8B8A8_UNORM;
+    bool hdrOutput_ = false;
+    float sdrWhiteNits_ = 200.0F;
     std::atomic<bool> menuOpen_{false};
     std::atomic<bool> statisticsVisible_{false};
     bool reportedMenuOpen_ = false;

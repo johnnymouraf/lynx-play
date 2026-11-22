@@ -186,11 +186,41 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     {
         spdlog::info("VSR is unavailable: {}", videoSuperResolutionAvailability_.detail);
     }
+
+    hdrDisplay_ = render::detectHdrDisplay(nullptr);
+    spdlog::info("HDR display: '{}', HDR supported {}, HDR active {}, SDR white {:.0f} nits",
+                 hdrDisplay_.name.empty() ? "unknown" : hdrDisplay_.name,
+                 hdrDisplay_.hdrSupported ? "yes" : "no", hdrDisplay_.hdrActive ? "yes" : "no",
+                 hdrDisplay_.sdrWhiteNits);
+
+    rtxHdrAvailability_ = render::VideoSuperResolution::probeHdr();
+
+    if (rtxHdrAvailability_.available)
+    {
+        spdlog::info("RTX Video HDR is available ({})", rtxHdrAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("RTX Video HDR is unavailable: {}", rtxHdrAvailability_.detail);
+    }
+
+    spdlog::info("HDR setting: {} (RTX Video HDR {})", core::hdrModeName(settings_.video.hdr),
+                 hdrRtxAvailable() ? "available on this display" : "unavailable on this display");
 }
 
 const core::VideoSettings& SettingsController::video() const
 {
     return settings_.video;
+}
+
+core::HdrMode SettingsController::hdrMode() const
+{
+    return settings_.video.hdr;
+}
+
+bool SettingsController::rtxVideoHdrAvailable() const
+{
+    return rtxHdrAvailability_.available;
 }
 
 const core::AudioSettings& SettingsController::audio() const
@@ -291,6 +321,78 @@ void SettingsController::setLowestLatency(bool lowest)
     core::VideoSettings video = settings_.video;
     video.presentMode = lowest ? PresentMode::LowestLatency : PresentMode::VSync;
     apply(video);
+}
+
+QString SettingsController::hdr() const
+{
+    return QString::fromLatin1(core::hdrModeName(settings_.video.hdr).data());
+}
+
+void SettingsController::setHdr(const QString& name)
+{
+    core::HdrMode mode = core::HdrMode::Auto;
+
+    if (name == u"off"_s)
+    {
+        mode = core::HdrMode::Off;
+    }
+    else if (name == u"auto"_s)
+    {
+        mode = core::HdrMode::Auto;
+    }
+    else if (name == u"rtx"_s)
+    {
+        mode = core::HdrMode::RtxVideoHdr;
+    }
+    else
+    {
+        return;
+    }
+
+    core::VideoSettings video = settings_.video;
+    video.hdr = mode;
+    apply(video);
+}
+
+QString SettingsController::hdrDescription() const
+{
+    QString description;
+
+    if (!hdrDisplay_.hdrSupported)
+    {
+        description = u"Esta tela não é HDR: o HDR do PS5 é convertido para SDR."_s;
+    }
+    else if (!hdrDisplay_.hdrActive)
+    {
+        description = u"Esta tela é HDR, mas o HDR do Windows está desligado. Ligue em "
+                      u"Configurações › Sistema › Tela › HDR para ver HDR."_s;
+    }
+    else
+    {
+        description = u"Tela HDR ativa (%1)."_s.arg(QString::fromStdString(hdrDisplay_.name));
+    }
+
+    if (hdrRtxAvailable())
+    {
+        description +=
+            u" O RTX Video HDR também precisa estar ligado no NVIDIA App (Sistema › Vídeo › "
+            u"RTX Video Enhancements)."_s;
+    }
+    else
+    {
+        description += u" RTX Video HDR indisponível: "_s +
+                       (rtxHdrAvailability_.available
+                            ? u"requer uma tela HDR com o HDR do Windows ligado."_s
+                            : u"o driver NVIDIA não aceitou a extensão."_s);
+    }
+
+    description += u" A escolha vale para a próxima transmissão."_s;
+    return description;
+}
+
+bool SettingsController::hdrRtxAvailable() const
+{
+    return hdrDisplay_.hdrActive && rtxHdrAvailability_.available;
 }
 
 int SettingsController::minBitrateMbps() const
@@ -756,9 +858,9 @@ void SettingsController::apply(const core::VideoSettings& video)
     }
 
     settings_.video = video;
-    spdlog::info("Video settings: {}p, {} fps, {}, {} Mbps, {}", resolution(),
+    spdlog::info("Video settings: {}p, {} fps, {}, {} Mbps, {}, HDR {}", resolution(),
                  video.framesPerSecond, core::codecName(video.codec), bitrateMbps(),
-                 presentModeName(video.presentMode));
+                 presentModeName(video.presentMode), core::hdrModeName(video.hdr));
     emit videoChanged();
     save();
 }

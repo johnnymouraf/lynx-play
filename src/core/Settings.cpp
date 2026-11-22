@@ -47,6 +47,12 @@ constexpr Names<PresentMode, 2> kPresentModeNames{{
     {"lowestLatency", PresentMode::LowestLatency},
 }};
 
+constexpr Names<HdrMode, 3> kHdrNames{{
+    {"off", HdrMode::Off},
+    {"auto", HdrMode::Auto},
+    {"rtx", HdrMode::RtxVideoHdr},
+}};
+
 constexpr Names<ReflexMode, 3> kReflexNames{{
     {"off", ReflexMode::Off},
     {"on", ReflexMode::On},
@@ -141,6 +147,7 @@ VideoSettings readVideo(const Json& video)
     settings.codec = namedValue(kCodecNames, video, "codec", settings.codec);
     settings.presentMode =
         namedValue(kPresentModeNames, video, "presentMode", settings.presentMode);
+    settings.hdr = namedValue(kHdrNames, video, "hdr", settings.hdr);
 
     const auto framesPerSecond = integerAt(video, "fps");
 
@@ -403,6 +410,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"codec", nameOf(kCodecNames, video.codec)},
              {"bitrateKbps", video.bitrateKbps},
              {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
+             {"hdr", nameOf(kHdrNames, video.hdr)},
          }},
         {"audio",
          {
