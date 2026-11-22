@@ -2,8 +2,11 @@
 
 #include "app/Fonts.h"
 #include "app/InputController.h"
+#include "app/OverlayInput.h"
 #include "app/SettingsController.h"
 #include "input/GamepadManager.h"
+#include "input/KeyboardMouse.h"
+#include "render/ReflexSession.h"
 
 #include <QGuiApplication>
 #include <QWindow>
@@ -134,6 +137,15 @@ StreamController::StreamController(SettingsController& settings, InputController
                 session_->setMicrophoneMuted(settings_.microphoneMuted());
             });
 
+    connect(&settings_, &SettingsController::keyboardMouseChanged, this,
+            [this]
+            {
+                if (keyboardMouse_ != nullptr)
+                {
+                    keyboardMouse_->setSettings(settings_.keyboardMouse());
+                }
+            });
+
     connect(&input_, &InputController::microphoneButtonPressed, this,
             [this]
             {
@@ -242,6 +254,9 @@ void StreamController::startSession()
         return;
     }
 
+    metrics_ = std::make_shared<core::StreamMetrics>();
+    keyboardMouse_ = std::make_shared<input::KeyboardMouseInput>(settings_.keyboardMouse());
+
     const remoteplay::SessionRequest request{
         .host = target.host,
         .ps5 = target.ps5,
@@ -249,6 +264,8 @@ void StreamController::startSession()
         .video = settings_.video(),
         .audio = settings_.audio(),
         .gamepads = input_.gamepads(),
+        .keyboardMouse = keyboardMouse_.get(),
+        .metrics = metrics_,
     };
     auto started = remoteplay::StreamSession::start(*gpu, *mailbox, request, eventsFor(session));
 
@@ -325,6 +342,45 @@ void StreamController::onFirstPicture(std::uint64_t session)
     const auto closed = [this, session](render::CloseReason reason)
     { post([this, session, reason] { onWindowClosed(session, reason); }); };
 
+    const render::OverlayActions overlayActions{
+        .reflexChanged = [this](core::ReflexMode mode)
+        {
+            const QString name = QString::fromLatin1(render::reflexModeName(mode));
+            post([this, name] { settings_.setReflex(name); });
+        },
+        .microphoneMutedChanged = [this](bool muted)
+        { post([this, muted] { settings_.setMicrophoneMuted(muted); }); },
+        .statisticsVisibleChanged = [this](bool visible)
+        { post([this, visible] { settings_.setOverlayStatisticsVisible(visible); }); },
+        .menuOpenChanged = [this](bool open)
+        {
+            post(
+                [this, open]
+                {
+                    if (input_.gamepads() != nullptr)
+                    {
+                        input_.gamepads()->setOverlayOpen(open);
+                    }
+
+                    if (keyboardMouse_ != nullptr)
+                    {
+                        keyboardMouse_->setOverlayOpen(open);
+                    }
+                });
+        },
+        .disconnect = [this]
+        {
+            post(
+                [this]
+                {
+                    if (window_ != nullptr)
+                    {
+                        window_->close();
+                    }
+                });
+        },
+    };
+
     auto window = render::StreamWindow::open(*gpu_, mailbox_,
                                              {
                                                  .title = L"Lynx Play — " +
@@ -335,7 +391,40 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                      settings_.videoSuperResolution(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
-                                                 .overlayFont = overlayFont(),
+                                                 .overlayFonts = overlayFonts(),
+                                                 .overlay =
+                                                     {
+                                                         .statisticsVisible =
+                                                             settings_.overlayStatisticsVisible(),
+                                                         .reflex = settings_.reflexMode(),
+                                                         .microphoneMuted =
+                                                             settings_.microphoneMuted(),
+                                                         .microphoneDetail =
+                                                             input_.controllerConnected()
+                                                                 ? "DualSense"
+                                                                 : "Sem controle",
+                                                         .sessionName =
+                                                             target_->name.toStdString(),
+                                                     },
+                                                 .overlayActions = overlayActions,
+                                                 .metrics = metrics_,
+                                                 .keyboardMouse = keyboardMouse_,
+                                                 .gamepad = [this]
+                                                 {
+                                                     const input::GamepadManager* gamepads =
+                                                         input_.gamepads();
+
+                                                     if (gamepads == nullptr)
+                                                     {
+                                                         return render::OverlayGamepad{};
+                                                     }
+
+                                                     const std::optional<input::GamepadSample>
+                                                         sample = gamepads->sample();
+
+                                                     return sample ? overlayGamepad(*sample)
+                                                                   : render::OverlayGamepad{};
+                                                 },
                                                  .onClosed = closed,
                                              });
 
@@ -398,9 +487,23 @@ void StreamController::onWindowClosed(std::uint64_t session, render::CloseReason
 void StreamController::stop()
 {
     ++sessionNumber_;
+
+    if (input_.gamepads() != nullptr)
+    {
+        input_.gamepads()->setOverlayOpen(false);
+    }
+
+    if (keyboardMouse_ != nullptr)
+    {
+        keyboardMouse_->setOverlayOpen(false);
+        keyboardMouse_->releaseAll();
+    }
+
     window_.reset();
     session_.reset();
     mailbox_.reset();
+    metrics_.reset();
+    keyboardMouse_.reset();
     gpu_.reset();
 }
 

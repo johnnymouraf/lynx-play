@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QVariantMap>
 #include <QtQmlIntegration>
 
 #include <optional>
@@ -50,6 +51,13 @@ class SettingsController : public QObject
     Q_PROPERTY(bool videoSuperResolutionAvailable READ videoSuperResolutionAvailable CONSTANT)
     Q_PROPERTY(QString videoSuperResolutionUnavailableReason READ
                    videoSuperResolutionUnavailableReason CONSTANT)
+    Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
+                   setOverlayStatisticsVisible NOTIFY overlayChanged)
+    Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
+    Q_PROPERTY(int mouseSensitivityPercent READ mouseSensitivityPercent WRITE
+                   setMouseSensitivityPercent NOTIFY keyboardMouseChanged)
+    Q_PROPERTY(bool invertMouseY READ invertMouseY WRITE setInvertMouseY NOTIFY
+                   keyboardMouseChanged)
 
 public:
     // Without a store, changes last until the app closes.
@@ -59,6 +67,8 @@ public:
     [[nodiscard]] const core::VideoSettings& video() const;
     [[nodiscard]] const core::AudioSettings& audio() const;
     [[nodiscard]] const core::ControllerSettings& controller() const;
+    [[nodiscard]] const core::OverlaySettings& overlay() const;
+    [[nodiscard]] const core::KeyboardMouseSettings& keyboardMouse() const;
     [[nodiscard]] render::PresentTiming presentTiming() const;
 
     // The lines of the resolution asked of the PS5: 360, 540, 720 or 1080.
@@ -121,12 +131,29 @@ public:
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
 
+    [[nodiscard]] bool overlayStatisticsVisible() const;
+    void setOverlayStatisticsVisible(bool visible);
+
+    [[nodiscard]] QVariantMap keyboardBindings() const;
+    [[nodiscard]] int mouseSensitivityPercent() const;
+    void setMouseSensitivityPercent(int percent);
+    [[nodiscard]] bool invertMouseY() const;
+    void setInvertMouseY(bool invert);
+    // Binds one control; a binding another control had moves to it.
+    Q_INVOKABLE void setKeyboardBinding(const QString& control, const QString& binding);
+    // The settings name of a Qt key, for the Controles screen's capture.
+    Q_INVOKABLE QString bindingNameForKey(int qtKey) const;
+    // The keycap label the Controles screen shows.
+    Q_INVOKABLE QString bindingLabel(const QString& binding) const;
+
 signals:
     void videoChanged();
     void audioChanged();
     void audioDevicesChanged();
     void controllerChanged();
     void rtxChanged();
+    void overlayChanged();
+    void keyboardMouseChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 
@@ -135,6 +162,8 @@ private:
     void apply(const core::AudioSettings& audio);
     void apply(const core::ControllerSettings& controller);
     void applyRtx(const core::RtxSettings& rtx);
+    void applyOverlay(const core::OverlaySettings& overlay);
+    void applyKeyboardMouse(const core::KeyboardMouseSettings& keyboardMouse);
     void save();
 
     std::optional<core::SettingsStore> store_;

@@ -17,9 +17,27 @@ namespace
 {
 
 constexpr auto kFontDirectory = ":/qt/qml/LynxPlay/assets/fonts";
-constexpr auto kOverlayFontPath = ":/qt/qml/LynxPlay/assets/fonts/JetBrainsMono-Medium.ttf";
+constexpr auto kOverlayFontDirectory = ":/qt/qml/LynxPlay/assets/fonts";
 constexpr auto kDefaultFamily = "Inter";
 constexpr int kDefaultPixelSize = 14;
+
+std::shared_ptr<const std::vector<std::uint8_t>> fontBytes(const char* name)
+{
+    const QString path = QString::fromLatin1(kOverlayFontDirectory) + QStringLiteral("/") +
+                         QString::fromLatin1(name);
+    QFile file(path);
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        spdlog::warn("The overlay font is missing: {}", name);
+        return {};
+    }
+
+    const QByteArray bytes = file.readAll();
+    const auto* const begin = reinterpret_cast<const std::uint8_t*>(bytes.constData());
+
+    return std::make_shared<const std::vector<std::uint8_t>>(begin, begin + bytes.size());
+}
 
 } // namespace
 
@@ -47,20 +65,14 @@ void loadBundledFonts()
     QGuiApplication::setFont(font);
 }
 
-std::shared_ptr<const std::vector<std::uint8_t>> overlayFont()
+render::OverlayFonts overlayFonts()
 {
-    QFile file(QString::fromLatin1(kOverlayFontPath));
-
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        spdlog::warn("The overlay font is missing: {}", kOverlayFontPath);
-        return {};
-    }
-
-    const QByteArray bytes = file.readAll();
-    const auto* const begin = reinterpret_cast<const std::uint8_t*>(bytes.constData());
-
-    return std::make_shared<const std::vector<std::uint8_t>>(begin, begin + bytes.size());
+    return {
+        .body = fontBytes("Inter-Regular.ttf"),
+        .label = fontBytes("Inter-Medium.ttf"),
+        .title = fontBytes("Inter-SemiBold.ttf"),
+        .mono = fontBytes("JetBrainsMono-Medium.ttf"),
+    };
 }
 
 } // namespace lynx::app

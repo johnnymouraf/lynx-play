@@ -31,7 +31,8 @@ class FilePlayer
 public:
     [[nodiscard]] static std::expected<std::unique_ptr<FilePlayer>, std::string> start(
         const render::GpuDevice& gpu, std::shared_ptr<render::FrameMailbox> mailbox,
-        const std::filesystem::path& path, double framesPerSecond);
+        const std::filesystem::path& path, double framesPerSecond,
+        std::shared_ptr<core::StreamMetrics> metrics);
 
     FilePlayer(const FilePlayer&) = delete;
     FilePlayer& operator=(const FilePlayer&) = delete;

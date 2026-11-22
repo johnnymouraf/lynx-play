@@ -2,6 +2,7 @@
 
 #include "core/Windows.h"
 
+#include <d3d11.h>
 #include <spdlog/spdlog.h>
 
 namespace lynx::render
@@ -11,6 +12,8 @@ namespace
 {
 
 using core::describeFailure;
+
+constexpr INT kHighestGpuThreadPriority = 7;
 
 std::expected<ComPtr<IDXGIFactory6>, std::string> createFactory()
 {
@@ -154,10 +157,44 @@ std::expected<GpuDevice, std::string> createGpuDevice()
         return std::unexpected(describeFailure("CreateCommandQueue", result));
     }
 
+    // One D3D11 device on the stream adapter serves DXGI's per-thread GPU
+    // priority and the video processor's interop: the video processor needs
+    // the video and BGRA flags, so the priority device carries them too. A
+    // failure only costs the priority and VSR, which falls back to shaders.
+    constexpr UINT kD3d11Flags = static_cast<UINT>(D3D11_CREATE_DEVICE_BGRA_SUPPORT |
+                                                    D3D11_CREATE_DEVICE_VIDEO_SUPPORT);
+    constexpr D3D_FEATURE_LEVEL kD3d11Levels[]{D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0};
+    constexpr UINT kD3d11LevelCount = 2;
+    const HRESULT d3d11Result = D3D11CreateDevice(
+        gpu.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, kD3d11Flags, kD3d11Levels,
+        kD3d11LevelCount, D3D11_SDK_VERSION, &gpu.d3d11Device, nullptr, &gpu.d3d11Context);
+
+    if (FAILED(d3d11Result))
+    {
+        spdlog::warn("{}", describeFailure("D3D11CreateDevice", d3d11Result));
+    }
+    else if (const HRESULT result = gpu.d3d11Device.As(&gpu.dxgiDevice); FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("ID3D11Device as IDXGIDevice", result));
+    }
+
     spdlog::info("Rendering on {} (vendor 0x{:04X}), tearing {}", gpu.info.name,
                  gpu.info.vendorId, gpu.supportsTearing ? "supported" : "unsupported");
 
     return gpu;
+}
+
+void raiseCurrentThreadGpuPriority(IDXGIDevice& device)
+{
+    if (const HRESULT result = device.SetGPUThreadPriority(kHighestGpuThreadPriority);
+        FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("SetGPUThreadPriority", result));
+        return;
+    }
+
+    spdlog::info("GPU thread priority {} on thread {}", kHighestGpuThreadPriority,
+                 GetCurrentThreadId());
 }
 
 } // namespace lynx::render

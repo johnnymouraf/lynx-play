@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include <spdlog/spdlog.h>
+
 namespace lynx::render
 {
 
@@ -14,6 +16,8 @@ std::expected<std::shared_ptr<FrameMailbox>, std::string> FrameMailbox::create()
         return std::unexpected(
             core::describeFailure("CreateEventW", HRESULT_FROM_WIN32(GetLastError())));
     }
+
+    spdlog::info("Frame queue depth 1: only the newest decoded frame waits");
 
     // The constructor is private, out of make_shared's reach.
     return std::shared_ptr<FrameMailbox>(new FrameMailbox(std::move(frameReady)));

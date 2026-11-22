@@ -6,6 +6,8 @@
 #include "render/GpuDevice.h"
 #include "render/StreamWindow.h"
 
+#include "core/StreamMetrics.h"
+
 #include <QObject>
 #include <QString>
 #include <QtQmlIntegration>
@@ -17,6 +19,11 @@
 #include <string>
 
 #include <windows.h>
+
+namespace lynx::input
+{
+class KeyboardMouseInput;
+}
 
 namespace lynx::app
 {
@@ -112,6 +119,8 @@ private:
     std::uint64_t sessionNumber_ = 0;
     std::optional<render::GpuDevice> gpu_;
     std::shared_ptr<render::FrameMailbox> mailbox_;
+    std::shared_ptr<core::StreamMetrics> metrics_;
+    std::shared_ptr<input::KeyboardMouseInput> keyboardMouse_;
     std::unique_ptr<remoteplay::StreamSession> session_;
     std::unique_ptr<render::StreamWindow> window_;
 };

@@ -36,6 +36,7 @@ TEST_CASE("Settings survive a write and a read")
     };
     settings.controller.preferred = "DualSense Wireless Controller";
     settings.rtx = {.reflex = ReflexMode::Boost, .videoSuperResolution = true};
+    settings.overlay.statisticsVisible = true;
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -46,6 +47,7 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->audio == settings.audio);
     CHECK(readBack->controller == settings.controller);
     CHECK(readBack->rtx == settings.rtx);
+    CHECK(readBack->overlay == settings.overlay);
 }
 
 TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and Reflex")

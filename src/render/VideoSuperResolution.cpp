@@ -544,23 +544,34 @@ VsrAvailability VideoSuperResolution::probe()
 }
 
 std::expected<VideoSuperResolution, std::string> VideoSuperResolution::create(
-    ID3D12Device& device12, IDXGIAdapter4& adapter, UINT slotCount)
+    ID3D12Device& device12, ID3D11Device& device11, ID3D11DeviceContext& context11,
+    UINT slotCount)
 {
-    auto video = openVideoDevice(adapter);
-
-    if (!video)
-    {
-        return std::unexpected(video.error().detail);
-    }
-
     VideoSuperResolution vsr;
     vsr.device12_ = &device12;
-    vsr.device_ = std::move(video->device);
-    vsr.context_ = std::move(video->context);
-    vsr.device5_ = std::move(video->device5);
-    vsr.context4_ = std::move(video->context4);
-    vsr.videoDevice_ = std::move(video->videoDevice);
-    vsr.videoContext_ = std::move(video->videoContext);
+    vsr.device_ = &device11;
+    vsr.context_ = &context11;
+
+    if (const HRESULT result = vsr.device_.As(&vsr.device5_); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D11Device5 (VSR)", result));
+    }
+
+    if (const HRESULT result = vsr.context_.As(&vsr.context4_); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D11DeviceContext4 (VSR)", result));
+    }
+
+    if (const HRESULT result = vsr.device_.As(&vsr.videoDevice_); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D11VideoDevice (VSR)", result));
+    }
+
+    if (const HRESULT result = vsr.context_.As(&vsr.videoContext_); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D11VideoContext1 (VSR)", result));
+    }
+
     vsr.slotCount_ = slotCount;
 
     if (const HRESULT result =

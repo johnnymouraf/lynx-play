@@ -1,5 +1,7 @@
 #include "render/FrameRenderer.h"
 
+#include "core/Latency.h"
+
 #include <algorithm>
 #include <format>
 #include <span>
@@ -15,6 +17,7 @@ namespace
 {
 
 using core::describeFailure;
+using Clock = std::chrono::steady_clock;
 
 // Long enough to never fire while frames flow; on expiry the frame is tried
 // again.
@@ -118,6 +121,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
       presenter_(std::move(presenter)),
       mailbox_(std::move(mailbox)),
       options_(std::move(options)),
+      metrics_(options_.metrics),
       requestedSize_(swapChain_.size()),
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
@@ -159,6 +163,32 @@ void FrameRenderer::setVideoSuperResolution(bool enabled)
 {
     requestedVideoSuperResolution_.store(enabled);
     SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::toggleOverlayMenu()
+{
+    menuToggleRequested_.store(true);
+    redrawRequested_.store(true);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::toggleOverlayStatistics()
+{
+    statisticsToggleRequested_.store(true);
+    redrawRequested_.store(true);
+    SetEvent(wakeEvent_.get());
+}
+
+bool FrameRenderer::overlayMenuOpen() const
+{
+    const Overlay* const overlay = overlayForMessages_.load();
+    return overlay != nullptr && overlay->menuOpen();
+}
+
+bool FrameRenderer::handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    Overlay* const overlay = overlayForMessages_.load();
+    return overlay != nullptr && overlay->handleMessage(window, message, wParam, lParam);
 }
 
 std::expected<void, std::string> FrameRenderer::createFrameResources()
@@ -233,6 +263,12 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 void FrameRenderer::run(const std::stop_token& stop)
 {
     SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
+    const core::MmcssRegistration mmcss = core::MmcssRegistration::enable(L"Games");
+
+    if (gpu_.dxgiDevice)
+    {
+        raiseCurrentThreadGpuPriority(*gpu_.dxgiDevice.Get());
+    }
 
     const ReflexAvailability availability = ReflexSession::probe();
     reflexReason_ = availability.reason;
@@ -250,13 +286,23 @@ void FrameRenderer::run(const std::stop_token& stop)
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
 
-    const std::span<const std::uint8_t> font =
-        options_.overlayFont ? std::span<const std::uint8_t>(*options_.overlayFont)
-                             : std::span<const std::uint8_t>{};
+    OverlayActions actions = options_.overlayActions;
+    const std::function<void(core::ReflexMode)> appReflex = actions.reflexChanged;
 
-    std::unique_ptr<Overlay> overlay;
+    actions.reflexChanged = [this, appReflex](core::ReflexMode mode)
+    {
+        requestedReflex_.store(mode);
+        SetEvent(wakeEvent_.get());
+
+        if (appReflex)
+        {
+            appReflex(mode);
+        }
+    };
+
     auto created = Overlay::create(*gpu_.device.Get(), *gpu_.queue.Get(), window_,
-                                   SwapChain::kBufferCount, SwapChain::kFormat, font);
+                                   SwapChain::kBufferCount, SwapChain::kFormat,
+                                   options_.overlayFonts, options_.overlay, std::move(actions));
 
     if (!created)
     {
@@ -264,15 +310,17 @@ void FrameRenderer::run(const std::stop_token& stop)
     }
     else
     {
-        overlay = std::move(*created);
+        overlay_ = std::move(*created);
+        overlayForMessages_.store(overlay_.get());
     }
 
     const std::stop_callback wakeOnStop(stop, [this] { SetEvent(wakeEvent_.get()); });
     const std::array events{mailbox_->frameReadyEvent(), wakeEvent_.get()};
+    const DWORD timeout = options_.gamepad ? 16 : INFINITE;
 
     while (true)
     {
-        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE, INFINITE);
+        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE, timeout);
 
         if (stop.stop_requested())
         {
@@ -281,8 +329,10 @@ void FrameRenderer::run(const std::stop_token& stop)
 
         applyRequestedReflex();
         applyRequestedVideoSuperResolution();
+        applyOverlayToggles();
+        pollGamepad();
 
-        if (auto frame = renderFrame(overlay.get()); !frame)
+        if (auto frame = renderFrame(); !frame)
         {
             spdlog::error("Rendering stopped: {}", frame.error());
 
@@ -294,15 +344,67 @@ void FrameRenderer::run(const std::stop_token& stop)
             break;
         }
 
+        if (overlay_ != nullptr && overlay_->visible())
+        {
+            redrawRequested_.store(true);
+            SetEvent(wakeEvent_.get());
+        }
+
         reportStatistics();
     }
+
+    overlayForMessages_.store(nullptr);
 
     // The overlay's buffers and the frames in flight are released below, so
     // the GPU must be done with them first.
     waitForGpu();
 }
 
-std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
+void FrameRenderer::applyOverlayToggles()
+{
+    if (overlay_ == nullptr)
+    {
+        return;
+    }
+
+    if (menuToggleRequested_.exchange(false))
+    {
+        overlay_->toggleMenu();
+        redrawRequested_.store(true);
+    }
+
+    if (statisticsToggleRequested_.exchange(false))
+    {
+        overlay_->toggleStatistics();
+        redrawRequested_.store(true);
+    }
+}
+
+OverlayGamepad FrameRenderer::gamepadState() const
+{
+    return options_.gamepad ? options_.gamepad() : OverlayGamepad{};
+}
+
+void FrameRenderer::pollGamepad()
+{
+    if (overlay_ == nullptr)
+    {
+        return;
+    }
+
+    const OverlayGamepad gamepad = gamepadState();
+    const bool chord = gamepad.connected && gamepad.create && gamepad.options;
+
+    if (chord && !chordHeld_)
+    {
+        overlay_->toggleMenu();
+        redrawRequested_.store(true);
+    }
+
+    chordHeld_ = chord;
+}
+
+std::expected<void, std::string> FrameRenderer::renderFrame()
 {
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
@@ -395,7 +497,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
 
     if (prepareVideoSuperResolution())
     {
-        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, overlay);
+        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex);
 
         if (!recorded)
         {
@@ -413,7 +515,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
         auto& allocator = allocators_.at(bufferIndex);
         allocator->Reset();
         commandList_->Reset(allocator.Get(), nullptr);
-        recordShaderFrame(bufferIndex, overlay);
+        recordShaderFrame(bufferIndex);
 
         if (const HRESULT result = commandList_->Close(); FAILED(result))
         {
@@ -451,9 +553,23 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
     allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
     framesInFlight_.at(bufferIndex) = shownFrame_;
 
+    const Clock::time_point now = Clock::now();
+    const std::optional<Clock::duration> interval =
+        showsNewFrame && lastNewFramePresentTime_
+            ? std::optional(now - *lastNewFramePresentTime_)
+            : std::nullopt;
+    const std::optional<Clock::duration> readyToPresent =
+        showsNewFrame ? std::optional(now - shownFrame_->timestamp) : std::nullopt;
+
+    if (metrics_ != nullptr)
+    {
+        metrics_->addPresented(now, interval, readyToPresent, showsNewFrame);
+    }
+
     if (showsNewFrame)
     {
-        presented_.add(std::chrono::steady_clock::now() - shownFrame_->timestamp);
+        lastNewFramePresentTime_ = now;
+        presented_.add(now - shownFrame_->timestamp);
     }
 
     reflexFrameId_.reset();
@@ -520,6 +636,14 @@ bool FrameRenderer::prepareVideoSuperResolution()
         return false;
     }
 
+    if (gpu_.d3d11Device.Get() == nullptr || gpu_.d3d11Context.Get() == nullptr)
+    {
+        videoSuperResolutionFailed_ = true;
+        spdlog::error("VSR is unavailable; the shader path scales the stream: the stream "
+                      "adapter has no D3D11 device");
+        return false;
+    }
+
     const VsrPicture picture{
         .input = input,
         .output = output,
@@ -537,8 +661,9 @@ bool FrameRenderer::prepareVideoSuperResolution()
 
     if (!videoSuperResolution_)
     {
-        auto created = VideoSuperResolution::create(*gpu_.device.Get(), *gpu_.adapter.Get(),
-                                                   SwapChain::kBufferCount);
+        auto created =
+            VideoSuperResolution::create(*gpu_.device.Get(), *gpu_.d3d11Device.Get(),
+                                         *gpu_.d3d11Context.Get(), SwapChain::kBufferCount);
 
         if (!created)
         {
@@ -567,7 +692,7 @@ bool FrameRenderer::prepareVideoSuperResolution()
     return true;
 }
 
-void FrameRenderer::recordShaderFrame(UINT bufferIndex, Overlay* overlay)
+void FrameRenderer::recordShaderFrame(UINT bufferIndex)
 {
     ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
     const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
@@ -606,9 +731,9 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, Overlay* overlay)
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay != nullptr)
+    if (overlay_ != nullptr)
     {
-        overlay->render(*commandList_.Get(), target, overlayStats());
+        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
@@ -620,8 +745,7 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, Overlay* overlay)
     timer_->endFrame(*commandList_.Get(), bufferIndex);
 }
 
-std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(UINT bufferIndex,
-                                                                               Overlay* overlay)
+std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(UINT bufferIndex)
 {
     const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
 
@@ -691,9 +815,9 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay != nullptr)
+    if (overlay_ != nullptr)
     {
-        overlay->render(*commandList_.Get(), target, overlayStats());
+        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
@@ -764,9 +888,17 @@ void FrameRenderer::recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT
     commandList.ResourceBarrier(1, &toCommon);
 }
 
-OverlayStats FrameRenderer::overlayStats() const
+OverlayStats FrameRenderer::overlayStats()
 {
     OverlayStats stats;
+
+    if (metrics_ != nullptr)
+    {
+        stats.video = metrics_->snapshot(core::StreamMetrics::Clock::now());
+    }
+
+    stats.outputWidth = swapChain_.size().width;
+    stats.outputHeight = swapChain_.size().height;
 
     if (lastGpuTimes_)
     {

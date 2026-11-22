@@ -6,6 +6,7 @@
 #include "input/ControllerMapping.h"
 #include "input/DualSenseEffects.h"
 #include "input/GamepadManager.h"
+#include "input/KeyboardMouse.h"
 #include "media/VideoDecoder.h"
 #include "remoteplay/ChiakiLogSink.h"
 
@@ -23,6 +24,7 @@
 
 #include <chiaki/opusdecoder.h>
 #include <chiaki/opusencoder.h>
+#include <chiaki/packetstats.h>
 #include <chiaki/session.h>
 #include <spdlog/spdlog.h>
 
@@ -127,7 +129,9 @@ struct StreamSession::State
     std::string host;
     ChiakiLogSink logSink;
     std::unique_ptr<media::VideoDecoder> decoder;
+    std::shared_ptr<core::StreamMetrics> metrics;
     input::GamepadManager* gamepads = nullptr;
+    input::KeyboardMouseInput* keyboardMouse = nullptr;
     std::unique_ptr<audio::AudioOutput> audioOutput;
     std::unique_ptr<audio::Microphone> microphone;
     std::unique_ptr<audio::Haptics> haptics;
@@ -145,6 +149,10 @@ struct StreamSession::State
     // Only touched on chiaki's video thread.
     std::uint32_t decodeFailuresInRow = 0;
     SteadyClock::time_point lastKeyframeRequest{};
+    // Cumulative packet counts from the session; the congestion control resets
+    // them, so each delta starts from what is left after a reset.
+    std::uint64_t lastPacketsReceived = 0;
+    std::uint64_t lastPacketsLost = 0;
     // The end reaches the interface once, whichever thread sees it first.
     std::atomic<bool> endReported = false;
 
@@ -246,6 +254,21 @@ bool StreamSession::State::onVideoSample(std::uint8_t* buffer, std::size_t size,
 
 bool StreamSession::State::decode(std::span<const std::uint8_t> sample)
 {
+    if (metrics != nullptr)
+    {
+        std::uint64_t received = 0;
+        std::uint64_t lost = 0;
+        chiaki_packet_stats_get(&session.stream_connection.packet_stats, false, &received, &lost);
+
+        const std::uint64_t receivedDelta =
+            received >= lastPacketsReceived ? received - lastPacketsReceived : received;
+        const std::uint64_t lostDelta = lost >= lastPacketsLost ? lost - lastPacketsLost : lost;
+        lastPacketsReceived = received;
+        lastPacketsLost = lost;
+
+        metrics->addPacketStats(SteadyClock::now(), receivedDelta, lostDelta);
+    }
+
     const auto decoded = decoder->decode(sample);
 
     if (decoded)
@@ -341,17 +364,28 @@ void StreamSession::State::inputLoop(const std::stop_token& stop)
     while (!stop.stop_requested())
     {
         ChiakiControllerState controllerState;
+        input::GamepadSample combined;
+        bool hasInput = false;
 
-        if (gamepads != nullptr)
+        if (gamepads != nullptr && !gamepads->overlayOpen())
         {
             if (const std::optional<input::GamepadSample> sample = gamepads->sample(); sample)
             {
-                controllerState = input::toChiakiControllerState(*sample);
+                combined = *sample;
+                hasInput = true;
             }
-            else
-            {
-                chiaki_controller_state_set_idle(&controllerState);
-            }
+        }
+
+        if (keyboardMouse != nullptr)
+        {
+            const input::GamepadSample keyboard = keyboardMouse->sample();
+            combined = hasInput ? input::mergeSamples(combined, keyboard) : keyboard;
+            hasInput = true;
+        }
+
+        if (hasInput)
+        {
+            controllerState = input::toChiakiControllerState(combined);
         }
         else
         {
@@ -617,9 +651,12 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     state->events = std::move(events);
     state->host = request.host;
     state->gamepads = request.gamepads;
+    state->keyboardMouse = request.keyboardMouse;
+    state->metrics = request.metrics;
     state->microphoneMuted = request.audio.microphoneMuted;
 
-    auto decoder = media::VideoDecoder::create(gpu, request.video.codec, std::move(mailbox));
+    auto decoder =
+        media::VideoDecoder::create(gpu, request.video.codec, std::move(mailbox), request.metrics);
 
     if (!decoder)
     {
@@ -708,6 +745,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
 
     state->started = true;
     state->startInput();
+    spdlog::info("Input: the controller state is sampled right before each send, every 4 ms");
     const VideoProfile profile = videoProfileFor(request.video);
     spdlog::info("Session started with {}: {}x{} at {} fps, {}, {} kbps", request.host,
                  profile.width, profile.height, profile.framesPerSecond,

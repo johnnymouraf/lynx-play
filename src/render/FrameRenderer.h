@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/RateCounter.h"
+#include "core/StreamMetrics.h"
 #include "core/Windows.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
@@ -14,6 +15,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -40,8 +42,13 @@ public:
         // Runs the stream through RTX Video Super Resolution when the GPU
         // and the driver support it, instead of the shader's scaling pass.
         bool videoSuperResolution = false;
-        // The font the overlay's text is drawn with; empty uses Dear ImGui's.
-        std::shared_ptr<const std::vector<std::uint8_t>> overlayFont;
+        OverlayFonts overlayFonts;
+        OverlayOptions overlay;
+        OverlayActions overlayActions;
+        // The counters the overlay reads; shared with the decoder.
+        std::shared_ptr<core::StreamMetrics> metrics;
+        // The controller the quick menu navigates with; may be empty.
+        std::function<OverlayGamepad()> gamepad;
         // Called once on the renderer's thread when it stops for good (the
         // GPU was removed or reset).
         std::function<void()> onFailure;
@@ -71,26 +78,38 @@ public:
     // processor and the shader's path before the next frame.
     void setVideoSuperResolution(bool enabled);
 
+    // Safe from any thread; the overlay opens or closes on the next frame.
+    void toggleOverlayMenu();
+    void toggleOverlayStatistics();
+    [[nodiscard]] bool overlayMenuOpen() const;
+
+    // Feeds Dear ImGui's Win32 backend from the window's message loop. The
+    // overlay may not exist yet.
+    bool handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+
 private:
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
                   std::shared_ptr<FrameMailbox> mailbox, Options options);
 
     [[nodiscard]] std::expected<void, std::string> createFrameResources();
     void run(const std::stop_token& stop);
-    [[nodiscard]] std::expected<void, std::string> renderFrame(Overlay* overlay);
+    void applyOverlayToggles();
+    void pollGamepad();
+    [[nodiscard]] OverlayGamepad gamepadState() const;
+    [[nodiscard]] std::expected<void, std::string> renderFrame();
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
     void applyRequestedVideoSuperResolution();
     // Configures the video processor for the picture on screen and the
     // window it fits; false means the shader's path draws this frame.
     [[nodiscard]] bool prepareVideoSuperResolution();
-    void recordShaderFrame(UINT bufferIndex, Overlay* overlay);
+    void recordShaderFrame(UINT bufferIndex);
     // Copies the frame into the VSR input, runs the processor and records the
     // draw; false when the frame was dropped and the shader path retakes it.
     [[nodiscard]] std::expected<bool, std::string> recordVideoSuperResolutionFrame(
-        UINT bufferIndex, Overlay* overlay);
+        UINT bufferIndex);
     void recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex);
-    [[nodiscard]] OverlayStats overlayStats() const;
+    [[nodiscard]] OverlayStats overlayStats();
     [[nodiscard]] std::uint32_t lastGpuWorkUs() const;
     [[nodiscard]] std::string describePresentFailure(HRESULT result) const;
     void reportStatistics();
@@ -101,6 +120,8 @@ private:
     HWND window_ = nullptr;
     SwapChain swapChain_;
     FramePresenter presenter_;
+    std::unique_ptr<Overlay> overlay_;
+    std::atomic<Overlay*> overlayForMessages_{nullptr};
     std::optional<GpuTimer> timer_;
     std::optional<FrameGpuTimes> lastGpuTimes_;
     ReflexSession reflex_;
@@ -118,6 +139,8 @@ private:
     std::optional<std::uint64_t> reflexFrameId_;
     std::shared_ptr<FrameMailbox> mailbox_;
     Options options_;
+    std::shared_ptr<core::StreamMetrics> metrics_;
+    std::optional<std::chrono::steady_clock::time_point> lastNewFramePresentTime_;
     ComPtr<ID3D12GraphicsCommandList> commandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> allocators_;
     std::array<UINT64, SwapChain::kBufferCount> allocatorFenceValues_{};
@@ -136,6 +159,9 @@ private:
     core::UniqueHandle wakeEvent_;
     std::atomic<SurfaceSize> requestedSize_;
     std::atomic<bool> redrawRequested_ = false;
+    std::atomic<bool> menuToggleRequested_ = false;
+    std::atomic<bool> statisticsToggleRequested_ = false;
+    bool chordHeld_ = false;
     core::RateCounter presented_;
     // Last, so the thread starts after every member exists and stops first.
     std::jthread thread_;

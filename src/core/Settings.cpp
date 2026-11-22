@@ -1,6 +1,7 @@
 #include "core/Settings.h"
 
 #include "core/Files.h"
+#include "core/KeyboardBindings.h"
 
 #include <algorithm>
 #include <array>
@@ -115,6 +116,18 @@ bool booleanAt(const Json& object, const std::string& key, bool fallback)
     return entry->get<bool>();
 }
 
+std::optional<double> numberAt(const Json& object, const std::string& key)
+{
+    const auto entry = object.find(key);
+
+    if (entry == object.end() || !entry->is_number())
+    {
+        return std::nullopt;
+    }
+
+    return entry->get<double>();
+}
+
 VideoSettings readVideo(const Json& video)
 {
     VideoSettings settings;
@@ -201,7 +214,116 @@ RtxSettings readRtx(const Json& rtx)
     return settings;
 }
 
+OverlaySettings readOverlay(const Json& overlay)
+{
+    OverlaySettings settings;
+
+    if (!overlay.is_object())
+    {
+        return settings;
+    }
+
+    settings.statisticsVisible =
+        booleanAt(overlay, "statisticsVisible", settings.statisticsVisible);
+
+    return settings;
+}
+
+KeyboardMouseSettings readKeyboardMouse(const Json& keyboardMouse)
+{
+    KeyboardMouseSettings settings;
+
+    if (!keyboardMouse.is_object())
+    {
+        return settings;
+    }
+
+    if (const auto bindings = keyboardMouse.find("bindings");
+        bindings != keyboardMouse.end() && bindings->is_object())
+    {
+        for (std::size_t index = 0; index < kKeyboardControlCount; ++index)
+        {
+            const auto entry = bindings->find(std::string(kKeyboardControlNames.at(index)));
+
+            if (entry == bindings->end() || !entry->is_string())
+            {
+                continue;
+            }
+
+            const std::string name = entry->get<std::string>();
+
+            if (keyboardBindingFromName(name))
+            {
+                settings.bindings.at(index) = name;
+            }
+        }
+    }
+
+    if (const auto sensitivity = numberAt(keyboardMouse, "mouseSensitivity");
+        sensitivity && *sensitivity >= kMinMouseSensitivity &&
+        *sensitivity <= kMaxMouseSensitivity)
+    {
+        settings.mouseSensitivity = *sensitivity;
+    }
+
+    settings.invertY = booleanAt(keyboardMouse, "invertY", settings.invertY);
+
+    return settings;
+}
+
 } // namespace
+
+std::array<std::string, kKeyboardControlCount> defaultKeyboardBindings()
+{
+    return {
+        "W",
+        "S",
+        "A",
+        "D",
+        "Mouse",
+        "Space",
+        "Q",
+        "R",
+        "F",
+        "Shift",
+        "E",
+        "MouseRight",
+        "MouseLeft",
+        "Enter",
+        "Tab",
+    };
+}
+
+KeyboardMouseSettings assignKeyboardBinding(KeyboardMouseSettings settings, KeyboardControl control,
+                                            std::string_view binding)
+{
+    const std::size_t index = static_cast<std::size_t>(control);
+
+    if (index >= kKeyboardControlCount || binding.empty() || !keyboardBindingFromName(binding))
+    {
+        return settings;
+    }
+
+    const std::string replacement(binding);
+    const std::string previous = settings.bindings.at(index);
+
+    if (previous == replacement)
+    {
+        return settings;
+    }
+
+    for (std::size_t other = 0; other < kKeyboardControlCount; ++other)
+    {
+        if (other != index && settings.bindings.at(other) == replacement)
+        {
+            settings.bindings.at(other) = previous;
+            break;
+        }
+    }
+
+    settings.bindings.at(index) = replacement;
+    return settings;
+}
 
 std::expected<Settings, std::string> readSettings(std::istream& input)
 {
@@ -242,6 +364,17 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.rtx = readRtx(*rtx);
     }
 
+    if (const auto overlay = root.find("overlay"); overlay != root.end())
+    {
+        settings.overlay = readOverlay(*overlay);
+    }
+
+    if (const auto keyboardMouse = root.find("keyboardMouse");
+        keyboardMouse != root.end())
+    {
+        settings.keyboardMouse = readKeyboardMouse(*keyboardMouse);
+    }
+
     return settings;
 }
 
@@ -251,6 +384,15 @@ void writeSettings(const Settings& settings, std::ostream& output)
     const AudioSettings& audio = settings.audio;
     const ControllerSettings& controller = settings.controller;
     const RtxSettings& rtx = settings.rtx;
+    const OverlaySettings& overlay = settings.overlay;
+    const KeyboardMouseSettings& keyboardMouse = settings.keyboardMouse;
+
+    Json bindings = Json::object();
+
+    for (std::size_t index = 0; index < kKeyboardControlCount; ++index)
+    {
+        bindings[std::string(kKeyboardControlNames.at(index))] = keyboardMouse.bindings.at(index);
+    }
 
     const Json root{
         {"version", kSettingsVersion},
@@ -277,6 +419,16 @@ void writeSettings(const Settings& settings, std::ostream& output)
          {
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
              {"videoSuperResolution", rtx.videoSuperResolution},
+         }},
+        {"overlay",
+         {
+             {"statisticsVisible", overlay.statisticsVisible},
+         }},
+        {"keyboardMouse",
+         {
+             {"bindings", bindings},
+             {"mouseSensitivity", keyboardMouse.mouseSensitivity},
+             {"invertY", keyboardMouse.invertY},
          }},
     };
 

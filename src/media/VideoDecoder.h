@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/StreamMetrics.h"
 #include "core/VideoCodec.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
@@ -21,7 +22,8 @@ class VideoDecoder
 public:
     [[nodiscard]] static std::expected<std::unique_ptr<VideoDecoder>, std::string> create(
         const render::GpuDevice& gpu, core::VideoCodec codec,
-        std::shared_ptr<render::FrameMailbox> mailbox);
+        std::shared_ptr<render::FrameMailbox> mailbox,
+        std::shared_ptr<core::StreamMetrics> metrics);
 
     VideoDecoder(const VideoDecoder&) = delete;
     VideoDecoder& operator=(const VideoDecoder&) = delete;

@@ -63,6 +63,9 @@ std::expected<SwapChain, std::string> SwapChain::create(const GpuDevice& gpu, HW
         return std::unexpected(describeFailure("SetMaximumFrameLatency", result));
     }
 
+    spdlog::info("Presentation: frame queue depth {} (one frame at most waits for the display)",
+                 kMaxQueuedFrames);
+
     chain.frameLatencyWaitable_.reset(chain.swapChain_->GetFrameLatencyWaitableObject());
 
     const D3D12_DESCRIPTOR_HEAP_DESC heapDescription{

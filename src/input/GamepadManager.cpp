@@ -401,6 +401,16 @@ std::optional<std::string> GamepadManager::activeName() const
     return activeName_;
 }
 
+void GamepadManager::setOverlayOpen(bool open)
+{
+    overlayOpen_.store(open);
+}
+
+bool GamepadManager::overlayOpen() const
+{
+    return overlayOpen_.load();
+}
+
 bool GamepadManager::consumeMicrophoneButton()
 {
     return microphonePressed_.exchange(false);

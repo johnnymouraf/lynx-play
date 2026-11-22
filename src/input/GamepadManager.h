@@ -61,6 +61,11 @@ public:
     [[nodiscard]] std::optional<GamepadConnection> connection() const;
     [[nodiscard]] std::optional<std::string> activeName() const;
 
+    // While the overlay's menu is open, its input drives the menu and the
+    // console sees the controller at rest.
+    void setOverlayOpen(bool open);
+    [[nodiscard]] bool overlayOpen() const;
+
     // The microphone button on the DualSense, as a one-shot edge.
     [[nodiscard]] bool consumeMicrophoneButton();
 
@@ -98,6 +103,7 @@ private:
     bool rumbleErrorLogged_ = false;
     std::chrono::steady_clock::time_point nextRefresh_{};
     std::atomic<bool> microphonePressed_{false};
+    std::atomic<bool> overlayOpen_{false};
 
     mutable std::mutex mutex_;
     std::vector<GamepadInfo> infos_;

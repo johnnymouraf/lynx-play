@@ -3,11 +3,13 @@
 #include "core/ReflexMode.h"
 #include "core/VideoCodec.h"
 
+#include <array>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 
 namespace lynx::core
 {
@@ -67,6 +69,78 @@ struct ControllerSettings
     bool operator==(const ControllerSettings&) const = default;
 };
 
+// The controls a key or mouse control can stand in for.
+enum class KeyboardControl
+{
+    LeftStickUp = 0,
+    LeftStickDown,
+    LeftStickLeft,
+    LeftStickRight,
+    RightStick,
+    Cross,
+    Circle,
+    Square,
+    Triangle,
+    L1,
+    R1,
+    L2,
+    R2,
+    Options,
+    Create,
+    Count,
+};
+
+inline constexpr std::size_t kKeyboardControlCount =
+    static_cast<std::size_t>(KeyboardControl::Count);
+
+inline constexpr std::array<std::string_view, kKeyboardControlCount> kKeyboardControlNames{{
+    "leftStickUp",
+    "leftStickDown",
+    "leftStickLeft",
+    "leftStickRight",
+    "rightStick",
+    "cross",
+    "circle",
+    "square",
+    "triangle",
+    "l1",
+    "r1",
+    "l2",
+    "r2",
+    "options",
+    "create",
+}};
+
+inline constexpr double kMinMouseSensitivity = 0.1;
+inline constexpr double kMaxMouseSensitivity = 5.0;
+
+// The design's keyboard and mouse defaults: WASD and the mouse for the
+// sticks, then one key per button.
+[[nodiscard]] std::array<std::string, kKeyboardControlCount> defaultKeyboardBindings();
+
+struct KeyboardMouseSettings
+{
+    std::array<std::string, kKeyboardControlCount> bindings = defaultKeyboardBindings();
+    double mouseSensitivity = 1.0;
+    bool invertY = false;
+
+    bool operator==(const KeyboardMouseSettings&) const = default;
+};
+
+// Points a control at a binding; a binding another control already had moves
+// to the control that lost it, so two controls never share one.
+[[nodiscard]] KeyboardMouseSettings assignKeyboardBinding(KeyboardMouseSettings settings,
+                                                          KeyboardControl control,
+                                                          std::string_view binding);
+
+// What the in-stream overlay shows without being asked.
+struct OverlaySettings
+{
+    bool statisticsVisible = false;
+
+    bool operator==(const OverlaySettings&) const = default;
+};
+
 // The NVIDIA features applied to the stream.
 struct RtxSettings
 {
@@ -84,6 +158,8 @@ struct Settings
     AudioSettings audio;
     ControllerSettings controller;
     RtxSettings rtx;
+    OverlaySettings overlay;
+    KeyboardMouseSettings keyboardMouse;
 
     bool operator==(const Settings&) const = default;
 };

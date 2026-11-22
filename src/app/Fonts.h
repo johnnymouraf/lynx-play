@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <vector>
+#include "render/Overlay.h"
 
 namespace lynx::app
 {
@@ -11,8 +9,8 @@ namespace lynx::app
 // and makes Inter the application's default font.
 void loadBundledFonts();
 
-// The JetBrains Mono bytes for the stream overlay's Dear ImGui font; empty
-// when the resource is missing.
-[[nodiscard]] std::shared_ptr<const std::vector<std::uint8_t>> overlayFont();
+// The Inter and JetBrains Mono bytes for the stream overlay's Dear ImGui
+// fonts; empty when a resource is missing.
+[[nodiscard]] render::OverlayFonts overlayFonts();
 
 } // namespace lynx::app

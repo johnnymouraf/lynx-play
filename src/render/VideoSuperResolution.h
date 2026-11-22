@@ -70,8 +70,11 @@ public:
     // never fails the app on a machine without an NVIDIA GPU.
     [[nodiscard]] static VsrAvailability probe();
 
+    // Uses the renderer's D3D11 device, a native device on the stream's
+    // adapter (D3D11On12 returns E_NOTIMPL for the extension).
     [[nodiscard]] static std::expected<VideoSuperResolution, std::string> create(
-        ID3D12Device& device12, IDXGIAdapter4& adapter, UINT slotCount);
+        ID3D12Device& device12, ID3D11Device& device11, ID3D11DeviceContext& context11,
+        UINT slotCount);
 
     VideoSuperResolution(const VideoSuperResolution&) = delete;
     VideoSuperResolution& operator=(const VideoSuperResolution&) = delete;

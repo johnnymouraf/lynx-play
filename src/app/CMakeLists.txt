@@ -24,6 +24,7 @@ qt_add_executable(lynx-play WIN32
     IconProvider.h
     InputController.cpp
     InputController.h
+    OverlayInput.h
     PairingController.cpp
     PairingController.h
     QtLogBridge.cpp
@@ -76,6 +77,7 @@ qt_add_qml_module(lynx-play
         qml/controls/Icon.qml
         qml/controls/IconButton.qml
         qml/controls/InputField.qml
+        qml/controls/Keycap.qml
         qml/controls/LinkButton.qml
         qml/controls/MenuRow.qml
         qml/controls/NavItem.qml

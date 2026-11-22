@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [1.5 Keyboard/mouse, overlay and stats](#15-keyboardmouse-overlay-and-stats)
   - [2.2 RTX Video Super Resolution](#22-rtx-video-super-resolution)
   - [Decisions to review](#decisions-to-review)
 
@@ -30,7 +29,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.4 Audio, DualSense and microphone** [auto]: low-latency audio;
         DualSense over USB and Bluetooth (haptics, adaptive triggers, touchpad,
         gyro); microphone with mute.
-  - [ ] **1.5 Keyboard/mouse, overlay and stats** [auto]: key mapping,
+  - [x] **1.5 Keyboard/mouse, overlay and stats** [auto]: key mapping,
         in-stream menu, statistics and latency tuning.
 - [ ] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
@@ -148,55 +147,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-### 1.5 Keyboard/mouse, overlay and stats
-
-- **Goal:** keyboard and mouse can play with a configurable mapping, an
-  in-stream overlay shows live statistics and quick actions, and the pipeline
-  is tuned for latency.
-- **Guardrails:** no RTX features (phase 2); the overlay is Dear ImGui drawn in
-  the stream's swap chain, never a Qt window over it.
-- **Success criteria:**
-  1. CI green on `auto/1.5`, unit tests included.
-  2. Unit tests cover the key mapping (defaults, remapping, conflicts) and the
-     statistics math (rates and averages over a sliding window).
-  3. In `--play-file` playback the overlay opens and closes with the design's
-     shortcuts (F1 menu, F2 statistics; Create + Options held on the
-     controller) and shows resolution, codec, received/decoded/presented fps,
-     bitrate, decode time and present-to-present time, updating live
-     (screenshots).
-  4. The Controles screen edits and saves the keyboard/mouse mapping.
-  5. The log confirms the latency measures in effect: MMCSS for the decode
-     and render threads, power throttling disabled for the process, the GPU
-     thread priority, and the frame queue depth of 1.
-  6. Owner checks: playing with keyboard and mouse; packet loss and bitrate
-     readings during a real session.
-- **Deliveries:**
-  1. Finish the overlay 2.1 brought: the design's styling (Inter labels,
-     mono values, 320 wide), the F1 menu / F2 statistics toggles and a hidden
-     by default (2.1 leaves a minimal panel always visible), and the quick
-     actions (Reflex, VSR, disconnect).
-  2. Statistics: counters from the session, decoder and renderer, shown in
-     the overlay.
-  3. Keyboard/mouse: raw input in the stream window mapped to controller
-     state (mouse to right stick with sensitivity), mapping saved in
-     `settings.json`, edited on the Controles screen.
-  4. Latency tuning: MMCSS, process power throttling off, GPU priority,
-     decoder flags review, input polled right before sending.
-- **Settled in planning:** 2.1 already brings Dear ImGui (DX12 + Win32
-  backends), a minimal always-visible statistics panel (stage GPU times,
-  Reflex mode and latency report, JetBrains Mono 15 px, 360 wide) and
-  `settings.json`'s `rtx.reflex`; this step styles and completes the overlay
-  and adds the toggles it lacks (decision D24). The Controles screen already
-  exists from 1.4 and gains the keyboard/mouse mapping.
-- **Changes:** `src/render/` (overlay), `src/input/` (keyboard/mouse),
-  `src/core/` (statistics), `src/app/` (Controles screen), `vcpkg.json`
-  (imgui), tests.
-- **Data and interfaces:** `settings.json` gains `keyboardMouse` (bindings,
-  mouse sensitivity, invert Y) and `overlay` (stats visible).
-- **Edge cases:** the overlay open while the controller is used (input goes to
-  the overlay, not the game); window focus lost (release every key);
-  very high mouse polling rates.
 
 ### 2.2 RTX Video Super Resolution
 
@@ -526,3 +476,59 @@ screen, while the full overlay is 1.5's.
 
 **Chosen: A**. Changing it: bump `kSettingsVersion` and add a migration.
 
+
+#### D29 – Received, decoded and presented fps on three lines (1.5)
+
+- A. One combined line as the design shows: doesn't fit in 296 px with three
+  values.
+- B. Three lines: shows the criterion's three values uncut.
+
+**Chosen: B**. Changing it: back to a single line.
+
+#### D30 – Keep the Reflex section in the statistics panel (1.5)
+
+- A. Remove it, losing 2.1's latency report.
+- B. Keep it compact.
+
+**Chosen: B**, so 2.1 doesn't regress. Changing it: delete the section.
+
+#### D31 – Quick menu actions now, VSR later (1.5)
+
+- A. Reflex, statistics, microphone and disconnect now; VSR arrives with 2.2.
+- B. Add VSR/DLSS/Configurações now (VSR doesn't exist; settings would end the
+  stream).
+
+**Chosen: A**. Changing it: insert the VSR row before the spacer.
+
+#### D32 – A key conflict swaps the two bindings (1.5)
+
+- A. Unbind the other control.
+- B. Swap the keys between the two controls, so none ends without one.
+
+**Chosen: B**. Changing it: clear the other binding.
+
+#### D33 – Presented fps counts only new decoded frames (1.5)
+
+- A. Count every present, including overlay redraws (~240 fps).
+- B. Count presented new decoded frames: reflects the stream.
+
+**Chosen: B**. Changing it: count every present.
+
+#### D34 – GPU thread priority through a minimal D3D11 device (1.5)
+
+D3D12 exposes no `SetGPUThreadPriority`.
+
+- A. Log the failure only.
+- B. Create a minimal D3D11 device on the same adapter just for
+  `IDXGIDevice`, which 2.2's interop will later share.
+
+**Chosen: B**, the API's only path. Changing it: reuse 2.2's interop device.
+
+#### D35 – Packet loss from cumulative deltas (1.5)
+
+- A. `chiaki_packet_stats_get(reset = true)`: steals the congestion
+  controller's samples.
+- B. Read cumulative counters and compute deltas.
+
+**Chosen: B**, so the bitrate controller isn't disturbed. Changing it: consume
+with reset.

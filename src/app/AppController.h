@@ -42,8 +42,7 @@ class AppController : public QObject
     Q_PROPERTY(QUrl logsUrl READ logsUrl CONSTANT)
 
 public:
-    AppController(StartupState state, const SettingsController& settings,
-                  QObject* parent = nullptr);
+    AppController(StartupState state, SettingsController& settings, QObject* parent = nullptr);
     ~AppController() override;
 
     [[nodiscard]] QString version() const;
@@ -62,7 +61,7 @@ private:
     void closeVideoTest();
 
     StartupState state_;
-    const SettingsController& settings_;
+    SettingsController& settings_;
     std::unique_ptr<render::TestPatternSource> videoTestSource_;
     std::unique_ptr<render::StreamWindow> videoTestWindow_;
 };
