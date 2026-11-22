@@ -45,7 +45,17 @@ jobs:
         with:
           arch: x64
 
-      - name: Show toolchain versions
+      # The standard library of the newest Visual Studio requires the clang-cl
+      # it ships, which is newer than the runner's standalone LLVM.
+      - name: Use Visual Studio's clang-cl
+        run: |
+          $llvm = Join-Path $env:VCINSTALLDIR 'Toolslvmdin'
+          if (-not (test-path (join-path $llvm 'clang-cl.exe'))) {
+            throw "visual studio's clang-cl is not installed in $llvm"
+          }
+          $llvm >> $env:github_path
+
+      - name: show toolchain versions
         run: |
           clang-cl --version
           cmake --version
