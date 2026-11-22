@@ -574,6 +574,11 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, Overlay* overlay)
 
     timer_->beginFrame(*commandList_.Get(), bufferIndex);
 
+    // The shader path doesn't run the video processor; its stage still needs
+    // valid stamps for the frame's times to be read back.
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
 
     if (shownFrame_)
