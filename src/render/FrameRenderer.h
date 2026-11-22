@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/RateCounter.h"
+#include "core/StreamMetrics.h"
 #include "core/Windows.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
@@ -13,6 +14,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -39,6 +41,8 @@ public:
         OverlayFonts overlayFonts;
         OverlayOptions overlay;
         OverlayActions overlayActions;
+        // The counters the overlay reads; shared with the decoder.
+        std::shared_ptr<core::StreamMetrics> metrics;
         // The controller the quick menu navigates with; may be empty.
         std::function<OverlayGamepad()> gamepad;
         // Called once on the renderer's thread when it stops for good (the
@@ -87,8 +91,8 @@ private:
     [[nodiscard]] std::expected<void, std::string> renderFrame();
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
-    void recordFrame(UINT bufferIndex, Overlay* overlay);
-    [[nodiscard]] OverlayStats overlayStats() const;
+    void recordFrame(UINT bufferIndex);
+    [[nodiscard]] OverlayStats overlayStats();
     [[nodiscard]] std::uint32_t lastGpuWorkUs() const;
     [[nodiscard]] std::string describePresentFailure(HRESULT result) const;
     void reportStatistics();
@@ -112,6 +116,8 @@ private:
     std::optional<std::uint64_t> reflexFrameId_;
     std::shared_ptr<FrameMailbox> mailbox_;
     Options options_;
+    std::shared_ptr<core::StreamMetrics> metrics_;
+    std::optional<std::chrono::steady_clock::time_point> lastPresentTime_;
     ComPtr<ID3D12GraphicsCommandList> commandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> allocators_;
     std::array<UINT64, SwapChain::kBufferCount> allocatorFenceValues_{};

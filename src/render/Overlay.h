@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ReflexMode.h"
+#include "core/StreamMetrics.h"
 #include "render/GpuTimer.h"
 
 #include <array>
@@ -58,6 +59,11 @@ struct ReflexOverlayStats
 
 struct OverlayStats
 {
+    // The video path's counters over the last two seconds.
+    core::StreamMetricsSnapshot video;
+    std::uint32_t outputWidth = 0;
+    std::uint32_t outputHeight = 0;
+
     bool gpuTimingsValid = false;
     std::array<double, kEffectStageCount> stageMilliseconds{};
     double totalMilliseconds = 0.0;

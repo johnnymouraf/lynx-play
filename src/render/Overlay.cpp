@@ -15,6 +15,11 @@
 #include <imgui_impl_win32.h>
 #include <spdlog/spdlog.h>
 
+// Dear ImGui leaves this one for the application to declare, to keep
+// <windows.h> out of its header.
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
+                                                              LPARAM lParam);
+
 namespace lynx::render
 {
 
@@ -127,6 +132,47 @@ std::string millisecondsText(double milliseconds, int precision = 1)
     return text;
 }
 
+std::string decimalText(double value, int precision = 1)
+{
+    std::string text = std::format("{:.{}f}", value, precision);
+    std::ranges::replace(text, '.', ',');
+    return text;
+}
+
+std::string resolutionText(const core::StreamMetricsSnapshot& video, std::uint32_t outputWidth,
+                           std::uint32_t outputHeight)
+{
+    if (!video.formatValid)
+    {
+        return "—";
+    }
+
+    std::string text = std::format("{}×{}", video.width, video.height);
+
+    if (outputWidth != 0 && outputHeight != 0 &&
+        (outputWidth != video.width || outputHeight != video.height))
+    {
+        text += std::format(" → {}×{}", outputWidth, outputHeight);
+    }
+
+    return text;
+}
+
+std::string codecText(const core::StreamMetricsSnapshot& video)
+{
+    if (video.codec.empty())
+    {
+        return "—";
+    }
+
+    return video.codec + " · SDR";
+}
+
+std::string fpsText(const core::StreamMetricsSnapshot& video, double fps)
+{
+    return video.formatValid ? decimalText(fps) : "—";
+}
+
 float textWidth(ImFont* font, float size, const char* text)
 {
     return font->CalcTextSizeA(size, FLT_MAX, 0.0F, text).x;
@@ -140,7 +186,7 @@ void drawText(ImDrawList* drawList, ImFont* font, float size, ImVec2 position, I
 
 void rightText(ImFont* font, float size, ImU32 color, const char* text)
 {
-    ImGui::PushFont(font);
+    ImGui::PushFont(font, size);
     const float width = ImGui::CalcTextSize(text).x;
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - width);
@@ -152,7 +198,7 @@ void rightText(ImFont* font, float size, ImU32 color, const char* text)
 
 void valueRow(const Fonts& fonts, const char* label, const char* value, ImU32 valueColor = kText)
 {
-    ImGui::PushFont(fonts.label);
+    ImGui::PushFont(fonts.label, kBodySize);
     ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
     ImGui::TextUnformatted(label);
     ImGui::PopStyleColor();
@@ -163,7 +209,7 @@ void valueRow(const Fonts& fonts, const char* label, const char* value, ImU32 va
 
 void sectionLabel(const Fonts& fonts, const char* label)
 {
-    ImGui::PushFont(fonts.overline);
+    ImGui::PushFont(fonts.overline, kOverlineSize);
     ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
     ImGui::TextUnformatted(label);
     ImGui::PopStyleColor();
@@ -191,7 +237,77 @@ void applyStyle()
     style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.2275F, 0.2706F, 0.3333F, 1.0F);
     style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.9608F, 0.7137F, 0.3647F, 1.0F);
     style.Colors[ImGuiCol_PlotLines] = ImVec4(0.9608F, 0.6353F, 0.2275F, 1.0F);
-    style.Colors[ImGuiCol_PlotBg] = ImVec4(1.0F, 1.0F, 1.0F, 0.0392F);
+}
+
+void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+
+    sectionLabel(fonts, "VÍDEO");
+
+    const std::string resolution = resolutionText(video, stats.outputWidth, stats.outputHeight);
+    const std::string codec = codecText(video);
+    const std::string bitrate =
+        video.bitrateMbps > 0.0 ? decimalText(video.bitrateMbps) + " Mbps" : "—";
+    const std::string loss = video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
+
+    valueRow(fonts, "Resolução", resolution.c_str());
+    valueRow(fonts, "Codec", codec.c_str());
+    valueRow(fonts, "FPS recebidos", fpsText(video, video.receivedFps).c_str());
+    valueRow(fonts, "FPS decodificados", fpsText(video, video.decodedFps).c_str());
+    valueRow(fonts, "FPS exibidos", fpsText(video, video.presentedFps).c_str());
+    valueRow(fonts, "Bitrate", bitrate.c_str());
+    valueRow(fonts, "Perda de pacotes", loss.c_str());
+}
+
+void drawLatencySection(const Fonts& fonts, const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+
+    sectionLabel(fonts, "LATÊNCIA");
+
+    const std::string decode =
+        video.decodeValid ? millisecondsText(video.decodeMilliseconds) : "—";
+    const std::string present =
+        video.presentIntervalValid ? millisecondsText(video.presentIntervalMilliseconds) : "—";
+    const std::string ready =
+        video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—";
+
+    valueRow(fonts, "Decodificação", decode.c_str());
+    valueRow(fonts, "Apresentação", present.c_str());
+    valueRow(fonts, "Quadro até a tela", ready.c_str());
+}
+
+void drawFrameTime(const Fonts& fonts, const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+
+    if (video.frameTimeCount < 2)
+    {
+        return;
+    }
+
+    float maximum = 33.3F;
+
+    for (std::size_t index = 0; index < video.frameTimeCount; ++index)
+    {
+        maximum = std::max(maximum, video.frameTimes.at(index) * 1.2F);
+    }
+
+    ImGui::PushFont(fonts.caption, kCaptionSize);
+    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
+    ImGui::TextUnformatted("Tempo de quadro");
+    ImGui::PopStyleColor();
+    rightText(fonts.caption, kCaptionSize, kTextMuted,
+              millisecondsText(video.presentIntervalMilliseconds).c_str());
+    ImGui::PopFont();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0F, 0.0F));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0F, 1.0F, 1.0F, 0.0392F));
+    ImGui::PlotLines("##frame-times", video.frameTimes.data(), static_cast<int>(video.frameTimeCount),
+                      0, nullptr, 0.0F, maximum, ImVec2(-1.0F, 36.0F));
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
 }
 
 void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
@@ -271,12 +387,15 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
     }
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0F, 6.0F));
-    ImGui::PushFont(fonts.label);
+    ImGui::PushFont(fonts.label, kBodySize);
     ImGui::TextUnformatted("Estatísticas");
     ImGui::PopFont();
     rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
 
+    drawVideoSection(fonts, stats);
+    drawLatencySection(fonts, stats);
     drawGpuSection(fonts, stats);
+    drawFrameTime(fonts, stats);
     drawReflexSection(fonts, stats.reflex);
 
     ImGui::PopStyleVar();
@@ -477,7 +596,7 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
 
     const Fonts& menuFonts = fonts;
 
-    ImGui::PushFont(menuFonts.title);
+    ImGui::PushFont(menuFonts.title, kTitleSize);
     ImGui::TextUnformatted("Menu rápido");
     ImGui::PopFont();
 
@@ -493,7 +612,7 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
 
     if (!sessionLine.empty())
     {
-        ImGui::PushFont(menuFonts.caption);
+        ImGui::PushFont(menuFonts.caption, kCaptionSize);
         ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
         ImGui::TextUnformatted(sessionLine.c_str());
         ImGui::PopStyleColor();
@@ -538,7 +657,7 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
     }
 
     ImGui::Dummy(ImVec2(0.0F, 2.0F));
-    ImGui::PushFont(menuFonts.caption);
+    ImGui::PushFont(menuFonts.caption, kCaptionSize);
     ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
     const char* const hint = "Fechar: F1 ou segure Create + Options";
     const float hintWidth = ImGui::CalcTextSize(hint).x;

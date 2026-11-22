@@ -7,6 +7,8 @@ add_library(lynx_input STATIC
     DualSenseEffects.h
     GamepadManager.cpp
     GamepadManager.h
+    KeyboardMouse.cpp
+    KeyboardMouse.h
     Sdl.cpp
     Sdl.h)
 add_library(Lynx::input ALIAS lynx_input)

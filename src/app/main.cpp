@@ -11,6 +11,7 @@
 #include "input/Sdl.h"
 #include "app/Version.h"
 #include "core/Log.h"
+#include "core/Latency.h"
 #include "core/Paths.h"
 #include "core/Settings.h"
 #include "remoteplay/ChiakiRuntime.h"
@@ -179,6 +180,7 @@ int main(int argc, char* argv[])
     startLogging();
     lynx::app::installQtLogBridge();
     spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
+    lynx::core::disableProcessPowerThrottling();
 
     QGuiApplication application(argc, argv);
     const auto commandLine = parseCommandLine(application);

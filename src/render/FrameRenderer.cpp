@@ -1,5 +1,7 @@
 #include "render/FrameRenderer.h"
 
+#include "core/Latency.h"
+
 #include <algorithm>
 #include <format>
 #include <span>
@@ -15,6 +17,7 @@ namespace
 {
 
 using core::describeFailure;
+using Clock = std::chrono::steady_clock;
 
 // Long enough to never fire while frames flow; on expiry the frame is tried
 // again.
@@ -118,6 +121,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
       presenter_(std::move(presenter)),
       mailbox_(std::move(mailbox)),
       options_(std::move(options)),
+      metrics_(options_.metrics),
       requestedSize_(swapChain_.size()),
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
@@ -232,6 +236,8 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 void FrameRenderer::run(const std::stop_token& stop)
 {
     SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
+    const core::MmcssRegistration mmcss = core::MmcssRegistration::enable(L"Games");
+    raiseCurrentThreadGpuPriority(*gpu_.device.Get());
 
     const ReflexAvailability availability = ReflexSession::probe();
     reflexReason_ = availability.reason;
@@ -492,9 +498,22 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
     framesInFlight_.at(bufferIndex) = shownFrame_;
 
+    const Clock::time_point now = Clock::now();
+    const std::optional<Clock::duration> interval =
+        lastPresentTime_ ? std::optional(now - *lastPresentTime_) : std::nullopt;
+    const std::optional<Clock::duration> readyToPresent =
+        showsNewFrame ? std::optional(now - shownFrame_->timestamp) : std::nullopt;
+
+    if (metrics_ != nullptr)
+    {
+        metrics_->addPresented(now, interval, readyToPresent);
+    }
+
+    lastPresentTime_ = now;
+
     if (showsNewFrame)
     {
-        presented_.add(std::chrono::steady_clock::now() - shownFrame_->timestamp);
+        presented_.add(now - shownFrame_->timestamp);
     }
 
     reflexFrameId_.reset();
@@ -576,9 +595,17 @@ void FrameRenderer::recordFrame(UINT bufferIndex)
     timer_->endFrame(*commandList_.Get(), bufferIndex);
 }
 
-OverlayStats FrameRenderer::overlayStats() const
+OverlayStats FrameRenderer::overlayStats()
 {
     OverlayStats stats;
+
+    if (metrics_ != nullptr)
+    {
+        stats.video = metrics_->snapshot(core::StreamMetrics::Clock::now());
+    }
+
+    stats.outputWidth = swapChain_.size().width;
+    stats.outputHeight = swapChain_.size().height;
 
     if (lastGpuTimes_)
     {

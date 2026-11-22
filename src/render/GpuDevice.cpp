@@ -12,6 +12,8 @@ namespace
 
 using core::describeFailure;
 
+constexpr INT kHighestGpuThreadPriority = 7;
+
 std::expected<ComPtr<IDXGIFactory6>, std::string> createFactory()
 {
     ComPtr<IDXGIFactory6> factory;
@@ -142,6 +144,27 @@ std::expected<GpuDevice, std::string> createGpuDevice()
                  gpu.info.vendorId, gpu.supportsTearing ? "supported" : "unsupported");
 
     return gpu;
+}
+
+void raiseCurrentThreadGpuPriority(ID3D12Device& device)
+{
+    ComPtr<IDXGIDevice> dxgiDevice;
+
+    if (const HRESULT result = device.QueryInterface(IID_PPV_ARGS(&dxgiDevice)); FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("ID3D12Device as IDXGIDevice", result));
+        return;
+    }
+
+    if (const HRESULT result = dxgiDevice->SetGPUThreadPriority(kHighestGpuThreadPriority);
+        FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("SetGPUThreadPriority", result));
+        return;
+    }
+
+    spdlog::info("GPU thread priority {} on thread {}", kHighestGpuThreadPriority,
+                 GetCurrentThreadId());
 }
 
 } // namespace lynx::render

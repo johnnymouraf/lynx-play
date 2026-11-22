@@ -1,8 +1,10 @@
 #include "render/StreamWindow.h"
 
 #include "core/Windows.h"
+#include "input/KeyboardMouse.h"
 
 #include <algorithm>
+#include <array>
 #include <mutex>
 #include <utility>
 
@@ -45,6 +47,36 @@ void registerWindowClassOnce(WNDPROC procedure)
 {
     static std::once_flag registered;
     std::call_once(registered, registerWindowClass, procedure);
+}
+
+void registerMouse(HWND window)
+{
+    const RAWINPUTDEVICE mouse{
+        .usUsagePage = 0x01,
+        .usUsage = 0x02,
+        .dwFlags = 0,
+        .hwndTarget = window,
+    };
+
+    if (!RegisterRawInputDevices(&mouse, 1, sizeof(mouse)))
+    {
+        spdlog::warn("{}", core::describeFailure("RegisterRawInputDevices",
+                                                 HRESULT_FROM_WIN32(GetLastError())));
+    }
+}
+
+void rawButton(const RAWMOUSE& mouse, USHORT downFlag, USHORT upFlag, std::uint16_t button,
+               input::KeyboardMouseInput& keyboardMouse)
+{
+    if ((mouse.usButtonFlags & downFlag) != 0)
+    {
+        keyboardMouse.mouseButton(button, true);
+    }
+
+    if ((mouse.usButtonFlags & upFlag) != 0)
+    {
+        keyboardMouse.mouseButton(button, false);
+    }
 }
 
 SurfaceSize clientSize(HWND window)
@@ -106,6 +138,9 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
             core::describeFailure("CreateWindowExW", HRESULT_FROM_WIN32(GetLastError())));
     }
 
+    registerMouse(window);
+    stream->keyboardMouse_ = std::move(options.keyboardMouse);
+
     if (options.mode == WindowMode::Fullscreen)
     {
         stream->enterFullscreen();
@@ -117,6 +152,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
         .overlayFonts = std::move(options.overlayFonts),
         .overlay = std::move(options.overlay),
         .overlayActions = std::move(options.overlayActions),
+        .metrics = std::move(options.metrics),
         .gamepad = std::move(options.gamepad),
         .onFailure = [window] { PostMessageW(window, kRenderFailedMessage, 0, 0); },
     };
@@ -238,16 +274,53 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case WM_KEYDOWN:
+        if (keyboardMouse_ != nullptr && wParam != VK_F1 && wParam != VK_F2 &&
+            wParam != VK_F11)
+        {
+            keyboardMouse_->keyDown(static_cast<std::uint16_t>(wParam));
+        }
+
         handleKey(wParam);
         return 0;
 
+    case WM_KEYUP:
+        if (keyboardMouse_ != nullptr)
+        {
+            keyboardMouse_->keyUp(static_cast<std::uint16_t>(wParam));
+        }
+
+        return 0;
+
     case WM_SYSKEYDOWN:
+        if (keyboardMouse_ != nullptr)
+        {
+            keyboardMouse_->keyDown(static_cast<std::uint16_t>(wParam));
+        }
+
         if (wParam == VK_RETURN && (lParam & kAltDownFlag) != 0)
         {
             toggleFullscreen();
             return 0;
         }
         break;
+
+    case WM_SYSKEYUP:
+        if (keyboardMouse_ != nullptr)
+        {
+            keyboardMouse_->keyUp(static_cast<std::uint16_t>(wParam));
+        }
+        break;
+
+    case WM_KILLFOCUS:
+        if (keyboardMouse_ != nullptr)
+        {
+            keyboardMouse_->releaseAll();
+        }
+        break;
+
+    case WM_INPUT:
+        handleRawInput(lParam);
+        return 0;
 
     case WM_ERASEBKGND:
         return 1;
@@ -319,6 +392,75 @@ void StreamWindow::setCursorVisible(bool visible)
     cursorVisible_ = visible;
 }
 
+void StreamWindow::handleRawInput(LPARAM lParam)
+{
+    if (keyboardMouse_ == nullptr)
+    {
+        return;
+    }
+
+    UINT size = 0;
+
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, nullptr, &size,
+                        sizeof(RAWINPUTHEADER)) != 0 ||
+        size == 0)
+    {
+        return;
+    }
+
+    // RAWMOUSE and RAWINPUTHEADER fit here; a bigger HID report is not mouse
+    // input the stream uses.
+    std::array<std::uint8_t, 128> buffer{};
+
+    if (size > buffer.size())
+    {
+        return;
+    }
+
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, buffer.data(), &size,
+                        sizeof(RAWINPUTHEADER)) != size)
+    {
+        return;
+    }
+
+    const auto* const raw = reinterpret_cast<const RAWINPUT*>(buffer.data());
+
+    if (raw->header.dwType != RIM_TYPEMOUSE)
+    {
+        return;
+    }
+
+    const RAWMOUSE& mouse = raw->data.mouse;
+
+    if ((mouse.usFlags & MOUSE_MOVE_ABSOLUTE) == 0)
+    {
+        keyboardMouse_->mouseMoved(mouse.lLastX, mouse.lLastY);
+    }
+    else
+    {
+        // A remote desktop or drawing tablet reports the cursor's place in a
+        // 0..65535 square instead of the movement.
+        if (haveAbsoluteMouse_)
+        {
+            const LONG width = std::max(1, GetSystemMetrics(SM_CXVIRTUALSCREEN));
+            const LONG height = std::max(1, GetSystemMetrics(SM_CYVIRTUALSCREEN));
+            const int deltaX =
+                static_cast<int>((mouse.lLastX - lastAbsoluteX_) * width / 65535);
+            const int deltaY =
+                static_cast<int>((mouse.lLastY - lastAbsoluteY_) * height / 65535);
+            keyboardMouse_->mouseMoved(deltaX, deltaY);
+        }
+
+        lastAbsoluteX_ = mouse.lLastX;
+        lastAbsoluteY_ = mouse.lLastY;
+        haveAbsoluteMouse_ = true;
+    }
+
+    rawButton(mouse, RI_MOUSE_BUTTON_1_DOWN, RI_MOUSE_BUTTON_1_UP, 0, *keyboardMouse_);
+    rawButton(mouse, RI_MOUSE_BUTTON_2_DOWN, RI_MOUSE_BUTTON_2_UP, 1, *keyboardMouse_);
+    rawButton(mouse, RI_MOUSE_BUTTON_3_DOWN, RI_MOUSE_BUTTON_3_UP, 2, *keyboardMouse_);
+}
+
 void StreamWindow::toggleFullscreen()
 {
     if (fullscreen_)
@@ -370,6 +512,11 @@ void StreamWindow::leaveFullscreen()
 // it presents to is destroyed.
 void StreamWindow::close(CloseReason reason)
 {
+    if (keyboardMouse_ != nullptr)
+    {
+        keyboardMouse_->releaseAll();
+    }
+
     setCursorVisible(true);
     renderer_.reset();
 

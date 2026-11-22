@@ -1,7 +1,9 @@
 #include "media/VideoDecoder.h"
 
 #include "core/RateCounter.h"
+#include "core/Latency.h"
 #include "core/Windows.h"
+#include "render/GpuDevice.h"
 
 #include <algorithm>
 #include <array>
@@ -245,6 +247,8 @@ struct VideoDecoder::Context
 {
     core::VideoCodec codec = core::VideoCodec::H265;
     std::shared_ptr<render::FrameMailbox> mailbox;
+    std::shared_ptr<core::StreamMetrics> metrics;
+    ID3D12Device* device = nullptr;
     CodecContextPtr codecContext;
     PacketPtr packet;
     FramePtr frame;
@@ -265,7 +269,7 @@ struct VideoDecoder::Context
 
 std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
     const render::GpuDevice& gpu, core::VideoCodec codec,
-    std::shared_ptr<render::FrameMailbox> mailbox)
+    std::shared_ptr<render::FrameMailbox> mailbox, std::shared_ptr<core::StreamMetrics> metrics)
 {
     forwardFfmpegLogOnce();
 
@@ -288,6 +292,8 @@ std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
     auto context = std::make_unique<Context>();
     context->codec = codec;
     context->mailbox = std::move(mailbox);
+    context->metrics = std::move(metrics);
+    context->device = gpu.device.Get();
     context->codecContext.reset(avcodec_alloc_context3(decoder));
     context->packet.reset(av_packet_alloc());
     context->frame.reset(av_frame_alloc());
@@ -311,7 +317,13 @@ std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
         return std::unexpected(describeAvError("avcodec_open2", result));
     }
 
+    if (context->metrics != nullptr)
+    {
+        context->metrics->setCodec(codec);
+    }
+
     spdlog::info("Decoding {} on the GPU with D3D12VA (hardware decoding)", core::codecName(codec));
+    spdlog::info("Decoder latency: low-delay output, one thread, no frame threading (flags reviewed)");
     return std::unique_ptr<VideoDecoder>(new VideoDecoder(std::move(context)));
 }
 
@@ -327,7 +339,28 @@ VideoDecoder::~VideoDecoder()
 
 std::expected<void, std::string> VideoDecoder::decode(std::span<const std::uint8_t> accessUnit)
 {
+    static thread_local bool latencySetup = false;
+    static thread_local std::optional<core::MmcssRegistration> mmcss;
+
+    if (!latencySetup)
+    {
+        latencySetup = true;
+        SetThreadDescription(GetCurrentThread(), L"Lynx video decoder");
+        mmcss.emplace(core::MmcssRegistration::enable(L"Games"));
+
+        if (context_->device != nullptr)
+        {
+            render::raiseCurrentThreadGpuPriority(*context_->device);
+        }
+    }
+
     const Clock::time_point sent = Clock::now();
+
+    if (context_->metrics != nullptr)
+    {
+        context_->metrics->addReceived(sent, accessUnit.size());
+    }
+
     auto decoded = context_->send(accessUnit).and_then([&] { return context_->receive(sent); });
 
     if (!decoded)
@@ -410,8 +443,15 @@ std::expected<void, std::string> VideoDecoder::Context::publish(const AVFrame& p
     }
 
     const Clock::time_point now = Clock::now();
+    const double milliseconds =
+        std::chrono::duration<double, std::milli>(now - sent).count();
     decoded.add(now - sent);
     ++totalFrames;
+
+    if (metrics != nullptr)
+    {
+        metrics->addDecoded(now, milliseconds);
+    }
 
     const StreamFormat current = formatOf(picture);
 
@@ -419,6 +459,11 @@ std::expected<void, std::string> VideoDecoder::Context::publish(const AVFrame& p
     {
         logFormat(current);
         format = current;
+
+        if (metrics != nullptr)
+        {
+            metrics->setFormat(current.width, current.height);
+        }
     }
 
     // The renderer holds a reference to the picture until it is done reading

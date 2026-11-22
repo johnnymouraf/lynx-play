@@ -85,7 +85,8 @@ std::optional<core::VideoCodec> codecOfFile(const std::filesystem::path& path)
 
 std::expected<std::unique_ptr<FilePlayer>, std::string> FilePlayer::start(
     const render::GpuDevice& gpu, std::shared_ptr<render::FrameMailbox> mailbox,
-    const std::filesystem::path& path, double framesPerSecond)
+    const std::filesystem::path& path, double framesPerSecond,
+    std::shared_ptr<core::StreamMetrics> metrics)
 {
     const auto codec = codecOfFile(path);
 
@@ -102,7 +103,7 @@ std::expected<std::unique_ptr<FilePlayer>, std::string> FilePlayer::start(
         return std::unexpected(stream.error());
     }
 
-    auto decoder = VideoDecoder::create(gpu, *codec, std::move(mailbox));
+    auto decoder = VideoDecoder::create(gpu, *codec, std::move(mailbox), std::move(metrics));
 
     if (!decoder)
     {

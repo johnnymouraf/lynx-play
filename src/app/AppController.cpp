@@ -4,6 +4,7 @@
 #include "app/SettingsController.h"
 #include "app/Version.h"
 #include "core/Paths.h"
+#include "core/StreamMetrics.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 #include "render/ReflexSession.h"
@@ -111,6 +112,7 @@ std::expected<void, std::string> AppController::startVideoTest()
         return std::unexpected(mailbox.error());
     }
 
+    auto metrics = std::make_shared<core::StreamMetrics>();
     auto source = render::TestPatternSource::start(*gpu, *mailbox);
 
     if (!source)
@@ -161,6 +163,7 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                                  Qt::QueuedConnection);
                                                          },
                                                      },
+                                                 .metrics = metrics,
                                                  .onClosed = closeLater,
                                              });
 

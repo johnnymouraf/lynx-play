@@ -3,6 +3,7 @@
 #include "app/Fonts.h"
 #include "app/OverlayInput.h"
 #include "app/SettingsController.h"
+#include "core/StreamMetrics.h"
 #include "input/GamepadManager.h"
 #include "input/Sdl.h"
 #include "media/FilePlayer.h"
@@ -63,7 +64,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
         return EXIT_FAILURE;
     }
 
-    auto player = media::FilePlayer::start(*gpu, *mailbox, path, framesPerSecond);
+    auto metrics = std::make_shared<core::StreamMetrics>();
+    auto player = media::FilePlayer::start(*gpu, *mailbox, path, framesPerSecond, metrics);
 
     if (!player)
     {
@@ -158,6 +160,7 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                     .sessionName = "Arquivo de teste",
                 },
             .overlayActions = overlayActions,
+            .metrics = metrics,
             .gamepad = [&gamepads]
             {
                 if (gamepads == nullptr)

@@ -31,4 +31,8 @@ struct GpuDevice
 
 [[nodiscard]] std::expected<GpuDevice, std::string> createGpuDevice();
 
+// Raises the calling thread's priority to DXGI's highest for GPU work. Call it
+// on the render and decode threads, once each.
+void raiseCurrentThreadGpuPriority(ID3D12Device& device);
+
 } // namespace lynx::render

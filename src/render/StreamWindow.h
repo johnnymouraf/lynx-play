@@ -16,6 +16,11 @@
 
 #include <windows.h>
 
+namespace lynx::input
+{
+class KeyboardMouseInput;
+}
+
 namespace lynx::render
 {
 
@@ -46,6 +51,10 @@ struct StreamWindowOptions
     OverlayFonts overlayFonts;
     OverlayOptions overlay;
     OverlayActions overlayActions;
+    // The counters the overlay reads; shared with the decoder.
+    std::shared_ptr<core::StreamMetrics> metrics;
+    // The keyboard and mouse state the window records for the session.
+    std::shared_ptr<input::KeyboardMouseInput> keyboardMouse;
     // The controller the overlay's menu navigates with; may be empty.
     std::function<OverlayGamepad()> gamepad;
     // Called once when the window closes by itself, never when its owner
@@ -82,6 +91,7 @@ private:
     static LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT handleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void handleKey(WPARAM key);
+    void handleRawInput(LPARAM lParam);
     void toggleFullscreen();
     void enterFullscreen();
     void leaveFullscreen();
@@ -91,8 +101,12 @@ private:
     HWND window_ = nullptr;
     std::unique_ptr<FrameRenderer> renderer_;
     std::function<void(CloseReason)> onClosed_;
+    std::shared_ptr<input::KeyboardMouseInput> keyboardMouse_;
     bool fullscreen_ = false;
     bool cursorVisible_ = true;
+    bool haveAbsoluteMouse_ = false;
+    LONG lastAbsoluteX_ = 0;
+    LONG lastAbsoluteY_ = 0;
     WINDOWPLACEMENT windowedPlacement_{.length = sizeof(WINDOWPLACEMENT)};
 };
 

@@ -5,6 +5,7 @@
 #include "app/OverlayInput.h"
 #include "app/SettingsController.h"
 #include "input/GamepadManager.h"
+#include "input/KeyboardMouse.h"
 #include "render/ReflexSession.h"
 
 #include <QGuiApplication>
@@ -135,6 +136,15 @@ StreamController::StreamController(SettingsController& settings, InputController
                 session_->setMicrophoneMuted(settings_.microphoneMuted());
             });
 
+    connect(&settings_, &SettingsController::keyboardMouseChanged, this,
+            [this]
+            {
+                if (keyboardMouse_ != nullptr)
+                {
+                    keyboardMouse_->setSettings(settings_.keyboardMouse());
+                }
+            });
+
     connect(&input_, &InputController::microphoneButtonPressed, this,
             [this]
             {
@@ -243,6 +253,9 @@ void StreamController::startSession()
         return;
     }
 
+    metrics_ = std::make_shared<core::StreamMetrics>();
+    keyboardMouse_ = std::make_shared<input::KeyboardMouseInput>(settings_.keyboardMouse());
+
     const remoteplay::SessionRequest request{
         .host = target.host,
         .ps5 = target.ps5,
@@ -250,6 +263,8 @@ void StreamController::startSession()
         .video = settings_.video(),
         .audio = settings_.audio(),
         .gamepads = input_.gamepads(),
+        .keyboardMouse = keyboardMouse_.get(),
+        .metrics = metrics_,
     };
     auto started = remoteplay::StreamSession::start(*gpu, *mailbox, request, eventsFor(session));
 
@@ -345,6 +360,11 @@ void StreamController::onFirstPicture(std::uint64_t session)
                     {
                         input_.gamepads()->setOverlayOpen(open);
                     }
+
+                    if (keyboardMouse_ != nullptr)
+                    {
+                        keyboardMouse_->setOverlayOpen(open);
+                    }
                 });
         },
         .disconnect = [this]
@@ -384,6 +404,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                              target_->name.toStdString(),
                                                      },
                                                  .overlayActions = overlayActions,
+                                                 .metrics = metrics_,
+                                                 .keyboardMouse = keyboardMouse_,
                                                  .gamepad = [this]
                                                  {
                                                      const input::GamepadManager* gamepads =
@@ -468,9 +490,17 @@ void StreamController::stop()
         input_.gamepads()->setOverlayOpen(false);
     }
 
+    if (keyboardMouse_ != nullptr)
+    {
+        keyboardMouse_->setOverlayOpen(false);
+        keyboardMouse_->releaseAll();
+    }
+
     window_.reset();
     session_.reset();
     mailbox_.reset();
+    metrics_.reset();
+    keyboardMouse_.reset();
     gpu_.reset();
 }
 

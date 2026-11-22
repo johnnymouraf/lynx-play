@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Settings.h"
+#include "core/StreamMetrics.h"
 #include "remoteplay/Console.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
@@ -14,6 +15,7 @@
 namespace lynx::input
 {
 class GamepadManager;
+class KeyboardMouseInput;
 }
 
 namespace lynx::remoteplay
@@ -65,6 +67,10 @@ struct SessionRequest
     core::AudioSettings audio;
     // The controllers that drive the console; owned by the app. May be null.
     input::GamepadManager* gamepads = nullptr;
+    // The keyboard and mouse the stream window records. May be null.
+    input::KeyboardMouseInput* keyboardMouse = nullptr;
+    // The decoder and session counters the overlay reads.
+    std::shared_ptr<core::StreamMetrics> metrics;
 };
 
 // A Remote Play session with a paired console, through chiaki-lib, its video

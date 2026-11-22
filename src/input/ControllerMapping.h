@@ -72,4 +72,9 @@ inline constexpr std::uint16_t kTouchpadHeight = 1079;
 
 [[nodiscard]] ChiakiControllerState toChiakiControllerState(const GamepadSample& sample);
 
+// Adds a second input source (the keyboard and mouse) to the controller's
+// sample: buttons add up, triggers take the stronger pull and each axis the
+// larger deflection.
+[[nodiscard]] GamepadSample mergeSamples(const GamepadSample& first, const GamepadSample& second);
+
 } // namespace lynx::input
