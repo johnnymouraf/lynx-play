@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [2.3 HDR](#23-hdr)
   - [2.4 Optical flow and cadence detection](#24-optical-flow-and-cadence-detection)
   - [2.5 DLSS Frame Generation 2x](#25-dlss-frame-generation-2x)
   - [2.6 DLSS Super Resolution (experimental)](#26-dlss-super-resolution-experimental)
@@ -39,7 +38,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         per stage.
   - [x] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
         and upscaling to any output (1440p/4K monitors).
-  - [ ] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
+  - [x] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
   - [ ] **2.4 Optical flow and cadence detection**: find the repeated frames of
         30 fps games inside the 60 fps stream.
   - [ ] **2.5 DLSS Frame Generation 2x**: 30→60 and 60→120 fps, with Reflex.
@@ -151,64 +150,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-
-### 2.3 HDR
-
-- **Goal:** the PS5's native HDR stream plays with correct BT.2020/PQ color on
-  an HDR display and tone-maps on an SDR one, and RTX Video HDR can turn an
-  SDR stream into HDR when the display and the NVIDIA App allow.
-- **Guardrails:** no DLSS (2.5, 2.6); the SDR path stays exactly as it is
-  when HDR is off; no capture card.
-- **Success criteria:**
-  1. CI green on `auto/2.3`, unit tests included.
-  2. `--play-file` with an HDR10 HEVC file (P010, BT.2020/PQ) plays; the log
-     shows P010, the stream's `color_trc`/`color_primaries` (and mastering
-     data when present), the display's HDR state, and which presentation path
-     ran; a screenshot shows a correctly tone-mapped picture on this SDR panel
-     (no washed-out or crushed frame).
-  3. The HDR setting (Desligado / Automático / RTX Video HDR) exists on
-     Configurações › Vídeo, is saved in `settings.json`, and applies live
-     where it can.
-  4. With HDR on for the session, the stream request uses
-     `CHIAKI_CODEC_H265_HDR` (the log shows it); P010 reaches the decoder
-     (owner check for a real session).
-  5. On this machine, display detection reports SDR and the app chooses the
-     SDR swap chain; RTX Video HDR is disabled with an explanation. On an HDR
-     display (owner check), the PQ swap chain and the TrueHDR extension run.
-- **Deliveries:**
-  1. HDR capture and presentation: P010 through the decoder and the shader
-     (BT.2020 matrix, PQ), a 10-bit intermediate, the R10G10B10A2_UNORM swap
-     chain with `DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020` on HDR displays,
-     and tone mapping PQ→SDR for SDR ones; the ImGui overlay converts sRGB→PQ
-     on an HDR chain.
-  2. Stream profile and settings: `CHIAKI_CODEC_H265_HDR` when the setting
-     asks for the stream's own HDR; `video.hdr` (off/auto/rtx) in
-     `settings.json`; the Vídeo screen row.
-  3. RTX Video HDR through the D3D11 extension already in place (`GUID
-     {fdd62bb4-620b-4fd7-9ab3-1e59d0d544b3}`, struct `{version 4, method 3,
-     enable 1}`), ordered before VSR in the same blit, with its own stage time
-     in `GpuTimer` and the overlay.
-  4. Display HDR detection: `DisplayConfigGetDeviceInfo` with
-     `GET_ADVANCED_COLOR_INFO_2` (or matching the HMONITOR across adapters,
-     since `GetContainingOutput` misses a panel on another GPU) and the
-     setting's enabled/disabled explanation.
-- **Settled in planning:** research in `scratchpad/research/hdr.md`: chiaki
-  1.10.1 requests HDR purely through the video profile's codec
-  (`CHIAKI_CODEC_H265_HDR`), with no callback flag, and FFmpeg supplies the
-  color metadata; this laptop's panel is SDR and owned by the Intel GPU, so
-  RTX Video HDR's picture is an owner check on an HDR display; the NVIDIA App
-  needs its HDR/Video Enhancements toggle on.
-- **Changes:** `src/render/` (shader, swap chain color space, HDR stage,
-  overlay), `src/media/` (P010 metadata), `src/remoteplay/` (profile),
-  `src/core/` (settings), `src/app/` (Vídeo screen), tests.
-- **Data and interfaces:** `settings.json` gains `video.hdr`
-  (`off`/`auto`/`rtx`); the decoded frame carries its color space and
-  mastering data; the presentation layer reports the display's color mode.
-- **Edge cases:** SDR display with HDR off and on; HDR display with Windows
-  HDR off (Windows tone maps; the log says which path); P010 decode failure
-  (fall back to 8-bit with a logged reason); overlay legibility on HDR;
-  non-NVIDIA GPU (RTX HDR disabled).
 
 ### 2.4 Optical flow and cadence detection
 
@@ -788,3 +729,46 @@ The owner asked about DLSS and frame generation, so the run no longer stops at
 - B. Stop at 2.2 and hand the rest over.
 
 **Chosen: A**. Changing it: nothing is redone; the run just stops earlier.
+
+#### D43 – HDR in "Automático" asks the PS5 for HDR even on an SDR panel (2.3)
+
+- A. Auto is the default and asks for HDR (H.265) whenever the console offers
+  it, tone-mapping to SDR here: the native path runs on this machine.
+- B. Off by default: nothing changes, but the native stream only runs when
+  chosen.
+- C. Auto asks only on an HDR display: on this panel Auto equals Off.
+
+**Chosen: A**. Changing it: the default in `core::VideoSettings` and
+`videoProfileFor`.
+
+#### D44 – The HDR setting is a three-state row on Vídeo (2.3)
+
+- A. One three-state row (Desligado / Automático / RTX Video HDR) under Vídeo.
+- B. Only the sketch's two-state toggle under RTX.
+- C. Both: two controls for one setting.
+
+**Chosen: A**. Changing it: add a toggle to `RtxSettings.qml` bound to `hdr`.
+
+#### D45 – Display HDR detection through DisplayConfig (2.3)
+
+The panel belongs to the Intel GPU and the NVIDIA adapter enumerates no
+outputs, so `GetContainingOutput` finds nothing.
+
+- A. `DisplayConfigGetDeviceInfo` with `GET_ADVANCED_COLOR_INFO_2` on the
+  window's monitor.
+- B. Enumerate outputs of every adapter and match the `HMONITOR` (gives
+  luminance but not the HDR state).
+- C. `GetContainingOutput` (fails here).
+
+**Chosen: A**. Changing it: use B for the panel's luminance.
+
+#### D46 – RTX Video HDR and VSR share the blit's timing (2.3)
+
+Both run in one `VideoProcessorBlt`.
+
+- A. A separate `RtxVideoHdr` stage; when both run, both report the shared
+  blit's time.
+- B. Attribute the blit to one and show 0 for the other.
+
+**Chosen: A**, each feature shows its real cost and the frame total doesn't
+change. Changing it: measure separately if the driver exposes it.
