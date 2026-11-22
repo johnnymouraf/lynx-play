@@ -53,5 +53,6 @@ registration keys, PINs, tokens or IP addresses outside the local network.
 
 ## Design
 
-Screens are designed in Drafia (MCP server `drafia`) before they are built in
-QML. The Drafia file is the source of truth for how the app looks.
+The design file lives under `design/` on the owner's machine, outside the
+repository. Its variables became the QML `Theme` singleton and its components
+the QML components; the app's look is defined by those.

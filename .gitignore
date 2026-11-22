@@ -8,3 +8,6 @@ CMakeUserPresets.json
 *.user
 /.vcpkg-cache/
 /.ngx/
+
+# The design file stays on the owner machine, not in the repository.
+/design/

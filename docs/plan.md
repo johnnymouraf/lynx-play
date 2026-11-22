@@ -20,7 +20,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.1 Foundation**: public repo, CI build, Qt shell, D3D12 window on the
         RTX, chiaki-lib linked.
   - [x] **1.2 Consoles** [auto]: LAN discovery, wake from rest mode, pairing
-        (Account ID + PIN), saved consoles, manual IP, screens from the Drafia
+        (Account ID + PIN), saved consoles, manual IP, screens from the
         design.
   - [x] **1.3 Video** [auto]: streaming session, hardware H.265/H.264 decode
         straight into D3D12, low-latency presentation, 1080p60 at the highest
@@ -148,10 +148,10 @@ the step is done and green.
   card code; no `Co-Authored-By` or any AI credit in commits or files.
 - **Commits:** Conventional Commits in English, one per delivery, pushed to the
   step branch right away.
-- **Design:** the Drafia document `design/lynx-play.drafia` is the source of
-  truth for how the app looks. Read it through the Drafia MCP tools
-  (`read_skill` `guide/design-to-code.md` first). Its variables become a QML
-  `Theme` singleton; its components become QML components.
+- **Design:** the design file under `design/` (on the owner's machine, kept
+  out of the repository) is the source of truth for how the app looks. Its
+  variables became the QML `Theme` singleton and its components the QML
+  components.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
