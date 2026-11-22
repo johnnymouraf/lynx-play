@@ -140,6 +140,7 @@ void drawReflexSection(const ReflexOverlayStats& reflex)
     case ReflexOverlayStats::State::Stalled:
     case ReflexOverlayStats::State::Failed:
         row("Modo", reflex.mode);
+        row("Low latency efetivo", reflex.lowLatencyEffective ? "sim" : "não");
         row("Sleep médio", millisecondsText(reflex.sleepMeanMs, 3));
         row("Sleep máximo", millisecondsText(reflex.sleepMaxMs, 3));
         row("Driver vê Sleep", reflex.driverSeesSleep ? "sim" : "não");

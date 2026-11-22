@@ -57,13 +57,13 @@ TEST_CASE("Old stalls leave the window")
 
     for (std::size_t index = 0; index < SleepStallDetector::kThreshold; ++index)
     {
-        detector.observe(10'000, 1'000);
+        (void)detector.observe(10'000, 1'000);
     }
 
     // One full window of short sleeps replaces every long one.
     for (std::size_t index = 0; index < SleepStallDetector::kWindow; ++index)
     {
-        detector.observe(1'000, 1'000);
+        (void)detector.observe(1'000, 1'000);
     }
 
     CHECK_FALSE(detector.observe(1'000, 1'000));

@@ -360,18 +360,13 @@ std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)
     if (marked)
     {
         reflex_.mark(reflexFrameId, LatencyMarker::SimulationStart);
+        reflex_.mark(reflexFrameId, LatencyMarker::SimulationEnd);
+        reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
     }
 
     auto& allocator = allocators_.at(bufferIndex);
     allocator->Reset();
     commandList_->Reset(allocator.Get(), nullptr);
-
-    if (marked)
-    {
-        reflex_.mark(reflexFrameId, LatencyMarker::SimulationEnd);
-        reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
-    }
-
     recordFrame(bufferIndex, overlay);
     commandList_->Close();
 

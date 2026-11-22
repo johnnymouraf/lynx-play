@@ -613,14 +613,14 @@ bool ReflexSession::applySleepMode(core::ReflexMode mode)
     if (status != NVAPI_OK)
     {
         spdlog::error("reflex: NvAPI_D3D_SetSleepMode mode={} failed: {}", reflexModeName(mode),
-                     statusText(nvapi(), status));
+                      statusText(nvapi(), status));
         return false;
     }
 
     appliedMode_ = mode;
-    spdlog::info("reflex: NvAPI_D3D_SetSleepMode mode={} status={} (NVAPI_OK), lowLatency={} "
-                 "boost={} intervalUs=0",
-                 reflexModeName(mode), static_cast<int>(status),
+    spdlog::info("reflex: NvAPI_D3D_SetSleepMode mode={} status={}, lowLatency={} boost={} "
+                 "intervalUs=0",
+                 reflexModeName(mode), statusText(nvapi(), status),
                  mode != core::ReflexMode::Off ? 1 : 0,
                  mode == core::ReflexMode::Boost ? 1 : 0);
     return true;
