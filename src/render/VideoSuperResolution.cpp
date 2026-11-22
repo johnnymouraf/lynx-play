@@ -279,6 +279,7 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
                                                               ID3D11Device5& device11,
                                                               SurfaceSize size,
                                                               DXGI_FORMAT format,
+                                                              D3D12_RESOURCE_FLAGS flags,
                                                               std::string_view what)
 {
     const D3D12_RESOURCE_DESC description{
@@ -291,7 +292,7 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
         .Format = format,
         .SampleDesc = {.Count = 1, .Quality = 0},
         .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
-        .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+        .Flags = flags,
     };
     const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
 
@@ -302,6 +303,38 @@ std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& devi
             D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&texture.texture12));
         FAILED(result))
     {
+        // A shared resource that the runtime refuses can be a format or a
+        // flag problem; log what the device thinks of both to tell them apart.
+        D3D12_FEATURE_DATA_FORMAT_SUPPORT support{};
+        support.Format = format;
+        const HRESULT supportResult = device12.CheckFeatureSupport(
+            D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support));
+
+        ComPtr<ID3D12Resource> unshared;
+
+        const HRESULT unsharedResult = device12.CreateCommittedResource(
+            &defaultHeap, D3D12_HEAP_FLAG_NONE, &description, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, IID_PPV_ARGS(&unshared));
+
+        D3D12_RESOURCE_DESC simultaneous = description;
+        simultaneous.Flags = static_cast<D3D12_RESOURCE_FLAGS>(
+            static_cast<UINT>(flags) |
+            static_cast<UINT>(D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS));
+        ComPtr<ID3D12Resource> sharedSimultaneous;
+
+        const HRESULT simultaneousResult = device12.CreateCommittedResource(
+            &defaultHeap, D3D12_HEAP_FLAG_SHARED, &simultaneous, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, IID_PPV_ARGS(&sharedSimultaneous));
+
+        spdlog::info("VSR diagnostics: format {} support 0x{:X}/0x{:X} (0x{:08X}), the same "
+                     "texture outside a shared heap 0x{:08X}, shared with simultaneous access "
+                     "0x{:08X}",
+                     static_cast<int>(format), static_cast<unsigned>(support.Support1),
+                     static_cast<unsigned>(support.Support2),
+                     static_cast<unsigned>(supportResult),
+                     static_cast<unsigned>(unsharedResult),
+                     static_cast<unsigned>(simultaneousResult));
+
         return std::unexpected(describeFailure(what, result));
     }
 
@@ -537,7 +570,7 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
     Slot slot;
 
     auto input = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.input,
-                                      inputFormatOf(picture.format),
+                                      inputFormatOf(picture.format), D3D12_RESOURCE_FLAG_NONE,
                                       "CreateCommittedResource (VSR input)");
 
     if (!input)
@@ -585,7 +618,8 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
     }
 
     auto output = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.output,
-                                      kOutputFormat, "CreateCommittedResource (VSR output)");
+                                      kOutputFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+                                      "CreateCommittedResource (VSR output)");
 
     if (!output)
     {
