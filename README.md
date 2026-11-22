@@ -73,15 +73,16 @@ ctest --preset release
 
 ## Project layout
 
-| Path                     | What it holds                                         |
-| ------------------------ | ----------------------------------------------------- |
-| `src/app`                | Entry point, Qt application and QML interface         |
-| `src/core`               | Logging and shared utilities                          |
-| `src/render`             | Direct3D 12 device, swap chain and stream window      |
-| `src/remoteplay`         | The bridge to chiaki-ng's library                     |
-| `tests`                  | Unit tests (Catch2)                                   |
-| `third_party/chiaki-ng`  | chiaki-ng, pinned as a submodule                      |
-| `cmake`, `triplets`      | CMake helpers and the vcpkg triplet                   |
+| Path                    | What it holds                                           |
+| ----------------------- | ------------------------------------------------------- |
+| `src/app`               | Entry point, Qt application and QML interface           |
+| `src/app/assets`        | Bundled fonts, icons and images, with their licenses    |
+| `src/core`              | Logging and shared utilities                            |
+| `src/render`            | Direct3D 12 device, swap chain and stream window        |
+| `src/remoteplay`        | chiaki-ng bridge: discovery, pairing, wake, saved list  |
+| `tests`                 | Unit tests (Catch2)                                     |
+| `third_party/chiaki-ng` | chiaki-ng, pinned as a submodule                        |
+| `cmake`, `triplets`     | CMake helpers and the vcpkg triplet                     |
 
 ## License
 

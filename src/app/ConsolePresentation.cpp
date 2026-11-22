@@ -135,7 +135,7 @@ QString consoleActivity(const ConsoleFacts& facts, const QDateTime& now)
         return u"Visto pela última vez %1"_s.arg(timeSince(lastSeen, now));
     }
 
-    return u"Ainda não respondeu neste endereço"_s;
+    return u"Ainda não respondeu"_s;
 }
 
 QString consoleName(const ConsoleFacts& facts)
