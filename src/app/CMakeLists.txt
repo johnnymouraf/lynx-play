@@ -16,6 +16,8 @@ qt_add_executable(lynx-play WIN32
     ConsolePresentation.h
     ConsolesController.cpp
     ConsolesController.h
+    FilePlayback.cpp
+    FilePlayback.h
     Fonts.cpp
     Fonts.h
     IconProvider.cpp
@@ -117,6 +119,7 @@ target_include_directories(lynx-play PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx-play PRIVATE
     Lynx::core
+    Lynx::media
     Lynx::remoteplay
     Lynx::render
     Qt6::Gui

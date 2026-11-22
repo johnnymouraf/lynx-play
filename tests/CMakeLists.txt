@@ -2,6 +2,8 @@ find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(lynx_tests
     core/RateCounterTests.cpp
+    media/AnnexBTests.cpp
+    media/FilePlayerTests.cpp
     remoteplay/AccountIdTests.cpp
     remoteplay/ChiakiRuntimeTests.cpp
     remoteplay/ConsoleMergeTests.cpp
@@ -17,6 +19,7 @@ add_executable(lynx_tests
     render/TestPatternTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE
+    Lynx::media
     Lynx::remoteplay
     Lynx::render
     Catch2::Catch2WithMain)

@@ -17,6 +17,7 @@ interface) is written for Windows and Direct3D 12.
 
 - [Status](#status)
 - [Download](#download)
+- [Playing a test stream](#playing-a-test-stream)
 - [Requirements](#requirements)
 - [Building](#building)
 - [Project layout](#project-layout)
@@ -43,6 +44,26 @@ encrypted for the current Windows user (DPAPI).
 
 The first run asks Windows Firewall to let Lynx Play use the network: allow it,
 or the consoles' answers to the network search never reach the app.
+
+## Playing a test stream
+
+To check the video path without a console, play an H.264 or H.265 elementary
+stream file (`.h264`, `.264`, `.h265`, `.265`, `.hevc`) in a loop:
+
+```powershell
+.\lynx-play.exe --play-file test1080p60.h265 --fps 60
+```
+
+It opens only the stream window, decodes on the GPU and renders exactly as a
+PS5 stream does, and logs the decoded and presented frame rates. `--fps`
+defaults to 60. FFmpeg makes a suitable file (no B-frames, as a console
+sends):
+
+```powershell
+ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=60 -t 20 `
+  -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p" `
+  -c:v libx265 -x265-params "keyint=60:bframes=0" test1080p60.h265
+```
 
 ## Requirements
 
@@ -77,8 +98,9 @@ ctest --preset release
 | ----------------------- | ------------------------------------------------------- |
 | `src/app`               | Entry point, Qt application and QML interface           |
 | `src/app/assets`        | Bundled fonts, icons and images, with their licenses    |
-| `src/core`              | Logging and shared utilities                            |
-| `src/render`            | Direct3D 12 device, swap chain and stream window        |
+| `src/core`              | Logging, settings and shared utilities                  |
+| `src/media`             | GPU decoding (FFmpeg, D3D12VA) and the test file source |
+| `src/render`            | Direct3D 12 stream window, frame presenter and shaders  |
 | `src/remoteplay`        | chiaki-ng bridge: discovery, pairing, wake, saved list  |
 | `tests`                 | Unit tests (Catch2)                                     |
 | `third_party/chiaki-ng` | chiaki-ng, pinned as a submodule                        |

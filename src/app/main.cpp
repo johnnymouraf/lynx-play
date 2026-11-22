@@ -1,5 +1,6 @@
 #include "app/AppController.h"
 #include "app/ConsolesController.h"
+#include "app/FilePlayback.h"
 #include "app/Fonts.h"
 #include "app/IconProvider.h"
 #include "app/QtLogBridge.h"
@@ -11,11 +12,14 @@
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
 
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QVariantMap>
 
 #include <cstdlib>
+#include <filesystem>
 #include <optional>
 
 #include <spdlog/spdlog.h>
@@ -30,6 +34,17 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
 namespace
 {
+
+constexpr double kMinFileFramesPerSecond = 1.0;
+constexpr double kMaxFileFramesPerSecond = 240.0;
+
+// Developer options: `--play-file <file> [--fps <rate>]` plays an elementary
+// stream instead of opening the interface.
+struct CommandLine
+{
+    std::optional<std::filesystem::path> playFile;
+    double framesPerSecond = 60.0;
+};
 
 void startLogging()
 {
@@ -101,6 +116,41 @@ QString findStreamGpu()
     return QString::fromStdString(adapters->at(*chosen).name);
 }
 
+// Shows Qt's message and exits on an unknown option; nullopt on a bad rate.
+std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
+{
+    using namespace Qt::StringLiterals;
+
+    const QCommandLineOption playFile(
+        u"play-file"_s, u"Plays an H.264 or H.265 elementary stream in a loop."_s, u"file"_s);
+    const QCommandLineOption framesPerSecond(u"fps"_s, u"The file's frame rate (60)."_s,
+                                             u"rate"_s, u"60"_s);
+
+    QCommandLineParser parser;
+    parser.addOptions({playFile, framesPerSecond});
+    parser.process(application);
+
+    CommandLine commandLine;
+    bool isNumber = false;
+    commandLine.framesPerSecond = parser.value(framesPerSecond).toDouble(&isNumber);
+
+    const bool inRange = commandLine.framesPerSecond >= kMinFileFramesPerSecond &&
+                         commandLine.framesPerSecond <= kMaxFileFramesPerSecond;
+
+    if (!isNumber || !inRange)
+    {
+        spdlog::error("--fps takes a rate from 1 to 240");
+        return std::nullopt;
+    }
+
+    if (parser.isSet(playFile))
+    {
+        commandLine.playFile = parser.value(playFile).toStdWString();
+    }
+
+    return commandLine;
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -110,6 +160,18 @@ int main(int argc, char* argv[])
     spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
 
     QGuiApplication application(argc, argv);
+    const auto commandLine = parseCommandLine(application);
+
+    if (!commandLine)
+    {
+        return EXIT_FAILURE;
+    }
+
+    if (commandLine->playFile)
+    {
+        return lynx::app::playFile(*commandLine->playFile, commandLine->framesPerSecond);
+    }
+
     lynx::app::loadBundledFonts();
 
     lynx::app::AppController controller({

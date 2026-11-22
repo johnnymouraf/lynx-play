@@ -7,6 +7,10 @@ target_include_directories(lynx_ffmpeg INTERFACE ${FFMPEG_INCLUDE_DIRS})
 target_link_libraries(lynx_ffmpeg INTERFACE ${FFMPEG_LIBRARIES})
 
 add_library(lynx_media STATIC
+    AnnexB.cpp
+    AnnexB.h
+    FilePlayer.cpp
+    FilePlayer.h
     VideoDecoder.cpp
     VideoDecoder.h)
 add_library(Lynx::media ALIAS lynx_media)
