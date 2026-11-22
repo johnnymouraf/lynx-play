@@ -151,6 +151,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
         .reflex = options.reflex,
         .upscaling = options.upscaling,
         .opticalFlow = options.opticalFlow,
+        .frameGeneration = options.frameGeneration,
         .hdr = options.hdr,
         .rtxVideoHdrAvailable = options.rtxVideoHdrAvailable,
         .overlayFonts = std::move(options.overlayFonts),
@@ -241,6 +242,14 @@ void StreamWindow::setOpticalFlow(bool enabled)
     if (renderer_ != nullptr)
     {
         renderer_->setOpticalFlow(enabled);
+    }
+}
+
+void StreamWindow::setFrameGeneration(core::FrameGenerationMode mode)
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setFrameGeneration(mode);
     }
 }
 

@@ -5,10 +5,11 @@
 #include <cstdint>
 #include <expected>
 #include <string>
-#include <string_view>
 
 #include <d3d12.h>
 #include <wrl/client.h>
+
+struct NVSDK_NGX_Parameter;
 
 namespace lynx::render
 {
@@ -58,9 +59,9 @@ inline constexpr std::uint32_t kAdaArchitecture = 0x00000190;
 [[nodiscard]] std::string ngxResultText(std::uint32_t result);
 
 // The process's NGX instance for the stream's device: NVSDK_NGX initialized
-// once with a project id and shut down with the renderer. The features
-// (DLSS Super Resolution, and DLSS Frame Generation later) are created
-// against it.
+// once with a project id and shut down with the renderer. DLSS Super
+// Resolution and DLSS Frame Generation are both created against it, and both
+// allocate their parameters through it.
 class NgxHost
 {
 public:
@@ -73,11 +74,21 @@ public:
     ~NgxHost();
 
     [[nodiscard]] ID3D12Device* device() const;
+    [[nodiscard]] bool initialized() const;
     // What the instance runs, for the log.
     [[nodiscard]] const std::string& description() const;
 
+    // A parameter block for creating and evaluating a feature; the caller
+    // destroys it with destroyParameters().
+    [[nodiscard]] std::expected<NVSDK_NGX_Parameter*, std::string> allocateParameters() const;
+    // The device's capability map; the caller destroys it the same way.
+    [[nodiscard]] std::expected<NVSDK_NGX_Parameter*, std::string> capabilityParameters() const;
+    static void destroyParameters(NVSDK_NGX_Parameter* parameters);
+
 private:
     NgxHost() = default;
+
+    void shutdown();
 
     Microsoft::WRL::ComPtr<ID3D12Device> device_;
     std::string description_;

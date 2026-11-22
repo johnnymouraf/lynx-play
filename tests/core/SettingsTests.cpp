@@ -40,6 +40,7 @@ TEST_CASE("Settings survive a write and a read")
         .reflex = ReflexMode::Boost,
         .upscaling = Upscaling::Dlss,
         .opticalFlow = false,
+        .frameGeneration = FrameGenerationMode::X2,
     };
     settings.overlay.statisticsVisible = true;
     std::ostringstream output;
@@ -52,6 +53,12 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->audio == settings.audio);
     CHECK(readBack->controller == settings.controller);
     CHECK(readBack->rtx == settings.rtx);
+    // Each RTX group survives on its own, so a field the writer forgot fails
+    // here and not only in the whole-struct comparison.
+    CHECK(readBack->rtx.reflex == ReflexMode::Boost);
+    CHECK(readBack->rtx.upscaling == Upscaling::Dlss);
+    CHECK(readBack->rtx.frameGeneration == FrameGenerationMode::X2);
+    CHECK_FALSE(readBack->rtx.opticalFlow);
     CHECK(readBack->overlay == settings.overlay);
 }
 
@@ -68,6 +75,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.rtx.reflex == ReflexMode::On);
     CHECK(defaults.rtx.upscaling == Upscaling::Shader);
     CHECK(defaults.rtx.opticalFlow);
+    CHECK(defaults.rtx.frameGeneration == FrameGenerationMode::Off);
 }
 
 TEST_CASE("Audio and controller defaults use the Windows default devices")
@@ -106,7 +114,9 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
         "rtx": {
             "reflex": "turbo",
             "upscaling": "turbo",
-            "opticalFlow": "yes"
+            "videoSuperResolution": "yes",
+            "opticalFlow": "yes",
+            "frameGeneration": "4x"
         }
     })");
 

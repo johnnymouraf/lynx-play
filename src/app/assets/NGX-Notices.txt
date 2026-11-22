@@ -1,7 +1,8 @@
 NVIDIA NGX runtimes
 ===================
 
-nvngx_dlss.dll is NVIDIA's DLSS Super Resolution runtime, distributed in
+nvngx_dlss.dll is NVIDIA's DLSS Super Resolution runtime and
+nvngx_dlssg.dll is its DLSS Frame Generation runtime, both distributed in
 object form under the NVIDIA RTX SDKs License (licenses/NGX-License.txt).
 
 This software contains source code provided by NVIDIA Corporation.

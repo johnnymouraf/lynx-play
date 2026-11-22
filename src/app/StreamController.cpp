@@ -123,6 +123,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                     window_->setReflexMode(settings_.reflexMode());
                     window_->setUpscaling(settings_.upscalingMode());
                     window_->setOpticalFlow(settings_.opticalFlow());
+                    window_->setFrameGeneration(settings_.frameGenerationMode());
                 }
             });
 
@@ -399,6 +400,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .reflex = settings_.reflexMode(),
                                                  .upscaling = settings_.upscalingMode(),
                                                  .opticalFlow = settings_.opticalFlow(),
+                                                 .frameGeneration =
+                                                     settings_.frameGenerationMode(),
                                                  .hdr = settings_.hdrMode(),
                                                  .rtxVideoHdrAvailable =
                                                      settings_.rtxVideoHdrAvailable(),

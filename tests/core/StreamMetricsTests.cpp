@@ -80,6 +80,25 @@ TEST_CASE("StreamMetrics keeps present intervals for the frame time plot")
     CHECK(snapshot.readyToPresentMilliseconds == Catch::Approx(3.0));
 }
 
+TEST_CASE("StreamMetrics counts generated presents apart from real ones")
+{
+    StreamMetrics metrics(kStart);
+
+    for (int frame = 0; frame < 60; ++frame)
+    {
+        const auto at = kStart + (frame + 1) * 16ms;
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
+        metrics.addGeneratedPresent(at);
+    }
+
+    const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
+
+    CHECK(snapshot.presentedFps == Catch::Approx(60.0));
+    CHECK(snapshot.generatedFps == Catch::Approx(60.0));
+    CHECK(snapshot.allPresentedFps == Catch::Approx(120.0));
+    CHECK(snapshot.generatedFrames == 60);
+}
+
 TEST_CASE("StreamMetrics carries the codec and the decoded size")
 {
     StreamMetrics metrics(kStart);

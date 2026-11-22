@@ -301,6 +301,9 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
     valueRow(fonts, "FPS recebidos", fpsText(video, video.receivedFps).c_str());
     valueRow(fonts, "FPS decodificados", fpsText(video, video.decodedFps).c_str());
     valueRow(fonts, "FPS exibidos", fpsText(video, video.presentedFps).c_str());
+    valueRow(fonts, "FPS apresentados", fpsText(video, video.allPresentedFps).c_str());
+    valueRow(fonts, "Quadros gerados",
+             video.formatValid ? std::format("{}", video.generatedFrames).c_str() : "—");
 
     std::string cadence = "—";
 

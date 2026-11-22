@@ -65,6 +65,11 @@ constexpr Names<Upscaling, 3> kUpscalingNames{{
     {"dlss", Upscaling::Dlss},
 }};
 
+constexpr Names<FrameGenerationMode, 2> kFrameGenerationNames{{
+    {"off", FrameGenerationMode::Off},
+    {"2x", FrameGenerationMode::X2},
+}};
+
 template <typename Value, std::size_t Size>
 std::string nameOf(const Names<Value, Size>& names, Value value)
 {
@@ -235,6 +240,8 @@ RtxSettings readRtx(const Json& rtx)
     }
 
     settings.opticalFlow = booleanAt(rtx, "opticalFlow", settings.opticalFlow);
+    settings.frameGeneration =
+        namedValue(kFrameGenerationNames, rtx, "frameGeneration", settings.frameGeneration);
 
     return settings;
 }
@@ -446,6 +453,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
              {"upscaling", nameOf(kUpscalingNames, rtx.upscaling)},
              {"opticalFlow", rtx.opticalFlow},
+             {"frameGeneration", nameOf(kFrameGenerationNames, rtx.frameGeneration)},
          }},
         {"overlay",
          {

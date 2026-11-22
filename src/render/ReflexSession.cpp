@@ -27,6 +27,7 @@ constexpr NvU32 kSleepId = 0x852CD1D2;
 constexpr NvU32 kGetSleepStatusId = 0xAEF96CA1;
 constexpr NvU32 kSetLatencyMarkerId = 0xD9984C05;
 constexpr NvU32 kGetLatencyId = 0x1A587F9C;
+constexpr NvU32 kNotifyOutOfBandCommandQueueId = 0x03D6E8CB;
 
 // A few seconds of markers before the driver's report fills up.
 constexpr std::uint64_t kLatencyWarmupFrames = 90;
@@ -47,6 +48,7 @@ struct Nvapi
     decltype(&NvAPI_D3D_GetSleepStatus) getSleepStatus = nullptr;
     decltype(&NvAPI_D3D_SetLatencyMarker) setLatencyMarker = nullptr;
     decltype(&NvAPI_D3D_GetLatency) getLatency = nullptr;
+    decltype(&NvAPI_D3D12_NotifyOutOfBandCommandQueue) notifyOutOfBand = nullptr;
     NvAPI_Status status = NVAPI_OK;
     std::string detail;
 };
@@ -107,6 +109,8 @@ Nvapi loadNvapi()
         reinterpret_cast<decltype(&NvAPI_D3D_SetLatencyMarker)>(api.query(kSetLatencyMarkerId));
     api.getLatency =
         reinterpret_cast<decltype(&NvAPI_D3D_GetLatency)>(api.query(kGetLatencyId));
+    api.notifyOutOfBand = reinterpret_cast<decltype(&NvAPI_D3D12_NotifyOutOfBandCommandQueue)>(
+        api.query(kNotifyOutOfBandCommandQueueId));
 
     if (api.initialize == nullptr)
     {
@@ -148,6 +152,14 @@ NV_LATENCY_MARKER_TYPE markerType(LatencyMarker marker)
         return PRESENT_START;
     case LatencyMarker::PresentEnd:
         return PRESENT_END;
+    case LatencyMarker::OutOfBandRenderSubmitStart:
+        return OUT_OF_BAND_RENDERSUBMIT_START;
+    case LatencyMarker::OutOfBandRenderSubmitEnd:
+        return OUT_OF_BAND_RENDERSUBMIT_END;
+    case LatencyMarker::OutOfBandPresentStart:
+        return OUT_OF_BAND_PRESENT_START;
+    case LatencyMarker::OutOfBandPresentEnd:
+        return OUT_OF_BAND_PRESENT_END;
     }
 
     return SIMULATION_START;
@@ -422,6 +434,76 @@ void ReflexSession::mark(std::uint64_t frameId, LatencyMarker marker)
     }
 }
 
+bool ReflexSession::enableOutOfBand(ID3D12CommandQueue& queue)
+{
+    if (!available_ || failed_ || device_ == nullptr)
+    {
+        return false;
+    }
+
+    const Nvapi& api = nvapi();
+
+    if (api.notifyOutOfBand == nullptr)
+    {
+        spdlog::warn("reflex: the driver has no "
+                     "NvAPI_D3D12_NotifyOutOfBandCommandQueue; frame generation can't run");
+        return false;
+    }
+
+    const NvAPI_Status status = api.notifyOutOfBand(&queue, OUT_OF_BAND_RENDER_PRESENT);
+    spdlog::info("reflex: out-of-band queue notification (render and present) status={}",
+                 statusText(api, status));
+
+    if (status != NVAPI_OK)
+    {
+        return false;
+    }
+
+    outOfBandQueue_ = &queue;
+    return true;
+}
+
+bool ReflexSession::outOfBandEnabled() const
+{
+    return outOfBandQueue_ != nullptr;
+}
+
+void ReflexSession::markOutOfBand(std::uint64_t frameId, LatencyMarker marker)
+{
+    if (!available_ || outOfBandQueue_ == nullptr || frameId == 0)
+    {
+        return;
+    }
+
+    NV_LATENCY_MARKER_PARAMS params{};
+    params.version = static_cast<NvU32>(NV_LATENCY_MARKER_PARAMS_VER1);
+    params.frameID = frameId;
+    params.markerType = markerType(marker);
+
+    const NvAPI_Status status = nvapi().setLatencyMarker(outOfBandQueue_, &params);
+
+    if (status != NVAPI_OK)
+    {
+        if (!markerFailureLogged_)
+        {
+            markerFailureLogged_ = true;
+            spdlog::warn("reflex: NvAPI_D3D_SetLatencyMarker (out-of-band) failed: {}",
+                         statusText(nvapi(), status));
+        }
+
+        return;
+    }
+
+    ++outOfBandMarkers_;
+
+    if (!outOfBandMarkersLogged_)
+    {
+        outOfBandMarkersLogged_ = true;
+        spdlog::info("reflex: first out-of-band markers accepted (render submit and present "
+                     "pairs for generated frames)");
+    }
+}
+
 void ReflexSession::poll()
 {
     if (!available_ || device_ == nullptr)
@@ -580,12 +662,12 @@ void ReflexSession::logSummary() const
     }
 
     spdlog::info("reflex: mode={} sleeps={} (one per source frame), markers={} (six per source "
-                 "frame); sleep mean {:.3f} ms, max {:.3f} ms; effective lowLatency={} "
-                 "driverSeesSleep={}{}; latency {}",
-                 reflexModeName(mode_), sleepCount_, markerSets_, meanSleepMilliseconds(),
-                 maxSleepMilliseconds(), sleepStatus_.lowLatency ? 1 : 0,
-                 sleepStatus_.driverSeesSleep ? 1 : 0, failed_ ? " (sleep failed)" : "",
-                 latencyText);
+                 "frame), out-of-band markers={}; sleep mean {:.3f} ms, max {:.3f} ms; effective "
+                 "lowLatency={} driverSeesSleep={}{}; latency {}",
+                 reflexModeName(mode_), sleepCount_, markerSets_, outOfBandMarkers_,
+                 meanSleepMilliseconds(), maxSleepMilliseconds(),
+                 sleepStatus_.lowLatency ? 1 : 0, sleepStatus_.driverSeesSleep ? 1 : 0,
+                 failed_ ? " (sleep failed)" : "", latencyText);
 }
 
 void ReflexSession::shutdown()
@@ -596,6 +678,7 @@ void ReflexSession::shutdown()
     }
 
     device_ = nullptr;
+    outOfBandQueue_ = nullptr;
     configured_ = false;
 }
 

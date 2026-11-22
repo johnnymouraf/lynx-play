@@ -18,7 +18,9 @@
 #include <nvapi.h>
 
 #ifdef LYNX_HAVE_NGX
+#pragma warning(push, 0)
 #include <nvsdk_ngx.h>
+#pragma warning(pop)
 #endif
 
 namespace lynx::render
@@ -238,6 +240,44 @@ std::filesystem::path applicationDataPath()
     return executableDirectory();
 }
 
+// The loader's Init call can raise on a device the driver can't handle; the
+// caller turns the exception into a regular failure.
+__declspec(noinline) NVSDK_NGX_Result callInitWithProjectId(
+    const char* projectId, NVSDK_NGX_EngineType engineType, const char* engineVersion,
+    const wchar_t* dataPath, ID3D12Device* device, const NVSDK_NGX_FeatureCommonInfo* featureInfo)
+{
+    NVSDK_NGX_Result result = NVSDK_NGX_Result_Fail;
+
+    __try
+    {
+        result = NVSDK_NGX_D3D12_Init_with_ProjectID(projectId, engineType, engineVersion,
+                                                      dataPath, device, featureInfo,
+                                                      NVSDK_NGX_Version_API);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        result = NVSDK_NGX_Result_FAIL_PlatformError;
+    }
+
+    return result;
+}
+
+__declspec(noinline) NVSDK_NGX_Result callShutdown(ID3D12Device* device)
+{
+    NVSDK_NGX_Result result = NVSDK_NGX_Result_Fail;
+
+    __try
+    {
+        result = NVSDK_NGX_D3D12_Shutdown1(device);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        result = NVSDK_NGX_Result_FAIL_PlatformError;
+    }
+
+    return result;
+}
+
 #endif
 
 } // namespace
@@ -350,15 +390,26 @@ std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
 {
 #ifdef LYNX_HAVE_NGX
     const std::filesystem::path dataPath = applicationDataPath();
+    const std::filesystem::path executable = executableDirectory();
+
+    if (executable.empty())
+    {
+        return std::unexpected("cannot find the executable's folder");
+    }
+
     const std::wstring dataPathText = dataPath.wstring();
+    const std::wstring executableText = executable.wstring();
+    const wchar_t* paths[] = {executableText.c_str()};
     NVSDK_NGX_FeatureCommonInfo common{};
     common.LoggingInfo.LoggingCallback = ngxLog;
     common.LoggingInfo.MinimumLoggingLevel = NVSDK_NGX_LOGGING_LEVEL_ON;
     common.LoggingInfo.DisableOtherLoggingSinks = true;
+    common.PathListInfo.Path = paths;
+    common.PathListInfo.Length = 1U;
 
-    const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_Init_with_ProjectID(
+    const NVSDK_NGX_Result result = callInitWithProjectId(
         kProjectId, NVSDK_NGX_ENGINE_TYPE_CUSTOM, kEngineVersion, dataPathText.c_str(), &device,
-        &common, NVSDK_NGX_Version_API);
+        &common);
 
     if (ngxFailed(result))
     {
@@ -371,7 +422,8 @@ std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
     host.device_ = &device;
     host.initialized_ = true;
     host.description_ = std::format("NGX 310.9.16, project {}", kProjectId);
-    spdlog::info("NGX: initialized with the stream's device ({})", host.description_);
+    spdlog::info("NGX: initialized with the stream's device ({}), app data '{}'", host.description_,
+                 dataPath.string());
 
     return host;
 #else
@@ -390,13 +442,7 @@ NgxHost& NgxHost::operator=(NgxHost&& other) noexcept
 {
     if (this != &other)
     {
-        if (initialized_ && device_)
-        {
-#ifdef LYNX_HAVE_NGX
-            NVSDK_NGX_D3D12_Shutdown1(device_.Get());
-#endif
-        }
-
+        shutdown();
         device_ = std::move(other.device_);
         description_ = std::move(other.description_);
         initialized_ = std::exchange(other.initialized_, false);
@@ -407,21 +453,27 @@ NgxHost& NgxHost::operator=(NgxHost&& other) noexcept
 
 NgxHost::~NgxHost()
 {
+    shutdown();
+}
+
+void NgxHost::shutdown()
+{
+#if defined(LYNX_HAVE_NGX)
     if (!initialized_ || !device_)
     {
         return;
     }
 
-#ifdef LYNX_HAVE_NGX
-    if (const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_Shutdown1(device_.Get());
-        ngxFailed(result))
+    if (const NVSDK_NGX_Result result = callShutdown(device_.Get()); ngxFailed(result))
     {
         spdlog::warn("NGX: shutdown failed: {}",
                      ngxResultText(static_cast<std::uint32_t>(result)));
     }
 #endif
 
+    device_.Reset();
     initialized_ = false;
+    description_.clear();
 }
 
 ID3D12Device* NgxHost::device() const
@@ -429,9 +481,72 @@ ID3D12Device* NgxHost::device() const
     return device_.Get();
 }
 
+bool NgxHost::initialized() const
+{
+    return initialized_;
+}
+
 const std::string& NgxHost::description() const
 {
     return description_;
+}
+
+std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::allocateParameters() const
+{
+#if !defined(LYNX_HAVE_NGX)
+    return std::unexpected("the NGX SDK wasn't fetched (scripts/fetch-ngx.ps1)");
+#else
+    if (!initialized_)
+    {
+        return std::unexpected("NGX isn't initialized");
+    }
+
+    NVSDK_NGX_Parameter* parameters = nullptr;
+    const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_AllocateParameters(&parameters);
+
+    if (ngxFailed(result) || parameters == nullptr)
+    {
+        return std::unexpected(std::format("NVSDK_NGX_D3D12_AllocateParameters: {}",
+                                           ngxResultText(static_cast<std::uint32_t>(result))));
+    }
+
+    return parameters;
+#endif
+}
+
+std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::capabilityParameters() const
+{
+#if !defined(LYNX_HAVE_NGX)
+    return std::unexpected("the NGX SDK wasn't fetched (scripts/fetch-ngx.ps1)");
+#else
+    if (!initialized_)
+    {
+        return std::unexpected("NGX isn't initialized");
+    }
+
+    NVSDK_NGX_Parameter* parameters = nullptr;
+    const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_GetCapabilityParameters(&parameters);
+
+    if (ngxFailed(result) || parameters == nullptr)
+    {
+        return std::unexpected(std::format("NVSDK_NGX_D3D12_GetCapabilityParameters: {}",
+                                           ngxResultText(static_cast<std::uint32_t>(result))));
+    }
+
+    return parameters;
+#endif
+}
+
+void NgxHost::destroyParameters(NVSDK_NGX_Parameter* parameters)
+{
+#if defined(LYNX_HAVE_NGX)
+    if (parameters != nullptr)
+    {
+        NVSDK_NGX_D3D12_DestroyParameters(parameters);
+    }
+#else
+    (void)parameters;
+#endif
 }
 
 } // namespace lynx::render

@@ -46,6 +46,7 @@ struct StreamWindowOptions
     core::ReflexMode reflex = core::ReflexMode::Off;
     core::Upscaling upscaling = core::Upscaling::Shader;
     bool opticalFlow = true;
+    core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
     core::HdrMode hdr = core::HdrMode::Auto;
     bool rtxVideoHdrAvailable = false;
     WindowMode mode = WindowMode::Windowed;
@@ -89,6 +90,7 @@ public:
     void setReflexMode(core::ReflexMode mode);
     void setUpscaling(core::Upscaling upscaling);
     void setOpticalFlow(bool enabled);
+    void setFrameGeneration(core::FrameGenerationMode mode);
     void setHdrMode(core::HdrMode mode);
     // Ends the stream as the player would with Esc.
     void close();

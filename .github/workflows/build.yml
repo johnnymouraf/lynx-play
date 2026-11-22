@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 env:
   VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\.vcpkg-cache,readwrite
@@ -27,6 +28,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # Artifacts count against the account's storage; keep only the newest
+      # two (one per branch building in parallel; each is tested within
+      # minutes of finishing).
+      - name: Purge old artifacts
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $artifacts = (gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" | ConvertFrom-Json).artifacts |
+            Sort-Object created_at -Descending
+          $artifacts | Select-Object -Skip 2 | ForEach-Object {
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$($_.id)" | Out-Null
+          }
 
       - name: Fetch chiaki-ng
         run: ./scripts/init-chiaki-submodules.ps1
@@ -118,6 +133,7 @@ jobs:
           cmake --preset release
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DLYNX_NGX_ROOT="${{ github.workspace }}/ngx"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'
@@ -141,3 +157,4 @@ jobs:
           name: lynx-play-windows-x64
           path: dist/lynx-play
           if-no-files-found: error
+          retention-days: 1

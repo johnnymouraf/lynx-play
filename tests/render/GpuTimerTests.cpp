@@ -1,11 +1,33 @@
 #include "render/GpuTimer.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
+#include <string_view>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace lynx::render;
+
+TEST_CASE("The pipeline's stage list keeps both upscalers and the flow")
+{
+    CHECK(kEffectStageCount == 8);
+    CHECK(stageName(EffectStage::VideoSuperResolution) == "VSR");
+    CHECK(stageName(EffectStage::DlssSuperResolution) == "DLSS SR");
+    CHECK(stageName(EffectStage::OpticalFlow) == "optical flow");
+
+    std::array<std::string_view, kEffectStageCount> names;
+
+    for (std::size_t index = 0; index < kEffectStageCount; ++index)
+    {
+        names.at(index) = stageName(static_cast<EffectStage>(index));
+    }
+
+    std::ranges::sort(names);
+    CHECK(std::ranges::adjacent_find(names) == names.end());
+    CHECK(std::ranges::find(names, "unknown") == names.end());
+}
 
 TEST_CASE("GPU timestamps become per-stage and total milliseconds")
 {

@@ -1,6 +1,7 @@
-# Downloads the pinned NVIDIA NGX SDK pieces the build needs: the DLSS
-# Super Resolution headers, the loader import library for /MD and the runtime
-# DLL that ships next to the executable. Nothing here is committed.
+# Downloads the pinned NVIDIA NGX SDK pieces the build needs: the DLSS Super
+# Resolution and DLSS Frame Generation headers, the loader import library for
+# /MD and the two runtime DLLs that ship next to the executable. Nothing here
+# is committed.
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
@@ -16,7 +17,10 @@ $headers = @(
     'nvsdk_ngx_helpers.h',
     'nvsdk_ngx_helpers_d3d.h',
     'nvsdk_ngx_helpers_cuda.h',
-    'nvsdk_ngx_loader.h'
+    'nvsdk_ngx_loader.h',
+    'nvsdk_ngx_defs_dlssg.h',
+    'nvsdk_ngx_params_dlssg.h',
+    'nvsdk_ngx_helpers_dlssg_d3d.h'
 )
 
 New-Item -ItemType Directory -Force (Join-Path $target 'include') | Out-Null
@@ -31,7 +35,7 @@ foreach ($header in $headers) {
 Invoke-WebRequest "$base/lib/Windows_x86_64/x64/nvsdk_ngx_d.lib" `
     -OutFile (Join-Path $target 'lib/nvsdk_ngx_d.lib')
 
-# The release DLL keeps NVIDIA's Authenticode signature; the dev builds carry a
+# The release DLLs keep NVIDIA's Authenticode signature; the dev builds carry a
 # debug overlay and must not be distributed.
 $dll = Join-Path $target 'bin/nvngx_dlss.dll'
 Invoke-WebRequest "$base/lib/Windows_x86_64/rel/nvngx_dlss.dll" -OutFile $dll
@@ -41,6 +45,13 @@ $size = (Get-Item $dll).Length
 
 if ($size -ne $expectedSize) {
     throw "nvngx_dlss.dll is $size bytes, expected $expectedSize"
+}
+
+$dlssg = Join-Path $target 'bin/nvngx_dlssg.dll'
+Invoke-WebRequest "$base/lib/Windows_x86_64/rel/nvngx_dlssg.dll" -OutFile $dlssg
+
+if (-not (Test-Path $dlssg) -or (Get-Item $dlssg).Length -eq 0) {
+    throw "nvngx_dlssg.dll wasn't downloaded"
 }
 
 Invoke-WebRequest "$base/LICENSE.txt" -OutFile (Join-Path $target 'LICENSE.txt')

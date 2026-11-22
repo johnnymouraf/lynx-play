@@ -9,12 +9,16 @@ add_library(lynx_render STATIC
     ColorConversion.h
     DlssSuperResolution.cpp
     DlssSuperResolution.h
+    FrameGeneration.cpp
+    FrameGeneration.h
     FrameMailbox.cpp
     FrameMailbox.h
     FramePresenter.cpp
     FramePresenter.h
     FrameRenderer.cpp
     FrameRenderer.h
+    FrameSchedule.cpp
+    FrameSchedule.h
     GpuDevice.cpp
     GpuDevice.h
     GpuTimer.cpp
@@ -23,6 +27,8 @@ add_library(lynx_render STATIC
     Hdr.h
     Layout.cpp
     Layout.h
+    MotionVectors.cpp
+    MotionVectors.h
     NgxHost.cpp
     NgxHost.h
     OpticalFlow.cpp
@@ -68,10 +74,11 @@ lynx_compile_shader(shaders/Scale.hlsl vertexMain vs_5_1 ScaleVertexShader)
 lynx_compile_shader(shaders/Scale.hlsl pixelMain ps_5_1 ScalePixelShader)
 lynx_compile_shader(shaders/Cadence.hlsl main cs_5_1 CadenceComputeShader)
 lynx_compile_shader(shaders/DlssMotion.hlsl main cs_5_1 DlssMotionComputeShader)
+lynx_compile_shader(shaders/FlowDensify.hlsl main cs_5_1 FlowDensifyComputeShader)
 
-# NVIDIA's NGX SDK: the headers, the loader import library and the DLSS
-# runtime fetched by scripts/fetch-ngx.ps1. A checkout without the download
-# still builds, with DLSS reporting itself unavailable.
+# NVIDIA's NGX SDK: the headers, the loader import library and the two DLSS
+# runtimes fetched by scripts/fetch-ngx.ps1. A checkout without the download
+# still builds, with both features reporting themselves unavailable.
 set(LYNX_NGX_ROOT "${PROJECT_SOURCE_DIR}/.ngx" CACHE PATH
     "NVIDIA NGX SDK fetched by scripts/fetch-ngx.ps1")
 
@@ -102,8 +109,18 @@ target_include_directories(lynx_render SYSTEM PRIVATE
     "${PROJECT_SOURCE_DIR}/third_party/nvof")
 target_compile_definitions(lynx_render PRIVATE LYNX_NVAPI=1)
 
+# The NGX SDK (headers, the /MD loader library and the DLSS-G runtime) is
+# fetched by CI from NVIDIA's public DLSS release; without it the renderer
+# builds with Frame Generation off.
+set(LYNX_NGX_ROOT "" CACHE PATH "NVIDIA NGX SDK folder fetched from NVIDIA/DLSS")
+if(LYNX_NGX_ROOT)
+    target_include_directories(lynx_render SYSTEM PRIVATE "${LYNX_NGX_ROOT}/include")
+    target_compile_definitions(lynx_render PRIVATE LYNX_HAVE_NGX=1)
+    target_link_libraries(lynx_render PRIVATE "${LYNX_NGX_ROOT}/lib/nvsdk_ngx_d.lib")
+endif()
+
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx_render
     PUBLIC Lynx::core d3d12 dxgi
-    PRIVATE d3d11 dxguid user32 imgui::imgui Lynx::input)
+    PRIVATE d3d11 dxguid user32 advapi32 imgui::imgui Lynx::input)
 lynx_set_warnings(lynx_render)

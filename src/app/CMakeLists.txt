@@ -168,16 +168,17 @@ target_link_libraries(lynx-play PRIVATE
 lynx_set_warnings(lynx-play)
 
 install(TARGETS lynx-play RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES "$<TARGET_PDB_FILE:lynx-play>" DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
 install(FILES ${lynx_licenses} DESTINATION licenses)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
         DESTINATION licenses RENAME NVAPI-License.txt)
 install(FILES assets/NGX-Notices.txt DESTINATION licenses RENAME NGX-Notices.txt)
 
-# NVIDIA's DLSS runtime ships next to the executable, with its license; the
-# loader imports nvsdk_ngx_d.lib and finds the DLL in the application folder.
+# NVIDIA's DLSS runtimes ship next to the executable, with their license; the
+# loader imports nvsdk_ngx_d.lib and finds the DLLs in the application folder.
 if(EXISTS "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll")
-    install(FILES "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll"
+    install(FILES
+            "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll"
+            "${LYNX_NGX_ROOT}/bin/nvngx_dlssg.dll"
             DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES "${LYNX_NGX_ROOT}/LICENSE.txt"
             DESTINATION licenses RENAME NGX-License.txt)
@@ -191,11 +192,12 @@ if(LYNX_IMGUI_COPYRIGHT)
     install(FILES "${LYNX_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
 endif()
 
+# The software OpenGL fallback is 20 MB and Qt Quick uses Direct3D here.
+# The MSVC runtime DLLs come with the Qt deployment, so the redistributable
+# installer is not shipped.
 qt_generate_deploy_qml_app_script(
     TARGET lynx-play
     OUTPUT_SCRIPT deploy_script
-    NO_TRANSLATIONS)
+    NO_TRANSLATIONS
+    DEPLOY_TOOL_OPTIONS --no-opengl-sw)
 install(SCRIPT "${deploy_script}")
-
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION ${CMAKE_INSTALL_BINDIR})
-include(InstallRequiredSystemLibraries)
