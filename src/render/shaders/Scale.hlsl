@@ -42,7 +42,8 @@ float3 pqToNits(float3 code)
     const float c3 = 18.6875;
 
     const float3 e = pow(max(code, 0.0), 1.0 / m2);
-    return 10000.0 * pow(max(e - c1, 0.0) / (c2 - c3 * e), 1.0 / m1);
+    const float3 base = max((e - c1) / (c2 - c3 * e), 0.0);
+    return 10000.0 * pow(base, 1.0 / m1);
 }
 
 // Linear BT.2020 primaries to linear BT.709 primaries.

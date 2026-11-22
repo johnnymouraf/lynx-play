@@ -99,6 +99,8 @@ struct StreamFormat
     std::string spaceTag = "unspecified";
     // The session asked for HDR and FFmpeg had no transfer to report.
     bool forcedHdr = false;
+    // The session asked for HDR, but the decoder produced 8-bit pictures.
+    bool hdrExpectedButSdr = false;
 
     bool operator==(const StreamFormat&) const = default;
 };
@@ -255,7 +257,11 @@ StreamFormat formatOf(const AVFrame& frame, bool hdrExpected)
     const auto* frames = reinterpret_cast<const AVHWFramesContext*>(frame.hw_frames_ctx->data);
     const bool tenBit = frames->sw_format == AV_PIX_FMT_P010;
     const bool fullRange = frame.color_range == AVCOL_RANGE_JPEG;
-    const bool forcedHdr = hdrExpected && frame.color_trc == AVCOL_TRC_UNSPECIFIED;
+    // An 8-bit picture with no transfer is SDR even when HDR was requested:
+    // the console didn't send the 10-bit stream. A P010 picture without a
+    // transfer is what the HDR request promised, so it is taken as PQ.
+    const bool forcedHdr =
+        hdrExpected && tenBit && frame.color_trc == AVCOL_TRC_UNSPECIFIED;
     const bool pq = forcedHdr || frame.color_trc == AVCOL_TRC_SMPTE2084;
     const render::TransferFunction transfer =
         pq ? render::TransferFunction::Pq : render::TransferFunction::Sdr;
@@ -275,6 +281,7 @@ StreamFormat formatOf(const AVFrame& frame, bool hdrExpected)
         .primariesTag = colorName(av_color_primaries_name(frame.color_primaries)),
         .spaceTag = colorName(av_color_space_name(frame.colorspace)),
         .forcedHdr = forcedHdr,
+        .hdrExpectedButSdr = hdrExpected && !tenBit,
     };
 }
 
@@ -308,6 +315,11 @@ void logFormat(const StreamFormat& format)
     {
         spdlog::info("HDR: the stream's color metadata is unspecified; the session asked for HDR, "
                      "so the pictures are taken as BT.2020/PQ");
+    }
+
+    if (format.hdrExpectedButSdr)
+    {
+        spdlog::info("HDR: requested, but the decoder produced 8-bit NV12; the stream stays SDR");
     }
 
     if (format.hdr.maxContentLightNits > 0.0 || format.hdr.maxMasteringLuminanceNits > 0.0)
