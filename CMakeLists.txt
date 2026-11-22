@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# No C++ modules here; skip CMake's dependency scan (and its build of std).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 option(LYNX_BUILD_TESTS "Build the unit tests" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
