@@ -151,10 +151,10 @@ bool dlssSuperResolutionEligible(SurfaceSize input, SurfaceSize output)
         return false;
     }
 
-    const std::uint64_t widest = std::uint64_t{output.width} * kMaxScale;
-    const std::uint64_t tallest = std::uint64_t{output.height} * kMaxScale;
+    const std::uint64_t widest = std::uint64_t{input.width} * kMaxScale;
+    const std::uint64_t tallest = std::uint64_t{input.height} * kMaxScale;
 
-    return input.width <= widest && input.height <= tallest;
+    return output.width <= widest && output.height <= tallest;
 }
 
 struct DlssSuperResolution::Impl
