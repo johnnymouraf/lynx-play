@@ -153,9 +153,9 @@ std::expected<VideoDevice, VsrFailure> openVideoDevice(IDXGIAdapter4& adapter)
     support.InFormat = DXGI_FORMAT_NV12;
     const HRESULT supportResult = video.device->CheckFeatureSupport(
         D3D11_FEATURE_FORMAT_SUPPORT, &support, sizeof(support));
-    spdlog::info("VSR diagnostics: D3D11 NV12 format support 0x{:X} (0x{:08X})",
-                 static_cast<unsigned>(support.OutFormatSupport),
-                 static_cast<unsigned>(supportResult));
+    spdlog::debug("VSR: D3D11 NV12 format support 0x{:X} (0x{:08X})",
+                  static_cast<unsigned>(support.OutFormatSupport),
+                  static_cast<unsigned>(supportResult));
 
     return video;
 }

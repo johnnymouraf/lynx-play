@@ -721,33 +721,43 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 void FrameRenderer::recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex)
 {
     ID3D12Resource* const input = videoSuperResolution_->input(bufferIndex);
+    const D3D12_RESOURCE_DESC source = shownFrame_->texture->GetDesc();
+    // A subresource is (plane, mip, slice); the decoder's textures have one
+    // mip and the visible picture sits in `arraySlice`.
+    const UINT subresourcesPerPlane =
+        static_cast<UINT>(source.MipLevels) * source.DepthOrArraySize;
 
     const auto toCopy = transition(input, D3D12_RESOURCE_STATE_COMMON,
                                    D3D12_RESOURCE_STATE_COPY_DEST);
     commandList.ResourceBarrier(1, &toCopy);
 
-    // Decoder textures have one mip, and a subresource's array slice is its
-    // index: the visible picture sits in `arraySlice`.
-    D3D12_TEXTURE_COPY_LOCATION source{
-        .pResource = shownFrame_->texture.Get(),
-        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        .SubresourceIndex = static_cast<UINT>(shownFrame_->arraySlice),
-    };
-    D3D12_TEXTURE_COPY_LOCATION destination{
-        .pResource = input,
-        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        .SubresourceIndex = 0,
-    };
-    const D3D12_BOX box{
-        .left = 0,
-        .top = 0,
-        .front = 0,
-        .right = shownFrame_->width,
-        .bottom = shownFrame_->height,
-        .back = 1,
-    };
+    // NV12 and P010 hold two planes, and D3D12 copies one plane per region:
+    // luma at full size and interleaved chroma at half.
+    for (UINT plane = 0; plane < 2; ++plane)
+    {
+        const UINT divisor = plane == 0 ? 1 : 2;
 
-    commandList.CopyTextureRegion(&destination, 0, 0, 0, &source, &box);
+        D3D12_TEXTURE_COPY_LOCATION planeSource{
+            .pResource = shownFrame_->texture.Get(),
+            .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+            .SubresourceIndex = plane * subresourcesPerPlane + shownFrame_->arraySlice,
+        };
+        D3D12_TEXTURE_COPY_LOCATION planeDestination{
+            .pResource = input,
+            .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+            .SubresourceIndex = plane,
+        };
+        const D3D12_BOX box{
+            .left = 0,
+            .top = 0,
+            .front = 0,
+            .right = shownFrame_->width / divisor,
+            .bottom = shownFrame_->height / divisor,
+            .back = 1,
+        };
+
+        commandList.CopyTextureRegion(&planeDestination, 0, 0, 0, &planeSource, &box);
+    }
 
     const auto toCommon = transition(input, D3D12_RESOURCE_STATE_COPY_DEST,
                                      D3D12_RESOURCE_STATE_COMMON);
