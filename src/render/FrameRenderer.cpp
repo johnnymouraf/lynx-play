@@ -1523,8 +1523,26 @@ bool FrameRenderer::prepareFrameGeneration(UINT bufferIndex)
                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     generationCommandList_->ResourceBarrier(1, &realToShader);
 
-    const auto warmed = frameGeneration_->evaluate(*generationCommandList_, *realPicture_.Get(),
-                                                    *motionVectors_->texture(), true, 0);
+    const auto warmed =
+        frameGeneration_->evaluate(*generationCommandList_.Get(), *realPicture_.Get(),
+                                   *motionVectors_->texture(), true, 0);
+
+    if (!warmed)
+    {
+        // The failed evaluate may have left the generated texture in UAV, so
+        // the recorded list is discarded instead of executed.
+        generationCommandList_->Close();
+        generationAllocators_.at(bufferIndex)->Reset();
+        generationCommandList_->Reset(generationAllocators_.at(bufferIndex).Get(), nullptr);
+        generationCommandList_->Close();
+
+        frameGenerationFailed_ = true;
+        frameGenerationFailure_ = warmed.error();
+        spdlog::info("Frame Generation: the warm-up evaluate failed: {}",
+                     frameGenerationFailure_);
+        frameGeneration_.reset();
+        return false;
+    }
 
     const auto generatedToCommon = transition(
         frameGeneration_->generated(), D3D12_RESOURCE_STATE_COPY_SOURCE,
@@ -1551,17 +1569,6 @@ bool FrameRenderer::prepareFrameGeneration(UINT bufferIndex)
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
     generationAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
     waitForFence(lastSignaledFence_);
-
-    if (!warmed)
-    {
-        frameGenerationFailed_ = true;
-        frameGenerationFailure_ = warmed.error();
-        spdlog::info("Frame Generation: the warm-up evaluate failed: {}",
-                     frameGenerationFailure_);
-        waitForGpu();
-        frameGeneration_.reset();
-        return false;
-    }
 
     frameGeneration_->generatedCopied();
     spdlog::info("Frame Generation: {} created for {}x{} {} ({} warm-up evaluations)",
