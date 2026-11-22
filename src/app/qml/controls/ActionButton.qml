@@ -17,8 +17,8 @@ T.Button {
             pressedFill: Theme.accentPressed,
             focusFill: Theme.accent,
             disabledFill: Theme.surfaceHigh,
-            content: Theme.onAccent,
-            hoverContent: Theme.onAccent,
+            content: Theme.textOnAccent,
+            hoverContent: Theme.textOnAccent,
             border: "transparent",
             pressedBorder: "transparent",
             disabledBorder: "transparent"
@@ -54,7 +54,7 @@ T.Button {
             focusFill: Theme.dangerSubtle,
             disabledFill: Theme.surfaceRaised,
             content: Theme.danger,
-            hoverContent: Theme.onDanger,
+            hoverContent: Theme.textOnDanger,
             border: "transparent",
             pressedBorder: "transparent",
             disabledBorder: "transparent"
