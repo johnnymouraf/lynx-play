@@ -214,6 +214,13 @@ bool ngxFailed(NVSDK_NGX_Result result)
     return (static_cast<std::uint32_t>(result) & 0xFFF00000U) == 0xBAD00000U;
 }
 
+void NVSDK_CONV ngxLog(const char* message, NVSDK_NGX_Logging_Level level,
+                        NVSDK_NGX_Feature source)
+{
+    spdlog::info("NGX[{}:{}]: {}", static_cast<int>(source), static_cast<int>(level),
+                 message != nullptr ? message : "");
+}
+
 std::filesystem::path applicationDataPath()
 {
     if (const auto dataDir = core::localDataDir(); dataDir)
@@ -323,27 +330,6 @@ DlssAvailability probeDlss()
         };
     }
 
-    wchar_t systemDirectory[MAX_PATH]{};
-    const UINT systemLength = GetSystemDirectoryW(systemDirectory, MAX_PATH);
-
-    if (systemLength == 0 || systemLength >= MAX_PATH)
-    {
-        return {
-            .available = false,
-            .reason = DlssUnavailable::NoNgxCore,
-            .detail = "the Windows system directory can't be read",
-        };
-    }
-
-    if (!fileExists(std::filesystem::path(systemDirectory) / "nvngx.dll"))
-    {
-        return {
-            .available = false,
-            .reason = DlssUnavailable::NoNgxCore,
-            .detail = "System32 has no nvngx.dll",
-        };
-    }
-
     if (!fileExists(executableDirectory() / "nvngx_dlss.dll"))
     {
         return {
@@ -365,9 +351,14 @@ std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
 #ifdef LYNX_HAVE_NGX
     const std::filesystem::path dataPath = applicationDataPath();
     const std::wstring dataPathText = dataPath.wstring();
+    NVSDK_NGX_FeatureCommonInfo common{};
+    common.LoggingInfo.LoggingCallback = ngxLog;
+    common.LoggingInfo.MinimumLoggingLevel = NVSDK_NGX_LOGGING_LEVEL_VERBOSE;
+    common.LoggingInfo.DisableOtherLoggingSinks = true;
+
     const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_Init_with_ProjectID(
         kProjectId, NVSDK_NGX_ENGINE_TYPE_CUSTOM, kEngineVersion, dataPathText.c_str(), &device,
-        nullptr, NVSDK_NGX_Version_API);
+        &common, NVSDK_NGX_Version_API);
 
     if (ngxFailed(result))
     {

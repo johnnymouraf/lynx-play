@@ -57,6 +57,7 @@ ColumnLayout {
         }
 
         Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
             implicitWidth: experimentalRow.implicitWidth + 2 * Theme.space2
             implicitHeight: 28
             radius: Theme.radiusFull

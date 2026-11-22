@@ -176,10 +176,11 @@ struct DlssSuperResolution::Impl
 
     ComPtr<ID3D12DescriptorHeap> viewHeap;
     UINT viewDescriptorSize = 0;
-    ComPtr<ID3D12DescriptorHeap> depthHeap;
     ComPtr<ID3D12RootSignature> motionRootSignature;
     ComPtr<ID3D12PipelineState> motionPipeline;
     ComPtr<ID3D12Resource> depth;
+    // The constant depth's pixels, copied into `depth` once per configure.
+    ComPtr<ID3D12Resource> depthUpload;
 
     ComPtr<ID3D12CommandAllocator> featureAllocator;
     ComPtr<ID3D12GraphicsCommandList> featureList;
@@ -203,11 +204,6 @@ struct DlssSuperResolution::Impl
         descriptor.ptr += static_cast<UINT64>(index) * viewDescriptorSize;
 
         return descriptor;
-    }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE depthView() const
-    {
-        return depthHeap->GetCPUDescriptorHandleForHeapStart();
     }
 
 #ifdef LYNX_HAVE_NGX
@@ -345,18 +341,6 @@ std::expected<DlssSuperResolution, std::string> DlssSuperResolution::create(
 
     impl->viewDescriptorSize =
         impl->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-    const D3D12_DESCRIPTOR_HEAP_DESC depthHeapDescription{
-        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-        .NumDescriptors = 1,
-    };
-
-    if (const HRESULT result = impl->device->CreateDescriptorHeap(
-            &depthHeapDescription, IID_PPV_ARGS(&impl->depthHeap));
-        FAILED(result))
-    {
-        return std::unexpected(describeFailure("CreateDescriptorHeap (DLSS depth)", result));
-    }
 
     if (auto root = createMotionRootSignature(*impl->device.Get(), impl->motionRootSignature);
         !root)
@@ -503,26 +487,80 @@ std::expected<void, std::string> DlssSuperResolution::configure(const DlssPictur
                                                impl.viewHandle(slot * kDescriptorsPerSlot + 1));
     }
 
+    // A constant far plane for every pixel: 0.9, never 1.0, since DLSS
+    // linearizes depth as 1 / (1 - depth). The pixels come from an upload
+    // buffer; no depth-stencil view is involved.
     const D3D12_RESOURCE_DESC depthDescription =
-        textureDescription(picture.input, DXGI_FORMAT_R32_FLOAT,
-                           D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+        textureDescription(picture.input, DXGI_FORMAT_R32_FLOAT, D3D12_RESOURCE_FLAG_NONE);
 
     if (const HRESULT result = impl.device->CreateCommittedResource(
-            &heap, D3D12_HEAP_FLAG_NONE, &depthDescription, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &heap, D3D12_HEAP_FLAG_NONE, &depthDescription, D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, IID_PPV_ARGS(&impl.depth));
         FAILED(result))
     {
         return std::unexpected(describeFailure("CreateCommittedResource (DLSS depth)", result));
     }
 
-    impl.device->CreateDepthStencilView(impl.depth.Get(), nullptr, impl.depthView());
+    const std::uint64_t rowBytes = std::uint64_t{picture.input.width} * sizeof(float);
+    const std::uint64_t rowPitch = (rowBytes + 255U) & ~std::uint64_t{255U};
+    const std::uint64_t uploadBytes = rowPitch * picture.input.height;
+    const D3D12_RESOURCE_DESC uploadDescription{
+        .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+        .Alignment = 0,
+        .Width = uploadBytes,
+        .Height = 1,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .Format = DXGI_FORMAT_UNKNOWN,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+        .Flags = D3D12_RESOURCE_FLAG_NONE,
+    };
+    const D3D12_HEAP_PROPERTIES uploadHeap{.Type = D3D12_HEAP_TYPE_UPLOAD};
+
+    if (const HRESULT result = impl.device->CreateCommittedResource(
+            &uploadHeap, D3D12_HEAP_FLAG_NONE, &uploadDescription,
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&impl.depthUpload));
+        FAILED(result))
+    {
+        return std::unexpected(
+            describeFailure("CreateCommittedResource (DLSS depth pixels)", result));
+    }
+
+    void* pixels = nullptr;
+    const D3D12_RANGE noRead{};
+
+    if (const HRESULT result = impl.depthUpload->Map(0, &noRead, &pixels); SUCCEEDED(result))
+    {
+        std::fill_n(static_cast<float*>(pixels), uploadBytes / sizeof(float), kConstantDepth);
+        impl.depthUpload->Unmap(0, nullptr);
+    }
 
     impl.featureAllocator->Reset();
     impl.featureList->Reset(impl.featureAllocator.Get(), nullptr);
-    impl.featureList->ClearDepthStencilView(impl.depthView(), D3D12_CLEAR_FLAG_DEPTH,
-                                             kConstantDepth, 0, 0, nullptr);
 
-    const auto toShader = transition(impl.depth.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE,
+    D3D12_TEXTURE_COPY_LOCATION source{};
+    source.pResource = impl.depthUpload.Get();
+    source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    source.PlacedFootprint = {
+        .Offset = 0,
+        .Footprint = {
+            .Format = DXGI_FORMAT_R32_FLOAT,
+            .Width = picture.input.width,
+            .Height = picture.input.height,
+            .Depth = 1,
+            .RowPitch = static_cast<UINT>(rowPitch),
+        },
+    };
+
+    D3D12_TEXTURE_COPY_LOCATION destination{};
+    destination.pResource = impl.depth.Get();
+    destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    destination.SubresourceIndex = 0;
+
+    impl.featureList->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+
+    const auto toShader = transition(impl.depth.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
                                      D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     impl.featureList->ResourceBarrier(1, &toShader);
 
