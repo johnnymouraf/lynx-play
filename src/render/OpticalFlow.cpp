@@ -145,17 +145,16 @@ const Api& api()
     return loaded;
 }
 
-std::expected<std::vector<DXGI_FORMAT>, std::string> surfaceFormats(const Api& loaded,
-                                                                    NvOFHandle handle,
-                                                                    NV_OF_BUFFER_USAGE usage)
+std::expected<std::vector<DXGI_FORMAT>, std::string> surfaceFormats(
+    const NV_OF_D3D12_API_FUNCTION_LIST& functions, NvOFHandle handle, NV_OF_BUFFER_USAGE usage)
 {
     std::uint32_t count = 0;
 
-    if (const NV_OF_STATUS status = loaded.functions.nvOFGetSurfaceFormatCountD3D12(
+    if (const NV_OF_STATUS status = functions.nvOFGetSurfaceFormatCountD3D12(
             handle, usage, NV_OF_MODE_OPTICALFLOW, &count);
         status != NV_OF_SUCCESS)
     {
-        return std::unexpected(statusName(status));
+        return std::unexpected(std::string(statusName(status)));
     }
 
     std::vector<DXGI_FORMAT> formats(count);
@@ -165,11 +164,11 @@ std::expected<std::vector<DXGI_FORMAT>, std::string> surfaceFormats(const Api& l
         return formats;
     }
 
-    if (const NV_OF_STATUS status = loaded.functions.nvOFGetSurfaceFormatD3D12(
+    if (const NV_OF_STATUS status = functions.nvOFGetSurfaceFormatD3D12(
             handle, usage, NV_OF_MODE_OPTICALFLOW, formats.data());
         status != NV_OF_SUCCESS)
     {
-        return std::unexpected(statusName(status));
+        return std::unexpected(std::string(statusName(status)));
     }
 
     return formats;
@@ -180,28 +179,29 @@ bool supports(const std::vector<DXGI_FORMAT>& formats, DXGI_FORMAT format)
     return std::ranges::find(formats, format) != formats.end();
 }
 
-std::expected<std::uint32_t, std::string> cap(const Api& loaded, NvOFHandle handle,
-                                             NV_OF_CAPS name)
+std::expected<std::uint32_t, std::string> cap(const NV_OF_D3D12_API_FUNCTION_LIST& functions,
+                                             NvOFHandle handle, NV_OF_CAPS name)
 {
     std::uint32_t value = 0;
     std::uint32_t size = sizeof(value);
 
-    if (const NV_OF_STATUS status = loaded.functions.nvOFGetCaps(handle, name, &value, &size);
+    if (const NV_OF_STATUS status = functions.nvOFGetCaps(handle, name, &value, &size);
         status != NV_OF_SUCCESS)
     {
-        return std::unexpected(statusName(status));
+        return std::unexpected(std::string(statusName(status)));
     }
 
     return value;
 }
 
-bool supportsGrid(const Api& loaded, NvOFHandle handle, std::uint32_t grid)
+bool supportsGrid(const NV_OF_D3D12_API_FUNCTION_LIST& functions, NvOFHandle handle,
+                  std::uint32_t grid)
 {
     std::array<std::uint32_t, 8> sizes{};
     std::uint32_t bytes = sizeof(sizes);
 
-    if (loaded.functions.nvOFGetCaps(handle, NV_OF_CAPS_SUPPORTED_OUTPUT_GRID_SIZES, sizes.data(),
-                                      &bytes) != NV_OF_SUCCESS)
+    if (functions.nvOFGetCaps(handle, NV_OF_CAPS_SUPPORTED_OUTPUT_GRID_SIZES, sizes.data(),
+                               &bytes) != NV_OF_SUCCESS)
     {
         return false;
     }
@@ -220,16 +220,16 @@ bool supportsGrid(const Api& loaded, NvOFHandle handle, std::uint32_t grid)
     return false;
 }
 
-std::string lastError(const Api& loaded, NvOFHandle handle)
+std::string lastError(const NV_OF_D3D12_API_FUNCTION_LIST& functions, NvOFHandle handle)
 {
-    if (loaded.functions.nvOFGetLastError == nullptr)
+    if (functions.nvOFGetLastError == nullptr)
     {
         return {};
     }
 
     char text[512]{};
     std::uint32_t size = sizeof(text);
-    const NV_OF_STATUS status = loaded.functions.nvOFGetLastError(handle, text, &size);
+    const NV_OF_STATUS status = functions.nvOFGetLastError(handle, text, &size);
 
     if (status != NV_OF_SUCCESS || text[0] == '\0')
     {
@@ -439,11 +439,11 @@ OpticalFlowAvailability OpticalFlow::probe()
     };
 
     const auto inputFormats =
-        surfaceFormats(loaded, handle, NV_OF_BUFFER_USAGE_INPUT);
+        surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_INPUT);
     const auto vectorFormats =
-        surfaceFormats(loaded, handle, NV_OF_BUFFER_USAGE_OUTPUT);
+        surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_OUTPUT);
     const auto costFormats =
-        surfaceFormats(loaded, handle, NV_OF_BUFFER_USAGE_COST);
+        surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_COST);
 
     if (!inputFormats || !vectorFormats || !costFormats)
     {
@@ -466,8 +466,8 @@ OpticalFlowAvailability OpticalFlow::probe()
                 .detail = "the driver lacks BGRA8 input with R16G16_SINT flow and R8_UINT cost"};
     }
 
-    const auto width = cap(loaded, handle, NV_OF_CAPS_WIDTH_MAX);
-    const auto height = cap(loaded, handle, NV_OF_CAPS_HEIGHT_MAX);
+    const auto width = cap(loaded.functions, handle, NV_OF_CAPS_WIDTH_MAX);
+    const auto height = cap(loaded.functions, handle, NV_OF_CAPS_HEIGHT_MAX);
 
     if (!width || !height)
     {
@@ -477,7 +477,7 @@ OpticalFlowAvailability OpticalFlow::probe()
                 .detail = std::format("nvOFGetCaps: {}", !width ? width.error() : height.error())};
     }
 
-    if (!supportsGrid(loaded, handle, kFlowGridSize))
+    if (!supportsGrid(loaded.functions, handle, kFlowGridSize))
     {
         destroy();
         return {.available = false,
@@ -515,7 +515,7 @@ std::expected<OpticalFlow, std::string> OpticalFlow::create(ID3D12Device& device
     impl->slotCount = slotCount;
 
     if (const NV_OF_STATUS status =
-            impl->functions.nvCreateOpticalFlowD3D12(device.Get(), &impl->handle);
+            impl->functions.nvCreateOpticalFlowD3D12(&device, &impl->handle);
         status != NV_OF_SUCCESS || impl->handle == nullptr)
     {
         return std::unexpected(
