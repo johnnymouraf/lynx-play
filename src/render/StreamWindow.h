@@ -44,6 +44,7 @@ struct StreamWindowOptions
     PresentTiming timing = PresentTiming::VSync;
     core::ReflexMode reflex = core::ReflexMode::Off;
     bool videoSuperResolution = false;
+    bool opticalFlow = true;
     WindowMode mode = WindowMode::Windowed;
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
@@ -84,6 +85,7 @@ public:
     void bringToFront();
     void setReflexMode(core::ReflexMode mode);
     void setVideoSuperResolution(bool enabled);
+    void setOpticalFlow(bool enabled);
     // Ends the stream as the player would with Esc.
     void close();
 

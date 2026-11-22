@@ -44,6 +44,27 @@ ColumnLayout {
 
     SettingRow {
         Layout.fillWidth: true
+        label: "Optical Flow"
+        description: section.settings.opticalFlowAvailable
+                     ? "Calcula os vetores de movimento entre os quadros. Identifica os quadros "
+                       + "repetidos dos jogos de 30 fps; o frame generation usa os vetores."
+                     : "Indisponível: " + section.settings.opticalFlowUnavailableReason
+
+        Toggle {
+            checked: section.settings.opticalFlow
+            enabled: section.settings.opticalFlowAvailable
+            opacity: enabled ? 1 : 0.5
+            Accessible.name: "Optical Flow"
+            onCheckedChanged: {
+                if (checked !== section.settings.opticalFlow) {
+                    section.settings.opticalFlow = checked;
+                }
+            }
+        }
+    }
+
+    SettingRow {
+        Layout.fillWidth: true
         label: "NVIDIA Reflex"
         description: section.settings.reflexAvailable
                      ? "Reduz a fila da GPU para baixar a latência. Boost mantém o clock alto."

@@ -122,6 +122,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                 {
                     window_->setReflexMode(settings_.reflexMode());
                     window_->setVideoSuperResolution(settings_.videoSuperResolution());
+                    window_->setOpticalFlow(settings_.opticalFlow());
                 }
             });
 
@@ -389,6 +390,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .reflex = settings_.reflexMode(),
                                                  .videoSuperResolution =
                                                      settings_.videoSuperResolution(),
+                                                 .opticalFlow = settings_.opticalFlow(),
                                                  .mode = render::WindowMode::Fullscreen,
                                                  .monitorOf = mainWindow_,
                                                  .overlayFonts = overlayFonts(),

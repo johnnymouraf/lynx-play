@@ -210,6 +210,7 @@ RtxSettings readRtx(const Json& rtx)
     settings.reflex = namedValue(kReflexNames, rtx, "reflex", settings.reflex);
     settings.videoSuperResolution =
         booleanAt(rtx, "videoSuperResolution", settings.videoSuperResolution);
+    settings.opticalFlow = booleanAt(rtx, "opticalFlow", settings.opticalFlow);
 
     return settings;
 }
@@ -419,6 +420,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
          {
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
              {"videoSuperResolution", rtx.videoSuperResolution},
+             {"opticalFlow", rtx.opticalFlow},
          }},
         {"overlay",
          {

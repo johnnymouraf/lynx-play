@@ -22,6 +22,10 @@ enum class ScaledPicture
     VideoSuperResolution,
 };
 
+// The intermediate is BGRA8 so NVIDIA's optical flow engine can read it
+// directly (it takes no RGBA8 input).
+inline constexpr DXGI_FORMAT kIntermediateFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+
 // Draws VideoFrames in two passes: YUV to RGB into an intermediate picture,
 // then the picture scaled to fit the back buffer with black bars around it.
 // The stages are separate so the pipeline can time each one.
@@ -31,13 +35,18 @@ public:
     // Keeps a set of views and an intermediate picture per back buffer, since
     // each frame in flight reads and writes its own.
     [[nodiscard]] static std::expected<FramePresenter, std::string> create(
-        ID3D12Device& device, UINT bufferCount, DXGI_FORMAT targetFormat);
+        ID3D12Device& device, UINT bufferCount, DXGI_FORMAT targetFormat,
+        DXGI_FORMAT intermediateFormat = kIntermediateFormat);
 
     // Whether the decoded picture's size differs from the intermediate's.
     [[nodiscard]] bool needsPicture(SurfaceSize picture) const;
 
     // Recreates the intermediate pictures. The GPU must be idle.
     [[nodiscard]] std::expected<void, std::string> resizePicture(SurfaceSize picture);
+
+    // The converted picture of a back buffer; optical flow reads it.
+    [[nodiscard]] ID3D12Resource* intermediate(UINT bufferIndex) const;
+    [[nodiscard]] DXGI_FORMAT intermediateFormat() const;
 
     // Points this buffer's VSR view at the video processor's output texture.
     void writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resource& texture);
@@ -71,6 +80,7 @@ private:
     UINT viewDescriptorSize_ = 0;
     UINT intermediateTargetDescriptorSize_ = 0;
     UINT bufferCount_ = 0;
+    DXGI_FORMAT intermediateFormat_ = kIntermediateFormat;
     std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> intermediates_;
     SurfaceSize pictureSize_;
 };

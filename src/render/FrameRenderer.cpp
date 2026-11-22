@@ -127,6 +127,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
 {
     requestedReflex_.store(options_.reflex);
     requestedVideoSuperResolution_.store(options_.videoSuperResolution);
+    requestedOpticalFlow_.store(options_.opticalFlow);
 }
 
 FrameRenderer::~FrameRenderer()
@@ -162,6 +163,12 @@ void FrameRenderer::setReflexMode(core::ReflexMode mode)
 void FrameRenderer::setVideoSuperResolution(bool enabled)
 {
     requestedVideoSuperResolution_.store(enabled);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::setOpticalFlow(bool enabled)
+{
+    requestedOpticalFlow_.store(enabled);
     SetEvent(wakeEvent_.get());
 }
 
@@ -233,6 +240,26 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 
     copyCommandList_->Close();
 
+    for (auto& allocator : flowAllocators_)
+    {
+        if (const HRESULT result = gpu_.device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
+            FAILED(result))
+        {
+            return std::unexpected(describeFailure("CreateCommandAllocator (flow)", result));
+        }
+    }
+
+    if (const HRESULT result = gpu_.device->CreateCommandList(
+            0, D3D12_COMMAND_LIST_TYPE_DIRECT, flowAllocators_[0].Get(), nullptr,
+            IID_PPV_ARGS(&flowCommandList_));
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure("CreateCommandList (flow)", result));
+    }
+
+    flowCommandList_->Close();
+
     if (const HRESULT result =
             gpu_.device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
         FAILED(result))
@@ -285,6 +312,18 @@ void FrameRenderer::run(const std::stop_token& stop)
 
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
+    requestedOpticalFlowApplied_ = requestedOpticalFlow_.load();
+
+    if (auto metric = CadenceMetric::create(*gpu_.device.Get()); metric)
+    {
+        cadenceMetric_ = std::make_unique<CadenceMetric>(std::move(*metric));
+    }
+    else
+    {
+        spdlog::warn("Cadence detection is unavailable: {}", metric.error());
+    }
+
+    spdlog::info("Optical flow: {}", requestedOpticalFlowApplied_ ? "on" : "off");
 
     OverlayActions actions = options_.overlayActions;
     const std::function<void(core::ReflexMode)> appReflex = actions.reflexChanged;
@@ -329,6 +368,7 @@ void FrameRenderer::run(const std::stop_token& stop)
 
         applyRequestedReflex();
         applyRequestedVideoSuperResolution();
+        applyRequestedOpticalFlow();
         applyOverlayToggles();
         pollGamepad();
 
@@ -406,6 +446,8 @@ void FrameRenderer::pollGamepad()
 
 std::expected<void, std::string> FrameRenderer::renderFrame()
 {
+    drainCadence();
+
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
 
@@ -451,6 +493,15 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     if (showsNewFrame)
     {
         shownFrame_ = std::move(newest);
+
+        // A frame the mailbox replaced breaks the pair sequence: the next
+        // picture is no longer the one the metric compares against.
+        if (const std::uint64_t dropped = mailbox_->takeDroppedCount(); dropped > 0)
+        {
+            droppedFrames_ += dropped;
+            cadence_.reset();
+            cadenceReferenceValid_ = false;
+        }
     }
 
     if (auto resized = applyRequestedSize(); !resized)
@@ -458,8 +509,18 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         return resized;
     }
 
+    if (shownFrame_ && lastPictureFormat_ && *lastPictureFormat_ != shownFrame_->format)
+    {
+        // A different source format starts a new compare window.
+        cadence_.reset();
+        cadenceReferenceValid_ = false;
+        flowReferenceValid_ = false;
+    }
+
     if (shownFrame_)
     {
+        lastPictureFormat_ = shownFrame_->format;
+
         const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
 
         if (presenter_.needsPicture(picture))
@@ -470,6 +531,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             {
                 return resized;
             }
+
+            // The new textures have no history: restart both windows.
+            cadence_.reset();
+            cadenceReferenceValid_ = false;
+            flowReferenceValid_ = false;
         }
     }
 
@@ -478,12 +544,30 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     const UINT bufferIndex = swapChain_.currentIndex();
     waitForFence(allocatorFenceValues_.at(bufferIndex));
     waitForFence(copyAllocatorFenceValues_.at(bufferIndex));
+    waitForFence(flowAllocatorFenceValues_.at(bufferIndex));
     framesInFlight_.at(bufferIndex).reset();
 
     if (auto times = timer_->take(bufferIndex))
     {
         lastGpuTimes_ = *times;
     }
+
+    const bool flowReady = prepareOpticalFlow();
+
+    const UINT previousIndex =
+        (bufferIndex + SwapChain::kBufferCount - 1) % SwapChain::kBufferCount;
+    const std::optional<VideoFrame>& previousFrame = framesInFlight_.at(previousIndex);
+
+    FramePlan plan;
+    plan.previous = previousFrame ? &*previousFrame : nullptr;
+    plan.writeFlowPicture = flowReady && shownFrame_.has_value();
+    plan.cadence = showsNewFrame && cadenceMetric_ && cadenceReferenceValid_ &&
+                   plan.previous != nullptr &&
+                   plan.previous->width == shownFrame_->width &&
+                   plan.previous->height == shownFrame_->height &&
+                   plan.previous->format == shownFrame_->format;
+    plan.opticalFlow = showsNewFrame && flowReady && flowReferenceValid_;
+    cadenceSignal_ = 0;
 
     const bool marked = reflexFrameId_.has_value();
     const std::uint64_t reflexFrameId = reflexFrameId_.value_or(0);
@@ -497,7 +581,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     if (prepareVideoSuperResolution())
     {
-        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex);
+        const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, plan);
 
         if (!recorded)
         {
@@ -515,7 +599,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         auto& allocator = allocators_.at(bufferIndex);
         allocator->Reset();
         commandList_->Reset(allocator.Get(), nullptr);
-        recordShaderFrame(bufferIndex);
+        recordShaderFrame(bufferIndex, plan);
 
         if (const HRESULT result = commandList_->Close(); FAILED(result))
         {
@@ -526,10 +610,36 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         {
             gpu_.queue->Wait(shownFrame_->fence.Get(), shownFrame_->fenceValue);
         }
+
+        const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
+        gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+        signalCadence();
     }
 
-    const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
-    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    std::uint64_t flowOutput = 0;
+    bool flowSubmitted = false;
+
+    if (plan.opticalFlow)
+    {
+        const std::uint64_t inputValue = opticalFlow_->nextInputValue();
+        gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
+
+        const auto output = opticalFlow_->execute(bufferIndex, inputValue);
+
+        if (output)
+        {
+            flowOutput = *output;
+            flowSubmitted = true;
+        }
+        else
+        {
+            opticalFlowFailed_ = true;
+            redrawRequested_.store(true);
+            SetEvent(wakeEvent_.get());
+            spdlog::error("Optical flow stopped; cadence runs on the block metric alone: {}",
+                          output.error());
+        }
+    }
 
     if (marked)
     {
@@ -549,9 +659,28 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         return std::unexpected(describePresentFailure(presentResult));
     }
 
+    if (plan.opticalFlow)
+    {
+        if (auto watched = recordFlowWatch(bufferIndex, flowSubmitted, flowOutput); !watched)
+        {
+            return watched;
+        }
+    }
+
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
     allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
+    flowAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
     framesInFlight_.at(bufferIndex) = shownFrame_;
+
+    if (shownFrame_)
+    {
+        cadenceReferenceValid_ = true;
+
+        if (plan.writeFlowPicture)
+        {
+            flowReferenceValid_ = true;
+        }
+    }
 
     const Clock::time_point now = Clock::now();
     const std::optional<Clock::duration> interval =
@@ -692,7 +821,166 @@ bool FrameRenderer::prepareVideoSuperResolution()
     return true;
 }
 
-void FrameRenderer::recordShaderFrame(UINT bufferIndex)
+void FrameRenderer::applyRequestedOpticalFlow()
+{
+    const bool requested = requestedOpticalFlow_.load();
+
+    if (requested == requestedOpticalFlowApplied_)
+    {
+        return;
+    }
+
+    requestedOpticalFlowApplied_ = requested;
+    opticalFlowFailed_ = false;
+    flowReferenceValid_ = false;
+    spdlog::info("Optical flow: {}", requested ? "on" : "off");
+}
+
+bool FrameRenderer::prepareOpticalFlow()
+{
+    if (!shownFrame_ || !requestedOpticalFlowApplied_ || opticalFlowFailed_)
+    {
+        return false;
+    }
+
+    const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+
+    if (opticalFlow_ && opticalFlow_->configuredFor(picture))
+    {
+        return true;
+    }
+
+    waitForGpu();
+
+    if (!opticalFlow_)
+    {
+        auto created = OpticalFlow::create(*gpu_.device.Get(), SwapChain::kBufferCount);
+
+        if (!created)
+        {
+            opticalFlowFailed_ = true;
+            spdlog::error("Optical flow is unavailable; cadence runs on the block metric alone: {}",
+                          created.error());
+            return false;
+        }
+
+        opticalFlow_.emplace(std::move(*created));
+        spdlog::info("Optical flow: {}", opticalFlow_->description());
+    }
+
+    std::array<ID3D12Resource*, SwapChain::kBufferCount> inputs{};
+
+    for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+    {
+        inputs.at(index) = presenter_.intermediate(index);
+
+        if (inputs.at(index) == nullptr)
+        {
+            opticalFlowFailed_ = true;
+            spdlog::error("Optical flow is unavailable; the converted pictures are missing");
+            return false;
+        }
+    }
+
+    if (auto configured = opticalFlow_->configure(picture, inputs); !configured)
+    {
+        opticalFlowFailed_ = true;
+        spdlog::error("Optical flow is unavailable; cadence runs on the block metric alone: {}",
+                      configured.error());
+        return false;
+    }
+
+    flowReferenceValid_ = false;
+    spdlog::info("Optical flow: {}", opticalFlow_->description());
+    return true;
+}
+
+void FrameRenderer::signalCadence()
+{
+    if (cadenceSignal_ == 0 || cadenceMetric_ == nullptr)
+    {
+        return;
+    }
+
+    gpu_.queue->Signal(cadenceMetric_->fence(), cadenceSignal_);
+    cadenceSignal_ = 0;
+}
+
+void FrameRenderer::drainCadence()
+{
+    if (cadenceMetric_ == nullptr)
+    {
+        return;
+    }
+
+    while (const auto sample = cadenceMetric_->take())
+    {
+        const double blockSamples =
+            static_cast<double>(sample->totalBlocks) * CadenceMetric::kSamplesPerBlock;
+
+        const CadenceSample comparison{
+            .changedBlocks = sample->changedBlocks,
+            .totalBlocks = sample->totalBlocks,
+            .meanDifference =
+                blockSamples > 0.0 ? static_cast<double>(sample->sad) / blockSamples : 0.0,
+        };
+
+        if (cadence_.observe(comparison) == CadenceDetector::Decision::SceneCut)
+        {
+            spdlog::debug("Cadence: scene cut, window restarted");
+        }
+    }
+}
+
+std::expected<void, std::string> FrameRenderer::recordFlowWatch(UINT bufferIndex,
+                                                                bool waitForFlow,
+                                                                std::uint64_t outputValue)
+{
+    auto& allocator = flowAllocators_.at(bufferIndex);
+    allocator->Reset();
+    flowCommandList_->Reset(allocator.Get(), nullptr);
+
+    if (waitForFlow)
+    {
+        gpu_.queue->Wait(opticalFlow_->fence(), outputValue);
+    }
+
+    timer_->endStage(*flowCommandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+    timer_->endFrame(*flowCommandList_.Get(), bufferIndex);
+
+    if (const HRESULT result = flowCommandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (flow)", result));
+    }
+
+    const std::array<ID3D12CommandList*, 1> lists{flowCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    return {};
+}
+
+FlowOverlayState FrameRenderer::opticalFlowState() const
+{
+    if (!requestedOpticalFlowApplied_)
+    {
+        return FlowOverlayState::Off;
+    }
+
+    if (opticalFlowFailed_)
+    {
+        return FlowOverlayState::Unavailable;
+    }
+
+    if (!opticalFlow_ || !shownFrame_)
+    {
+        return FlowOverlayState::Off;
+    }
+
+    const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+    return opticalFlow_->configuredFor(picture) ? FlowOverlayState::Running
+                                                 : FlowOverlayState::Off;
+}
+
+void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
 {
     ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
     const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
@@ -712,6 +1000,16 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex)
     }
 
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Cadence);
+
+    if (plan.cadence && cadenceMetric_)
+    {
+        cadenceSignal_ =
+            cadenceMetric_->record(*commandList_.Get(), *shownFrame_, *plan.previous);
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Cadence);
 
     const auto toRenderTarget =
         transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -742,10 +1040,17 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex)
         transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     commandList_->ResourceBarrier(1, &toPresent);
 
-    timer_->endFrame(*commandList_.Get(), bufferIndex);
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+
+    if (!plan.opticalFlow)
+    {
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+        timer_->endFrame(*commandList_.Get(), bufferIndex);
+    }
 }
 
-std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(UINT bufferIndex)
+std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
+    UINT bufferIndex, const FramePlan& plan)
 {
     const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
 
@@ -793,7 +1098,25 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
     // the stage after the queue has waited for it.
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    // Optical flow reads the converted picture; the video processor's output
+    // is RGBA8 at the fit size, which the engine doesn't take.
+    if (plan.writeFlowPicture && shownFrame_)
+    {
+        presenter_.recordConversion(*commandList_.Get(), bufferIndex, *shownFrame_);
+    }
+
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Cadence);
+
+    if (plan.cadence && cadenceMetric_)
+    {
+        cadenceSignal_ =
+            cadenceMetric_->record(*commandList_.Get(), *shownFrame_, *plan.previous);
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Cadence);
 
     ID3D12Resource* const output = videoSuperResolution_->output(bufferIndex);
     const auto toShader = transition(output, D3D12_RESOURCE_STATE_COMMON,
@@ -830,15 +1153,26 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
                                       D3D12_RESOURCE_STATE_PRESENT);
     commandList_->ResourceBarrier(1, &toPresent);
 
-    timer_->endFrame(*commandList_.Get(), bufferIndex);
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+
+    if (!plan.opticalFlow)
+    {
+        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+        timer_->endFrame(*commandList_.Get(), bufferIndex);
+    }
 
     if (const HRESULT result = commandList_->Close(); FAILED(result))
     {
         return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (VSR)", result));
     }
 
-    // The draw reads the processor's output only after its signal.
+    // The draw reads the processor's output only after its signal; the flow
+    // reads the converted picture after the list that wrote it.
     gpu_.queue->Wait(videoSuperResolution_->fence(), *outputReady);
+
+    const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    signalCadence();
     return true;
 }
 
@@ -905,6 +1239,16 @@ OverlayStats FrameRenderer::overlayStats()
         stats.gpuTimingsValid = true;
         stats.stageMilliseconds = lastGpuTimes_->stages;
         stats.totalMilliseconds = lastGpuTimes_->total;
+    }
+
+    stats.opticalFlow = opticalFlowState();
+
+    if (const auto& cadence = cadence_.estimate())
+    {
+        stats.cadenceValid = true;
+        stats.cadenceFramesPerSecond = cadence->framesPerSecond;
+        stats.cadenceRepeatedFrames = static_cast<std::uint32_t>(cadence->repeatedFrames);
+        stats.cadenceWindowFrames = static_cast<std::uint32_t>(cadence->windowFrames);
     }
 
     ReflexOverlayStats& reflex = stats.reflex;
@@ -983,7 +1327,7 @@ void FrameRenderer::reportStatistics()
         return;
     }
 
-    const std::uint64_t dropped = mailbox_->takeDroppedCount();
+    const std::uint64_t dropped = std::exchange(droppedFrames_, 0);
 
     if (summary->count == 0 && dropped == 0)
     {
@@ -1006,6 +1350,12 @@ void FrameRenderer::reportStatistics()
         }
 
         spdlog::info("GPU: {}total {:.2f} ms", stages, lastGpuTimes_->total);
+    }
+
+    if (const auto& cadence = cadence_.estimate())
+    {
+        spdlog::info("Cadence: {:.1f} fps, {} of the last {} source frames repeated",
+                     cadence->framesPerSecond, cadence->repeatedFrames, cadence->windowFrames);
     }
 
     reflex_.logSummary();

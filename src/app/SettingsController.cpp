@@ -186,6 +186,17 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     {
         spdlog::info("VSR is unavailable: {}", videoSuperResolutionAvailability_.detail);
     }
+
+    opticalFlowAvailability_ = render::OpticalFlow::probe();
+
+    if (opticalFlowAvailability_.available)
+    {
+        spdlog::info("Optical flow is available ({})", opticalFlowAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("Optical flow is unavailable: {}", opticalFlowAvailability_.detail);
+    }
 }
 
 const core::VideoSettings& SettingsController::video() const
@@ -522,6 +533,48 @@ QString SettingsController::videoSuperResolutionUnavailableReason() const
     return {};
 }
 
+bool SettingsController::opticalFlow() const
+{
+    return settings_.rtx.opticalFlow;
+}
+
+void SettingsController::setOpticalFlow(bool enabled)
+{
+    core::RtxSettings rtx = settings_.rtx;
+    rtx.opticalFlow = enabled;
+    applyRtx(rtx);
+}
+
+bool SettingsController::opticalFlowAvailable() const
+{
+    return opticalFlowAvailability_.available;
+}
+
+QString SettingsController::opticalFlowUnavailableReason() const
+{
+    switch (opticalFlowAvailability_.reason)
+    {
+    case render::OpticalFlowUnavailable::NoNvidiaGpu:
+        return u"A GPU usada para o vídeo não é NVIDIA."_s;
+    case render::OpticalFlowUnavailable::NoDriver:
+        return u"O driver NVIDIA não traz o nvofapi64.dll."_s;
+    case render::OpticalFlowUnavailable::DriverTooOld:
+        return u"O driver NVIDIA é anterior ao Optical Flow 5.0."_s;
+    case render::OpticalFlowUnavailable::DriverFailed:
+        return u"O driver NVIDIA recusou o Optical Flow."_s;
+    case render::OpticalFlowUnavailable::FormatUnsupported:
+        return u"O driver não aceita o fluxo óptico no formato do vídeo."_s;
+    case render::OpticalFlowUnavailable::SizeUnsupported:
+        return u"A resolução do vídeo excede o limite do Optical Flow."_s;
+    case render::OpticalFlowUnavailable::SessionFailed:
+        return u"O fluxo óptico parou nesta transmissão."_s;
+    case render::OpticalFlowUnavailable::None:
+        break;
+    }
+
+    return {};
+}
+
 bool SettingsController::overlayStatisticsVisible() const
 {
     return settings_.overlay.statisticsVisible;
@@ -802,8 +855,9 @@ void SettingsController::applyRtx(const core::RtxSettings& rtx)
     }
 
     settings_.rtx = rtx;
-    spdlog::info("RTX settings: Reflex {}, VSR {}", render::reflexModeName(rtx.reflex),
-                 rtx.videoSuperResolution ? "on" : "off");
+    spdlog::info("RTX settings: Reflex {}, VSR {}, optical flow {}",
+                 render::reflexModeName(rtx.reflex), rtx.videoSuperResolution ? "on" : "off",
+                 rtx.opticalFlow ? "on" : "off");
     emit rtxChanged();
     save();
 }

@@ -1,6 +1,10 @@
 add_library(lynx_render STATIC
     AdapterSelection.cpp
     AdapterSelection.h
+    CadenceDetector.cpp
+    CadenceDetector.h
+    CadenceMetric.cpp
+    CadenceMetric.h
     ColorConversion.cpp
     ColorConversion.h
     FrameMailbox.cpp
@@ -15,6 +19,8 @@ add_library(lynx_render STATIC
     GpuTimer.h
     Layout.cpp
     Layout.h
+    OpticalFlow.cpp
+    OpticalFlow.h
     Overlay.cpp
     Overlay.h
     ReflexSession.cpp
@@ -54,6 +60,7 @@ lynx_compile_shader(shaders/VideoFrame.hlsl vertexMain vs_5_1 VideoFrameVertexSh
 lynx_compile_shader(shaders/VideoFrame.hlsl pixelMain ps_5_1 VideoFramePixelShader)
 lynx_compile_shader(shaders/Scale.hlsl vertexMain vs_5_1 ScaleVertexShader)
 lynx_compile_shader(shaders/Scale.hlsl pixelMain ps_5_1 ScalePixelShader)
+lynx_compile_shader(shaders/Cadence.hlsl main cs_5_1 CadenceComputeShader)
 
 find_package(imgui CONFIG REQUIRED)
 
@@ -69,7 +76,8 @@ endif()
 # The NVAPI headers declare the Reflex entry points. They are portable, and
 # the driver's import library is never linked: nvapi64.dll loads at run time.
 target_include_directories(lynx_render SYSTEM PRIVATE
-    "${PROJECT_SOURCE_DIR}/third_party/nvapi")
+    "${PROJECT_SOURCE_DIR}/third_party/nvapi"
+    "${PROJECT_SOURCE_DIR}/third_party/nvof")
 target_compile_definitions(lynx_render PRIVATE LYNX_NVAPI=1)
 
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")

@@ -147,6 +147,9 @@ struct RtxSettings
     ReflexMode reflex = ReflexMode::On;
     // RTX Video Super Resolution through the driver's video processor.
     bool videoSuperResolution = false;
+    // The driver's optical flow between frames, for cadence detection now and
+    // DLSS later.
+    bool opticalFlow = true;
 
     bool operator==(const RtxSettings&) const = default;
 };

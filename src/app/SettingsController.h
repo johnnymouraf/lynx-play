@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Settings.h"
+#include "render/OpticalFlow.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
 #include "render/VideoSuperResolution.h"
@@ -51,6 +52,9 @@ class SettingsController : public QObject
     Q_PROPERTY(bool videoSuperResolutionAvailable READ videoSuperResolutionAvailable CONSTANT)
     Q_PROPERTY(QString videoSuperResolutionUnavailableReason READ
                    videoSuperResolutionUnavailableReason CONSTANT)
+    Q_PROPERTY(bool opticalFlow READ opticalFlow WRITE setOpticalFlow NOTIFY rtxChanged)
+    Q_PROPERTY(bool opticalFlowAvailable READ opticalFlowAvailable CONSTANT)
+    Q_PROPERTY(QString opticalFlowUnavailableReason READ opticalFlowUnavailableReason CONSTANT)
     Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
                    setOverlayStatisticsVisible NOTIFY overlayChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
@@ -127,6 +131,14 @@ public:
     [[nodiscard]] bool videoSuperResolutionAvailable() const;
     [[nodiscard]] QString videoSuperResolutionUnavailableReason() const;
 
+    [[nodiscard]] bool opticalFlow() const;
+    void setOpticalFlow(bool enabled);
+
+    // False without an NVIDIA stream GPU or a driver with nvofapi64.dll 5.0;
+    // the cadence then falls back to the block-difference metric alone.
+    [[nodiscard]] bool opticalFlowAvailable() const;
+    [[nodiscard]] QString opticalFlowUnavailableReason() const;
+
     // False without an NVIDIA stream GPU or a working NVAPI.
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
@@ -170,6 +182,7 @@ private:
     core::Settings settings_;
     render::ReflexAvailability reflexAvailability_;
     render::VsrAvailability videoSuperResolutionAvailability_;
+    render::OpticalFlowAvailability opticalFlowAvailability_;
     QStringList outputDevices_;
     QStringList microphoneDevices_;
     bool devicesLogged_ = false;

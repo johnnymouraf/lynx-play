@@ -28,10 +28,14 @@ std::string_view stageName(EffectStage stage)
         return "color conversion";
     case EffectStage::VideoSuperResolution:
         return "VSR";
+    case EffectStage::Cadence:
+        return "cadence";
     case EffectStage::Scaling:
         return "scaling";
     case EffectStage::Overlay:
         return "overlay";
+    case EffectStage::OpticalFlow:
+        return "optical flow";
     }
 
     return "unknown";

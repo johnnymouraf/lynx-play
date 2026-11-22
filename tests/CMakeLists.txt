@@ -23,9 +23,11 @@ add_executable(lynx_tests
     remoteplay/PinTests.cpp
     remoteplay/StreamSessionTests.cpp
     render/AdapterSelectionTests.cpp
+    render/CadenceDetectorTests.cpp
     render/ColorConversionTests.cpp
     render/FrameMailboxTests.cpp
     render/GpuTimerTests.cpp
+    render/OpticalFlowTests.cpp
     render/LayoutTests.cpp
     render/ReflexTests.cpp
     render/TestPatternTests.cpp

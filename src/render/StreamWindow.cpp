@@ -150,6 +150,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
         .timing = options.timing,
         .reflex = options.reflex,
         .videoSuperResolution = options.videoSuperResolution,
+        .opticalFlow = options.opticalFlow,
         .overlayFonts = std::move(options.overlayFonts),
         .overlay = std::move(options.overlay),
         .overlayActions = std::move(options.overlayActions),
@@ -230,6 +231,14 @@ void StreamWindow::setVideoSuperResolution(bool enabled)
     if (renderer_ != nullptr)
     {
         renderer_->setVideoSuperResolution(enabled);
+    }
+}
+
+void StreamWindow::setOpticalFlow(bool enabled)
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setOpticalFlow(enabled);
     }
 }
 

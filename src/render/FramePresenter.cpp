@@ -237,7 +237,7 @@ ConversionConstants constantsFor(const VideoFrame& frame)
     };
 }
 
-D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture)
+D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture, DXGI_FORMAT format)
 {
     return {
         .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
@@ -246,7 +246,7 @@ D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture)
         .Height = picture.height,
         .DepthOrArraySize = 1,
         .MipLevels = 1,
-        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .Format = format,
         .SampleDesc = {.Count = 1, .Quality = 0},
         .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
         .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
@@ -257,11 +257,13 @@ D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture)
 
 std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& device,
                                                                   UINT bufferCount,
-                                                                  DXGI_FORMAT targetFormat)
+                                                                  DXGI_FORMAT targetFormat,
+                                                                  DXGI_FORMAT intermediateFormat)
 {
     FramePresenter presenter;
     presenter.device_ = &device;
     presenter.bufferCount_ = bufferCount;
+    presenter.intermediateFormat_ = intermediateFormat;
 
     auto conversionRoot = createConversionRootSignature(device);
 
@@ -282,7 +284,7 @@ std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& 
     presenter.scalingRootSignature_ = std::move(*scalingRoot);
 
     auto conversionPipeline =
-        createPipeline(device, *presenter.conversionRootSignature_.Get(), targetFormat,
+        createPipeline(device, *presenter.conversionRootSignature_.Get(), intermediateFormat,
                        {kVideoFrameVertexShader, sizeof(kVideoFrameVertexShader)},
                        {kVideoFramePixelShader, sizeof(kVideoFramePixelShader)});
 
@@ -352,7 +354,8 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
         return {};
     }
 
-    const D3D12_RESOURCE_DESC description = intermediateDescription(picture);
+    const D3D12_RESOURCE_DESC description =
+        intermediateDescription(picture, intermediateFormat_);
     const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
 
     intermediates_.clear();
@@ -377,6 +380,21 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
 
     pictureSize_ = picture;
     return {};
+}
+
+ID3D12Resource* FramePresenter::intermediate(UINT bufferIndex) const
+{
+    if (bufferIndex >= intermediates_.size())
+    {
+        return nullptr;
+    }
+
+    return intermediates_.at(bufferIndex).Get();
+}
+
+DXGI_FORMAT FramePresenter::intermediateFormat() const
+{
+    return intermediateFormat_;
 }
 
 void FramePresenter::writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resource& texture)

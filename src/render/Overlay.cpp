@@ -100,10 +100,14 @@ const char* stageLabel(EffectStage stage)
         return "Conversão de cor";
     case EffectStage::VideoSuperResolution:
         return "VSR";
+    case EffectStage::Cadence:
+        return "Cadência";
     case EffectStage::Scaling:
         return "Escala";
     case EffectStage::Overlay:
         return "Overlay";
+    case EffectStage::OpticalFlow:
+        return "Fluxo óptico";
     }
 
     return "?";
@@ -258,6 +262,17 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
     valueRow(fonts, "FPS recebidos", fpsText(video, video.receivedFps).c_str());
     valueRow(fonts, "FPS decodificados", fpsText(video, video.decodedFps).c_str());
     valueRow(fonts, "FPS exibidos", fpsText(video, video.presentedFps).c_str());
+
+    std::string cadence = "—";
+
+    if (stats.cadenceValid)
+    {
+        cadence = std::format("{} fps · {}/{} repetidos",
+                              decimalText(stats.cadenceFramesPerSecond),
+                              stats.cadenceRepeatedFrames, stats.cadenceWindowFrames);
+    }
+
+    valueRow(fonts, "Cadência", cadence.c_str());
     valueRow(fonts, "Bitrate", bitrate.c_str());
     valueRow(fonts, "Perda de pacotes", loss.c_str());
 }
@@ -317,12 +332,21 @@ void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
 {
     sectionLabel(fonts, "GPU POR ETAPA");
 
-    for (std::size_t stage = 0; stage < kEffectStageCount; ++stage)
+    for (std::size_t index = 0; index < kEffectStageCount; ++index)
     {
-        valueRow(fonts, stageLabel(static_cast<EffectStage>(stage)),
-                 stats.gpuTimingsValid
-                     ? millisecondsText(stats.stageMilliseconds.at(stage), 2).c_str()
-                     : "—");
+        const auto stage = static_cast<EffectStage>(index);
+        std::string value = "—";
+
+        if (stage == EffectStage::OpticalFlow && stats.opticalFlow != FlowOverlayState::Running)
+        {
+            value = stats.opticalFlow == FlowOverlayState::Off ? "desligado" : "indisponível";
+        }
+        else if (stats.gpuTimingsValid)
+        {
+            value = millisecondsText(stats.stageMilliseconds.at(index), 2);
+        }
+
+        valueRow(fonts, stageLabel(stage), value.c_str());
     }
 
     valueRow(fonts, "Total",

@@ -116,7 +116,8 @@ ctest --preset release
 [GNU Affero General Public License v3.0](LICENSE), required by chiaki-ng's
 library, which is AGPL-3.0 with an OpenSSL exception. NVIDIA runtimes are
 downloaded at build time under NVIDIA's own licenses and are never committed;
-the NVAPI headers vendored in `third_party/nvapi` are MIT. Dear ImGui is MIT.
+the NVAPI headers vendored in `third_party/nvapi` and the Optical Flow headers
+in `third_party/nvof` are MIT. Dear ImGui is MIT.
 
 The interface bundles the Sora, Inter and JetBrains Mono fonts (SIL Open Font
 License 1.1) and Lucide icons (ISC License); their license files sit next to

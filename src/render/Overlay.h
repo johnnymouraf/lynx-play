@@ -57,6 +57,14 @@ struct ReflexOverlayStats
     double latencyQueueMs = 0.0;
 };
 
+// How the optical flow stage reads in the statistics panel.
+enum class FlowOverlayState
+{
+    Off,
+    Running,
+    Unavailable,
+};
+
 struct OverlayStats
 {
     // The video path's counters over the last two seconds.
@@ -67,6 +75,14 @@ struct OverlayStats
     bool gpuTimingsValid = false;
     std::array<double, kEffectStageCount> stageMilliseconds{};
     double totalMilliseconds = 0.0;
+    FlowOverlayState opticalFlow = FlowOverlayState::Off;
+
+    // The published cadence, once two windows agree.
+    bool cadenceValid = false;
+    double cadenceFramesPerSecond = 0.0;
+    std::uint32_t cadenceRepeatedFrames = 0;
+    std::uint32_t cadenceWindowFrames = 0;
+
     ReflexOverlayStats reflex;
 };
 

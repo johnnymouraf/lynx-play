@@ -15,18 +15,22 @@ TEST_CASE("GPU timestamps become per-stage and total milliseconds")
     timestamps.ticks = {1'000,
                         1'100, 1'350,
                         1'350, 2'000,
-                        2'000, 2'150,
-                        2'150, 2'250,
-                        2'400};
+                        2'000, 2'100,
+                        2'100, 2'250,
+                        2'250, 2'350,
+                        2'350, 2'500,
+                        2'600};
 
     const auto times = frameGpuTimes(timestamps, frequency);
 
     REQUIRE(times.has_value());
     CHECK(times->stages.at(0) == Catch::Approx(0.25));
     CHECK(times->stages.at(1) == Catch::Approx(0.65));
-    CHECK(times->stages.at(2) == Catch::Approx(0.15));
-    CHECK(times->stages.at(3) == Catch::Approx(0.10));
-    CHECK(times->total == Catch::Approx(1.40));
+    CHECK(times->stages.at(2) == Catch::Approx(0.10));
+    CHECK(times->stages.at(3) == Catch::Approx(0.15));
+    CHECK(times->stages.at(4) == Catch::Approx(0.10));
+    CHECK(times->stages.at(5) == Catch::Approx(0.15));
+    CHECK(times->total == Catch::Approx(1.60));
 }
 
 TEST_CASE("A frame without stamps has no GPU times")
@@ -45,7 +49,9 @@ TEST_CASE("A stage that ends before it starts invalidates the frame")
                         200, 300,
                         300, 400,
                         400, 500,
-                        600};
+                        500, 600,
+                        600, 700,
+                        800};
 
     CHECK_FALSE(frameGpuTimes(timestamps, 1'000'000).has_value());
 }

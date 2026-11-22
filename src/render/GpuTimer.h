@@ -18,16 +18,20 @@ namespace lynx::render
 
 using Microsoft::WRL::ComPtr;
 
-// The effects pipeline's stages, in drawing order.
+// The effects pipeline's stages, in the order a frame records them.
 enum class EffectStage : std::uint32_t
 {
     ColorConversion = 0,
     VideoSuperResolution = 1,
-    Scaling = 2,
-    Overlay = 3,
+    Cadence = 2,
+    Scaling = 3,
+    Overlay = 4,
+    // Timed from the main list's end to the flow engine's completion, which
+    // arrives on its own fence between frames.
+    OpticalFlow = 5,
 };
 
-inline constexpr std::size_t kEffectStageCount = 4;
+inline constexpr std::size_t kEffectStageCount = 6;
 // The frame's first stamp, each stage's two stamps, and its last one.
 inline constexpr std::size_t kTimestampCount = 2 + 2 * kEffectStageCount;
 

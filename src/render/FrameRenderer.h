@@ -3,10 +3,13 @@
 #include "core/RateCounter.h"
 #include "core/StreamMetrics.h"
 #include "core/Windows.h"
+#include "render/CadenceDetector.h"
+#include "render/CadenceMetric.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
 #include "render/GpuDevice.h"
 #include "render/GpuTimer.h"
+#include "render/OpticalFlow.h"
 #include "render/Overlay.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
@@ -42,6 +45,9 @@ public:
         // Runs the stream through RTX Video Super Resolution when the GPU
         // and the driver support it, instead of the shader's scaling pass.
         bool videoSuperResolution = false;
+        // Computes the driver's optical flow between the picture and the one
+        // before it; cadence detection runs either way.
+        bool opticalFlow = true;
         OverlayFonts overlayFonts;
         OverlayOptions overlay;
         OverlayActions overlayActions;
@@ -78,6 +84,9 @@ public:
     // processor and the shader's path before the next frame.
     void setVideoSuperResolution(bool enabled);
 
+    // Safe from any thread; optical flow starts or stops on the next frame.
+    void setOpticalFlow(bool enabled);
+
     // Safe from any thread; the overlay opens or closes on the next frame.
     void toggleOverlayMenu();
     void toggleOverlayStatistics();
@@ -88,6 +97,16 @@ public:
     bool handleOverlayMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
+    // What a frame records besides the picture: the cadence comparison and,
+    // for the video processor's path, the intermediate optical flow reads.
+    struct FramePlan
+    {
+        bool cadence = false;
+        bool writeFlowPicture = false;
+        bool opticalFlow = false;
+        const VideoFrame* previous = nullptr;
+    };
+
     FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain, FramePresenter presenter,
                   std::shared_ptr<FrameMailbox> mailbox, Options options);
 
@@ -100,15 +119,29 @@ private:
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
     void applyRequestedVideoSuperResolution();
+    void applyRequestedOpticalFlow();
     // Configures the video processor for the picture on screen and the
     // window it fits; false means the shader's path draws this frame.
     [[nodiscard]] bool prepareVideoSuperResolution();
-    void recordShaderFrame(UINT bufferIndex);
+    // Builds the optical flow session for the picture on screen; false leaves
+    // the frame on the block-difference cadence metric alone.
+    [[nodiscard]] bool prepareOpticalFlow();
+    void recordShaderFrame(UINT bufferIndex, const FramePlan& plan);
     // Copies the frame into the VSR input, runs the processor and records the
     // draw; false when the frame was dropped and the shader path retakes it.
     [[nodiscard]] std::expected<bool, std::string> recordVideoSuperResolutionFrame(
-        UINT bufferIndex);
+        UINT bufferIndex, const FramePlan& plan);
     void recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex);
+    // Signals the cadence fence after a list that recorded a sample.
+    void signalCadence();
+    // Reads the metric samples whose fences have passed into the detector.
+    void drainCadence();
+    // Ends the frame after the flow engine's fence, so the stage's time is
+    // the engine's real cost.
+    [[nodiscard]] std::expected<void, std::string> recordFlowWatch(UINT bufferIndex,
+                                                                   bool waitForFlow,
+                                                                   std::uint64_t outputValue);
+    [[nodiscard]] FlowOverlayState opticalFlowState() const;
     [[nodiscard]] OverlayStats overlayStats();
     [[nodiscard]] std::uint32_t lastGpuWorkUs() const;
     [[nodiscard]] std::string describePresentFailure(HRESULT result) const;
@@ -134,6 +167,23 @@ private:
     // a failure falls back to the shader until the setting changes.
     std::optional<VideoSuperResolution> videoSuperResolution_;
     bool videoSuperResolutionFailed_ = false;
+    std::atomic<bool> requestedOpticalFlow_;
+    bool requestedOpticalFlowApplied_ = false;
+    // Built the first time the setting is on with a picture; a failure keeps
+    // cadence detection running on the blocks alone.
+    std::optional<OpticalFlow> opticalFlow_;
+    bool opticalFlowFailed_ = false;
+    // The previous picture's intermediate is usable as flow's reference.
+    bool flowReferenceValid_ = false;
+    // The block metric is optional: a failure only loses the cadence line.
+    std::unique_ptr<CadenceMetric> cadenceMetric_;
+    CadenceDetector cadence_;
+    // The previous presented picture can be compared against the next one.
+    bool cadenceReferenceValid_ = false;
+    // A format change restarts the windows like a source change does.
+    std::optional<PixelFormat> lastPictureFormat_;
+    std::uint64_t cadenceSignal_ = 0;
+    std::uint64_t droppedFrames_ = 0;
     // The Reflex frame id of a source frame taken but not presented yet; it
     // survives a frame-slot timeout so the retry reuses its one sleep.
     std::optional<std::uint64_t> reflexFrameId_;
@@ -149,6 +199,11 @@ private:
     ComPtr<ID3D12GraphicsCommandList> copyCommandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> copyAllocators_;
     std::array<UINT64, SwapChain::kBufferCount> copyAllocatorFenceValues_{};
+    // The small list that waits for the flow engine and closes the frame's
+    // stamps after it, on its own allocators.
+    ComPtr<ID3D12GraphicsCommandList> flowCommandList_;
+    std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> flowAllocators_;
+    std::array<UINT64, SwapChain::kBufferCount> flowAllocatorFenceValues_{};
     // The frame each back buffer's last commands read, kept until the GPU is
     // done with them.
     std::array<std::optional<VideoFrame>, SwapChain::kBufferCount> framesInFlight_;
