@@ -303,9 +303,11 @@ void StreamSession::State::onAudioSettings(std::uint32_t channels, std::uint32_t
     state.audioChannels = channels;
     spdlog::info("Stream audio: {} channels at {} Hz", channels, rate);
 
-    if (state.audioOutput)
+    if (state.audioOutput && !state.audioOutput->open(channels, rate))
     {
-        state.audioOutput->open(channels, rate);
+        state.reportNotice("Sem som no jogo",
+                           "Nenhuma saída de áudio abriu. Confira a saída em Configurações › "
+                           "Áudio e microfone.");
     }
 }
 
