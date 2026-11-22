@@ -89,8 +89,9 @@ Out of scope for now: capture card input (planned for the future).
 
 ## Auto mode
 
-Scope: up to 2.2. Started on 2026-11-22 while the owner sleeps; nobody answers
-questions until morning. Delivery: each step works on the branch
+Scope: up to 2.6 (extended from 2.2 at the owner's request, so DLSS
+and frame generation are included; phase 3 waits). Started on 2026-11-22 while
+the owner slept; nobody answers questions. Delivery: each step works on the branch
 `auto/<step>` (for example `auto/1.2`), commits and pushes each delivery there
 so CI builds it, and the orchestrator fast-forwards `main` to the branch once
 the step is done and green.
@@ -549,3 +550,15 @@ D3D12-created texture also failed.
 - B. Two devices: more memory and two lifecycles.
 
 **Chosen: A**. Changing it: split the device back out of `GpuDevice`.
+
+#### D42 – Scope extended through 2.6 (all)
+
+The owner asked about DLSS and frame generation, so the run no longer stops at
+2.2.
+
+- A. Build 2.3 (HDR), 2.4 (optical flow and cadence), 2.5 (DLSS Frame
+  Generation 2x) and 2.6 (DLSS Super Resolution), two at a time; phase 3
+  waits.
+- B. Stop at 2.2 and hand the rest over.
+
+**Chosen: A**. Changing it: nothing is redone; the run just stops earlier.
