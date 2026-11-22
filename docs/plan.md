@@ -11,9 +11,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [1.4 Audio, DualSense and microphone](#14-audio-dualsense-and-microphone)
   - [1.5 Keyboard/mouse, overlay and stats](#15-keyboardmouse-overlay-and-stats)
-  - [2.1 Reflex + Boost and the effects pipeline](#21-reflex--boost-and-the-effects-pipeline)
   - [2.2 RTX Video Super Resolution](#22-rtx-video-super-resolution)
   - [Decisions to review](#decisions-to-review)
 
@@ -29,13 +27,13 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.3 Video** [auto]: streaming session, hardware H.265/H.264 decode
         straight into D3D12, low-latency presentation, 1080p60 at the highest
         bitrate.
-  - [ ] **1.4 Audio, DualSense and microphone** [auto]: low-latency audio;
+  - [x] **1.4 Audio, DualSense and microphone** [auto]: low-latency audio;
         DualSense over USB and Bluetooth (haptics, adaptive triggers, touchpad,
         gyro); microphone with mute.
   - [ ] **1.5 Keyboard/mouse, overlay and stats** [auto]: key mapping,
         in-stream menu, statistics and latency tuning.
 - [ ] **2. RTX features**: image enhancement and lower latency on the RTX.
-  - [ ] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
+  - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
   - [ ] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
         and upscaling to any output (1440p/4K monitors).
@@ -67,13 +65,21 @@ Out of scope for now: capture card input (planned for the future).
   without touching the renderer: sources hand decoded GPU frames to the
   renderer; encoded sources (the PS5, a file) go through the decoder first.
 - Decoding: FFmpeg with D3D12VA (zero copy), on the renderer's device.
-- Input and audio: SDL3 for the DualSense (USB and Bluetooth), keyboard/mouse,
-  audio output, haptics and microphone.
-- RTX: Reflex + Boost through NVAPI (open headers); RTX Video Super Resolution
-  and RTX Video HDR through the driver's D3D11 video processor extensions,
-  shared with D3D12; DLSS Super Resolution and Frame Generation through NGX,
+- Input and audio: SDL3 (vcpkg 3.4.20) for the DualSense (USB and Bluetooth),
+  keyboard/mouse, audio output, haptics and microphone. Gamepads are owned by
+  the application's `InputController`, not the session, because SDL pumps
+  events on the main thread and the rail shows the controller outside
+  sessions.
+- RTX: Reflex + Boost through NVAPI — NVIDIA's `nvapi` repository pinned as a
+  submodule (MIT, headers only), with `System32\nvapi64.dll` loaded at run
+  time through `nvapi_QueryInterface` and no import library (2.1); RTX Video
+  Super Resolution and RTX Video HDR through the driver's D3D11 video
+  processor extensions on a native D3D11 device sharing textures and a fence
+  with D3D12 (2.2); DLSS Super Resolution and Frame Generation through NGX,
   with runtimes downloaded in CI from NVIDIA's public releases; motion vectors
   from the driver's optical flow (NvOF).
+- The in-stream overlay is Dear ImGui (vcpkg, DX12 + Win32 backends), brought
+  in by 2.1 as a minimal statistics panel; 1.5 owns its final look.
 - Frame Generation detects the repeated frames of 30 fps games in the 60 fps
   stream and interpolates between the distinct ones.
 - Target displays: today an Acer 1080p 60 Hz monitor on the RTX (and the 240 Hz
@@ -143,60 +149,6 @@ the step is done and green.
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
 
-### 1.4 Audio, DualSense and microphone
-
-- **Goal:** the stream plays the console's audio with low latency, the DualSense
-  controls the PS5 over USB and Bluetooth with haptics, adaptive triggers,
-  touchpad and gyro, and the microphone reaches the console with a mute
-  toggle.
-- **Guardrails:** no keyboard/mouse mapping yet (1.5); no overlay (1.5).
-- **Success criteria:**
-  1. CI green on `auto/1.4`, unit tests included.
-  2. Unit tests cover the pure mappings: SDL gamepad state (buttons, sticks,
-     triggers, touchpad points, gyro/accel) to `ChiakiControllerState`;
-     chiaki feedback events (rumble, trigger effects) to the DualSense output
-     commands; haptic audio routing (USB) and its rumble fallback
-     (Bluetooth).
-  3. With a DualSense connected to this PC (if one is connected tonight), the
-     log shows it detected with its connection type; otherwise record that it
-     could not be checked.
-  4. The Áudio e microfone and Controles screens from the design list the
-     output and microphone devices and the DualSense status, and save the
-     choices in `settings.json`.
-  5. Owner checks: audio in sync and without crackling during a real session;
-     controller input, haptics, adaptive triggers, touchpad and gyro in game;
-     voice reaching the console; mute working.
-- **Deliveries:**
-  1. SDL3 from vcpkg (static), initialized for gamepad, audio and sensors;
-     device listing for the settings screens.
-  2. Audio output: chiaki's decoded PCM (48 kHz) through an SDL audio stream
-     with a small, bounded queue (drop old audio rather than grow latency).
-  3. DualSense input: SDL gamepad events and sensors to
-     `chiaki_session_set_controller_state`, touchpad included.
-  4. Feedback: rumble, adaptive triggers (DualSense effect packets through
-     `SDL_SendGamepadEffect`), lightbar, haptics over USB (the controller's
-     audio channels) with rumble fallback over Bluetooth.
-  5. Microphone: SDL recording device → `chiaki_session_connect_microphone`
-     and the Opus sender; mute toggle bound to the DualSense mic button and
-     the interface.
-- **Settled in planning:** DualSense over USB and Bluetooth; over Bluetooth
-  fine haptics may fall back to plain rumble; microphone from the DualSense or
-  a PC headset. From 1.2 (D13): add the rail's DualSense status and the
-  controller hint bar from the design, shown only while a controller is
-  detected.
-- **Changes:** a new `src/input/` (gamepad, mappings), `src/audio/` (output,
-  microphone), `src/remoteplay/` (session hooks), `src/app/` (settings
-  screens), `vcpkg.json` (sdl3), `tests/input/`, `tests/audio/`. Reference:
-  `third_party/chiaki-ng/gui/src/controllermanager.cpp` and
-  `streamsession.cpp` (haptics, triggers, microphone).
-- **Data and interfaces:** `settings.json` gains `audio` (output device,
-  microphone device, microphone muted) and `controller` (preferred
-  controller) objects.
-- **Edge cases:** controller connected or disconnected mid-session; two
-  controllers (first one wins, show it); no audio device or the device
-  removed; microphone permission denied by Windows privacy settings (clear
-  message); Bluetooth latency.
-
 ### 1.5 Keyboard/mouse, overlay and stats
 
 - **Goal:** keyboard and mouse can play with a configurable mapping, an
@@ -220,8 +172,10 @@ the step is done and green.
   6. Owner checks: playing with keyboard and mouse; packet loss and bitrate
      readings during a real session.
 - **Deliveries:**
-  1. Dear ImGui (vcpkg, DX12 + Win32 backends) in the stream window, styled
-     with the design's tokens; overlay toggle.
+  1. Finish the overlay 2.1 brought: the design's styling (Inter labels,
+     mono values, 320 wide), the F1 menu / F2 statistics toggles and a hidden
+     by default (2.1 leaves a minimal panel always visible), and the quick
+     actions (Reflex, VSR, disconnect).
   2. Statistics: counters from the session, decoder and renderer, shown in
      the overlay.
   3. Keyboard/mouse: raw input in the stream window mapped to controller
@@ -229,7 +183,12 @@ the step is done and green.
      `settings.json`, edited on the Controles screen.
   4. Latency tuning: MMCSS, process power throttling off, GPU priority,
      decoder flags review, input polled right before sending.
-- **Settled in planning:** none beyond the shared decisions.
+- **Settled in planning:** 2.1 already brings Dear ImGui (DX12 + Win32
+  backends), a minimal always-visible statistics panel (stage GPU times,
+  Reflex mode and latency report, JetBrains Mono 15 px, 360 wide) and
+  `settings.json`'s `rtx.reflex`; this step styles and completes the overlay
+  and adds the toggles it lacks (decision D24). The Controles screen already
+  exists from 1.4 and gains the keyboard/mouse mapping.
 - **Changes:** `src/render/` (overlay), `src/input/` (keyboard/mouse),
   `src/core/` (statistics), `src/app/` (Controles screen), `vcpkg.json`
   (imgui), tests.
@@ -238,41 +197,6 @@ the step is done and green.
 - **Edge cases:** the overlay open while the controller is used (input goes to
   the overlay, not the game); window focus lost (release every key);
   very high mouse polling rates.
-
-### 2.1 Reflex + Boost and the effects pipeline
-
-- **Goal:** the renderer runs its work as a chain of GPU stages with a timing
-  for each, and NVIDIA Reflex (Off / On / On + Boost) trims the render queue
-  latency on RTX GPUs.
-- **Guardrails:** no image enhancement yet (2.2+); Reflex is skipped cleanly on
-  non-NVIDIA GPUs.
-- **Success criteria:**
-  1. CI green on `auto/2.1`, unit tests included.
-  2. The overlay shows the GPU time of each stage (color conversion, scaling,
-     overlay) from timestamp queries, in `--play-file` playback.
-  3. With Reflex On + Boost, the log shows `NvAPI_D3D_SetSleepMode` succeeding
-     with boost, sleep and latency markers per source frame, and the overlay
-     shows Reflex's latency report (`NvAPI_D3D_GetLatency`).
-  4. The RTX screen from the design has the Reflex setting, saved in
-     `settings.json`, applied without restarting the stream.
-  5. Owner checks: input feels at least as responsive with Reflex on.
-- **Deliveries:**
-  1. NVAPI: NVIDIA's `nvapi` repository as a pinned submodule (MIT), linked
-     only when building for x64.
-  2. Effects pipeline: ordered GPU stages between the decoded frame and the
-     back buffer, each with timestamp queries.
-  3. Reflex: sleep mode, one `NvAPI_D3D_Sleep` per source frame, latency
-     markers, latency report in the overlay.
-  4. The RTX settings screen (Reflex part).
-- **Settled in planning:** Reflex + Boost is wanted; Boost raises power use on
-  a laptop, so it is a separate choice.
-- **Changes:** `src/render/` (pipeline, Reflex session), `src/app/` (RTX
-  screen), `.gitmodules`, `cmake/`.
-- **Data and interfaces:** `settings.json` gains `rtx.reflex`
-  (`off`/`on`/`boost`).
-- **Edge cases:** Intel GPU or missing NVAPI (setting disabled, explained);
-  driver rejecting sleep mode; frame pacing when the source stalls (no
-  sleep-driven stalls: one sleep per source frame only).
 
 ### 2.2 RTX Video Super Resolution
 
@@ -300,7 +224,18 @@ the step is done and green.
      part.
 - **Settled in planning:** VSR is implemented through the driver's D3D11 video
   processor extension, so no SDK is needed; the RTX Video SDK path is not
-  used.
+  used. Confirmed by research (`scratchpad/research/rtx-vsr.md`):
+  `ID3D11VideoContext::VideoProcessorSetStreamExtension` on a **native**
+  D3D11 device on the stream's adapter (D3D11On12 returns `E_NOTIMPL`), GUID
+  `{d43ce1b3-1f4b-48ac-baee-c3c25375e6f7}`, struct
+  `{version = 1; method = 2; enable = 1}` (12 bytes, no quality field — the
+  quality and the on/off global toggle live in the NVIDIA App), NV12/P010 in
+  and R8G8B8A8 out, 1:1 clean-up supported, downscale not; textures shared
+  with NT handles plus one shared fence (D3D12 signal → D3D11 wait → blit →
+  D3D11 signal/flush → D3D12 wait), the input view must bind render target and
+  shader resource; expect ~5–8 ms per 1080p→1440p/4K frame on the 4060 and
+  measure. The extension returns `S_OK` even with the app's global toggle off,
+  so the picture is the only proof.
 - **Changes:** `src/render/` (D3D11 interop, VSR stage), `src/app/` (RTX
   screen), tests for the pure parts (size and rectangle math).
 - **Data and interfaces:** `settings.json` gains `rtx.videoSuperResolution`.
@@ -492,4 +427,102 @@ guard.
   Esc belongs to the stream window during playback.
 
 **Chosen: B**. Changing it: remove the three-line phase guard.
+
+#### D19 – One gamepad manager in the application, not in the session (1.4)
+
+`SDL_PumpEvents` must run on the main thread and 1.2's rail needs controller
+status outside sessions.
+
+- A. A `GamepadManager` in the application's `InputController`, with the
+  session reading snapshots.
+- B. The session owns SDL: opens duplicate handles and needs another status
+  path for the UI.
+
+**Chosen: A**. Changing it: move the manager into `StreamSession` and add a
+status source for the interface.
+
+#### D20 – Haptics over the USB audio endpoint, rumble as fallback (1.4)
+
+- A. Four-channel USB audio for fine haptics; classic rumble over Bluetooth
+  or when the endpoint isn't 4ch, and rumble events ignored while the audio
+  haptics are active.
+- B. Always rumble: loses the fine haptics.
+- C. Always audio haptics: silence or the wrong path over Bluetooth.
+
+**Chosen: A** (the research confirmed `SDL_RumbleGamepad` disables audio
+haptics). Changing it: `Haptics` and `StreamSession`'s rumble branch.
+
+#### D21 – Game volume in `settings.json` (1.4)
+
+The design sketch has an 85% volume the data model didn't mention.
+
+- A. `audio.volumePercent`, applied as gain on the SDL stream.
+- B. Drop the design's line.
+
+**Chosen: A**, the design is the source of the screen. Changing it: remove the
+field and the gain.
+
+#### D22 – Device changes apply to the next session; mute and volume live (1.4)
+
+No Apply button, and reopening the audio device mid-game is risky.
+
+- A. Save and open on the next stream; mute and volume apply immediately.
+- B. Reopen output/microphone right away.
+
+**Chosen: A**. Changing it: reopen in `StreamController`.
+
+#### D23 – Preferred controller by SDL name (1.4)
+
+- A. Store the gamepad's name; the first match wins.
+- B. Instance id/index: unstable across runs.
+
+**Chosen: A**. Changing it: `ControllerSettings` and the manager's selection.
+
+#### D24 – The overlay arrives early, with 2.1 (2.1)
+
+2.1's criteria need per-stage GPU time and the Reflex latency report on
+screen, while the full overlay is 1.5's.
+
+- A. A minimal Dear ImGui panel now, always visible; 1.5 styles it, adds the
+  F1/F2 toggles, the full statistics and the quick actions.
+- B. Temporary text overlay: redone in 1.5.
+- C. Log only: fails 2.1's criteria.
+
+**Chosen: A**. Changing it: `Overlay.cpp` in 1.5.
+
+#### D25 – Reflex on by default, Boost opt-in (2.1)
+
+- A. On: low latency with no extra power draw; Boost stays an explicit choice.
+- B. Off by default.
+- C. Boost by default, as the sketch shows: extra laptop power draw on every
+  install.
+
+**Chosen: A**. Changing it: the default in `core::RtxSettings`.
+
+#### D26 – The stall detector's threshold (2.1)
+
+- A. Sleep longer than max(GPU work of the frame, 2 ms) in 10 of 16 frames:
+  catches the measured 26 ms sleeps without flagging sub-millisecond work.
+- B. Compare against the time already blocked in the frame slot: hides a 4 ms
+  sleep inside a 16 ms VSync.
+- C. No detector: risks the measured 31 fps case.
+
+**Chosen: A**. Changing it: `SleepStallDetector` and `lastGpuWorkUs`.
+
+#### D27 – The RTX screen ships only with the Reflex row (2.1)
+
+- A. Only Reflex, the feature that exists; VSR, HDR and DLSS rows arrive
+  with their steps.
+- B. The sketch's rows, disabled.
+- C. All rows functional now (beyond the mission).
+
+**Chosen: A**. Changing it: add rows in each step.
+
+#### D28 – `settings.json` stays version 1 with additive groups (2.1, kept by the merge)
+
+- A. Version 1 with additive fields, each defaulting when absent.
+- B. Version 2 with a migration, which would reject existing files and reset
+  the owner's video settings on an older build.
+
+**Chosen: A**. Changing it: bump `kSettingsVersion` and add a migration.
 

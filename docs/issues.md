@@ -32,3 +32,12 @@
 - **Actual:** the ICMP port-unreachable from 987 surfaces as `WSAECONNRESET`,
   the log says "Discovery thread failed to read from socket", discovery stops
   and the card stays offline.
+
+## A paired but switched-off DualSense shows up as a gamepad for half a second
+
+- **Where:** `GamepadManager::openAll` / event handling at startup.
+- **Steps:** keep a paired DualSense switched off and start the app.
+- **Expected:** no gamepad listed.
+- **Actual:** occasionally one gamepad is enumerated and removed about 0.5 s
+  later (`SDL reports 1 gamepad(s)` then `Gamepad disconnected`); later runs
+  report none. Seen once; likely SDL/Windows behavior with a paired HID device.
