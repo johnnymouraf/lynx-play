@@ -56,9 +56,10 @@ float3 bt2020ToBt709(float3 color)
 float3 toneMapToSdr(float3 pq)
 {
     const float3 nits = pqToNits(pq);
-    const float3 linear = max(bt2020ToBt709(nits), 0.0) / max(sdrWhiteNits, 1.0);
+    const float3 linearColor = max(bt2020ToBt709(nits), 0.0) / max(sdrWhiteNits, 1.0);
     const float peak = max(contentPeakNits, sdrWhiteNits) / max(sdrWhiteNits, 1.0);
-    const float3 mapped = linear * (1.0 + linear / (peak * peak)) / (1.0 + linear);
+    const float3 mapped =
+        linearColor * (1.0 + linearColor / (peak * peak)) / (1.0 + linearColor);
 
     return pow(saturate(mapped), 1.0 / 2.2);
 }

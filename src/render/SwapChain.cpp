@@ -217,7 +217,13 @@ std::expected<void, std::string> SwapChain::applyColorSpace()
 
     if (const HRESULT result = swapChain_->SetColorSpace1(colorSpace); FAILED(result))
     {
-        return std::unexpected(describeFailure("SetColorSpace1", result));
+        if (hdr)
+        {
+            return std::unexpected(describeFailure("SetColorSpace1", result));
+        }
+
+        // sRGB is the swap chain's default; a refusal here leaves it as it is.
+        spdlog::warn("{}", describeFailure("SetColorSpace1 (SDR)", result));
     }
 
     if (hdr)
