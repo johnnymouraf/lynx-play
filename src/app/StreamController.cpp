@@ -149,11 +149,13 @@ void StreamController::play(Target target)
 
 void StreamController::cancel()
 {
-    if (phase_ == Phase::Connecting || phase_ == Phase::StartingVideo)
+    // While streaming, the stream window owns Esc and its close button.
+    if (phase_ == Phase::Idle || phase_ == Phase::Streaming)
     {
-        spdlog::info("Connecting canceled");
+        return;
     }
 
+    spdlog::info("Connecting canceled");
     stop();
     setPhase(Phase::Idle);
 }

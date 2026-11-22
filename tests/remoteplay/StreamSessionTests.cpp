@@ -27,16 +27,16 @@ TEST_CASE("videoProfileFor turns each resolution into its 16:9 size")
     settings.bitrateKbps = 6000;
 
     settings.resolution = core::VideoResolution::P540;
-    const VideoProfile small = videoProfileFor(settings);
+    const VideoProfile smallProfile = videoProfileFor(settings);
 
     settings.resolution = core::VideoResolution::P720;
-    const VideoProfile medium = videoProfileFor(settings);
+    const VideoProfile mediumProfile = videoProfileFor(settings);
 
-    CHECK(small.width == 960);
-    CHECK(small.height == 540);
-    CHECK(small.framesPerSecond == 30);
-    CHECK(small.codec == core::VideoCodec::H264);
-    CHECK(small.bitrateKbps == 6000);
-    CHECK(medium.width == 1280);
-    CHECK(medium.height == 720);
+    CHECK(smallProfile.width == 960);
+    CHECK(smallProfile.height == 540);
+    CHECK(smallProfile.framesPerSecond == 30);
+    CHECK(smallProfile.codec == core::VideoCodec::H264);
+    CHECK(smallProfile.bitrateKbps == 6000);
+    CHECK(mediumProfile.width == 1280);
+    CHECK(mediumProfile.height == 720);
 }
