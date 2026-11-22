@@ -13,7 +13,7 @@
 #include <QTimer>
 #include <QtQmlIntegration>
 
-#include <chrono>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -100,8 +100,6 @@ signals:
     void notice(const QString& tone, const QString& title, const QString& message);
 
 private:
-    using SteadyClock = std::chrono::steady_clock;
-
     void startDiscovery();
     void setDiscoveryStatus(DiscoveryStatus status);
     // Runs on chiaki's discovery threads.
@@ -113,10 +111,10 @@ private:
                                     const QDateTime& now) const;
     void syncManualHosts();
     void markSearching(const std::string& key);
-    // Ends a search unless it was started again since.
-    void expireSearch(const std::string& key);
+    // Ends a search unless it was started again since `timer` was set.
+    void expireSearch(const std::string& key, std::uint64_t timer);
     // Gives up on a console that didn't turn on in time.
-    void expireWake(const std::string& key);
+    void expireWake(const std::string& key, std::uint64_t timer);
     // Ends the wait for the consoles that now answer ready.
     void finishWakes();
 
@@ -137,8 +135,11 @@ private:
     std::vector<remoteplay::DiscoveredHost> discovered_;
     std::vector<remoteplay::ConsoleEntry> entries_;
     std::vector<std::string> queriedHosts_;
-    std::map<std::string, SteadyClock::time_point> searchingUntil_;
-    std::map<std::string, SteadyClock::time_point> wakingUntil_;
+    // The consoles being searched for or turned on, with the timer that ends
+    // the wait.
+    std::map<std::string, std::uint64_t> searching_;
+    std::map<std::string, std::uint64_t> waking_;
+    std::uint64_t timerGeneration_ = 0;
     QTimer clockTimer_;
     DiscoveryStatus discoveryStatus_ = DiscoveryStatus::Unavailable;
     bool remotePlayReady_ = false;

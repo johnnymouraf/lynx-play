@@ -145,6 +145,7 @@ FocusScope {
                     spacing: Theme.space1
 
                     AppText {
+                        Layout.fillWidth: true
                         text: "Consoles"
                         textStyle: "titleLarge"
                         Accessible.role: Accessible.Heading

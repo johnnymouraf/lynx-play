@@ -300,14 +300,16 @@ void ConsolesController::wake(const QString& key)
 
     spdlog::info("Wake-up sent to {} at {}", key.toStdString(), address);
     const std::string wakingKey = key.toStdString();
-    wakingUntil_[wakingKey] = SteadyClock::now() + kWakeTimeout;
-    QTimer::singleShot(kWakeTimeout, this, [this, wakingKey] { expireWake(wakingKey); });
+    const std::uint64_t timer = ++timerGeneration_;
+    waking_[wakingKey] = timer;
+    QTimer::singleShot(kWakeTimeout, this,
+                       [this, wakingKey, timer] { expireWake(wakingKey, timer); });
     refreshModel();
 }
 
 void ConsolesController::cancelWake(const QString& key)
 {
-    if (wakingUntil_.erase(key.toStdString()) == 0)
+    if (waking_.erase(key.toStdString()) == 0)
     {
         return;
     }
@@ -474,14 +476,12 @@ void ConsolesController::refreshModel()
 
 ConsoleRow ConsolesController::rowFor(const ConsoleEntry& entry, const QDateTime& now) const
 {
-    const auto searching = searchingUntil_.find(entry.key);
-    const bool isSearching = searching != searchingUntil_.end() &&
-                             searching->second > SteadyClock::now();
+    const bool isSearching = searching_.contains(entry.key);
 
     const ConsoleFacts facts{
         .saved = entry.savedIndex ? &file_.consoles.at(*entry.savedIndex) : nullptr,
         .discovered = entry.discovered ? &*entry.discovered : nullptr,
-        .waking = wakingUntil_.contains(entry.key),
+        .waking = waking_.contains(entry.key),
         .searching = isSearching,
     };
 
@@ -525,34 +525,35 @@ void ConsolesController::syncManualHosts()
 
 void ConsolesController::markSearching(const std::string& key)
 {
-    searchingUntil_[key] = SteadyClock::now() + kSearchDuration;
+    const std::uint64_t timer = ++timerGeneration_;
+    searching_[key] = timer;
 
-    QTimer::singleShot(kSearchDuration, this, [this, key] { expireSearch(key); });
+    QTimer::singleShot(kSearchDuration, this, [this, key, timer] { expireSearch(key, timer); });
 }
 
-void ConsolesController::expireSearch(const std::string& key)
+void ConsolesController::expireSearch(const std::string& key, std::uint64_t timer)
 {
-    const auto searching = searchingUntil_.find(key);
+    const auto searching = searching_.find(key);
 
-    if (searching == searchingUntil_.end() || searching->second > SteadyClock::now())
+    if (searching == searching_.end() || searching->second != timer)
     {
         return;
     }
 
-    searchingUntil_.erase(searching);
+    searching_.erase(searching);
     refreshModel();
 }
 
-void ConsolesController::expireWake(const std::string& key)
+void ConsolesController::expireWake(const std::string& key, std::uint64_t timer)
 {
-    const auto waking = wakingUntil_.find(key);
+    const auto waking = waking_.find(key);
 
-    if (waking == wakingUntil_.end() || waking->second > SteadyClock::now())
+    if (waking == waking_.end() || waking->second != timer)
     {
         return;
     }
 
-    wakingUntil_.erase(waking);
+    waking_.erase(waking);
     spdlog::warn("{} didn't turn on in time", key);
 
     const ConsoleRow* row = model_.find(fromUtf8(key));
@@ -565,7 +566,7 @@ void ConsolesController::expireWake(const std::string& key)
 
 void ConsolesController::finishWakes()
 {
-    for (auto waking = wakingUntil_.begin(); waking != wakingUntil_.end();)
+    for (auto waking = waking_.begin(); waking != waking_.end();)
     {
         const auto host = std::ranges::find(discovered_, waking->first, &DiscoveredHost::hostId);
         const bool ready = host != discovered_.end() && host->state == HostState::Ready;
@@ -577,7 +578,7 @@ void ConsolesController::finishWakes()
         }
 
         spdlog::info("{} turned on", waking->first);
-        waking = wakingUntil_.erase(waking);
+        waking = waking_.erase(waking);
     }
 }
 

@@ -72,6 +72,7 @@ Item {
                     spacing: Theme.space1
 
                     AppText {
+                        Layout.fillWidth: true
                         text: "Lynx Play"
                         font.family: Theme.fontDisplay
                         font.pixelSize: 24

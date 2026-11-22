@@ -8,6 +8,9 @@ DialogShell {
 
     required property ConsolesController consoles
 
+    // The card added or found, to focus once the dialog has given focus back.
+    property string addedKey
+
     signal added(string key)
 
     function openEmpty() {
@@ -25,13 +28,18 @@ DialogShell {
             return;
         }
 
-        const key = dialog.consoles.addByAddress(addressField.text);
+        dialog.addedKey = dialog.consoles.addByAddress(addressField.text);
         dialog.close();
-        dialog.added(key);
     }
 
     title: "Adicionar console pelo IP"
     onOpened: addressField.focusInput()
+    onClosed: {
+        if (dialog.addedKey.length > 0) {
+            dialog.added(dialog.addedKey);
+            dialog.addedKey = "";
+        }
+    }
 
     AppText {
         Layout.fillWidth: true
