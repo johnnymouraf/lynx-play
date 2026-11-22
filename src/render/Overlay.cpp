@@ -109,10 +109,11 @@ void drawGpuSection(const OverlayStats& stats)
     for (std::size_t stage = 0; stage < kEffectStageCount; ++stage)
     {
         row(stageLabel(static_cast<EffectStage>(stage)),
-            stats.gpuTimingsValid ? millisecondsText(stats.stageMilliseconds.at(stage)) : "—");
+            stats.gpuTimingsValid ? millisecondsText(stats.stageMilliseconds.at(stage), 2) : "—");
     }
 
-    row("Total", stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds) : "—");
+    row("Total",
+        stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds, 2) : "—");
     ImGui::EndTable();
 }
 
