@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [1.2 Consoles](#12-consoles)
   - [1.3 Video](#13-video)
   - [1.4 Audio, DualSense and microphone](#14-audio-dualsense-and-microphone)
   - [1.5 Keyboard/mouse, overlay and stats](#15-keyboardmouse-overlay-and-stats)
@@ -25,7 +24,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
       audio and the highest bitrate the console accepts.
   - [x] **1.1 Foundation**: public repo, CI build, Qt shell, D3D12 window on the
         RTX, chiaki-lib linked.
-  - [ ] **1.2 Consoles** [auto]: LAN discovery, wake from rest mode, pairing
+  - [x] **1.2 Consoles** [auto]: LAN discovery, wake from rest mode, pairing
         (Account ID + PIN), saved consoles, manual IP, screens from the Drafia
         design.
   - [ ] **1.3 Video** [auto]: streaming session, hardware H.265/H.264 decode
@@ -145,67 +144,6 @@ the step is done and green.
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
 
-### 1.2 Consoles
-
-- **Goal:** the home screen lists the PS5 consoles on the LAN and the saved
-  ones, with their state, and lets the owner pair a console (Account ID + PIN),
-  add one by IP, and wake a paired console from rest mode; the screens match
-  the Drafia design.
-- **Guardrails:** no streaming session yet (1.3); no PSN login (3.2).
-- **Success criteria:**
-  1. CI green on `auto/1.2`, unit tests included.
-  2. Unit tests cover: Account ID parsing (numeric and Base64 to the 8 bytes
-     chiaki expects, invalid input rejected), PIN validation (exactly 8
-     digits), the console store round trip (save, load, secrets encrypted on
-     disk) with an in-memory stream, and merging discovered hosts with saved
-     consoles.
-  3. The app shows the home screen from the design; with the PS5 on or in rest
-     mode on the LAN it appears with the right state within 5 seconds
-     (screenshot + log). If the console doesn't answer tonight, record that and
-     check the empty state instead.
-  4. "Adicionar pelo IP" validates the address and adds a card that queries
-     that address directly.
-  5. The pairing dialog walks through its states (Account ID, PIN, progress,
-     error) — checked with a fake PIN against the console when it is on (it
-     must end in the error state, not hang), or against an unreachable address
-     (timeout error).
-  6. Owner checks: a real pairing succeeds and "Ligar e jogar" wakes the
-     console.
-- **Deliveries:**
-  1. Theme and components: `Theme` singleton from the design variables and the
-     QML components the home and dialogs use; bundle the design's font if its
-     license allows (OFL), with its license file.
-  2. Discovery: a `ConsoleDiscovery` wrapping `chiaki_discovery_service_*`,
-     publishing hosts (name, address, state, PS5/PS4, host id, system
-     version) to a Qt model on the GUI thread.
-  3. Console store and merge: saved consoles in
-     `%APPDATA%\LynxPlay\consoles.json`; secrets (registration key, RP key)
-     encrypted with DPAPI (`CryptProtectData`, current user); a list model
-     that merges discovered and saved consoles by host id.
-  4. Pairing and manual add: `chiaki_regist_start` driven from the dialog;
-     Account ID and PIN validation; manual IP hosts queried with
-     `chiaki_discovery_send` to that address.
-  5. Wake: `chiaki_discovery_wakeup` with the saved credential for a paired
-     console in rest mode, the card showing "Ligando o console…".
-- **Settled in planning:** the Account ID is typed in (numeric or Base64), with
-  a link explaining how to find it; PSN login (3.2) will fill it later. The
-  design's copy is the interface text. Saved data lives only on this PC.
-- **Changes:** `src/remoteplay/` (discovery, registration, wake, console store
-  and Account ID/PIN logic — pure parts testable without Qt or sockets);
-  `src/app/` (models exposed to QML, controller actions, QML screens and
-  components under `src/app/qml/`); `tests/remoteplay/`. Reference
-  implementation for the chiaki API: `third_party/chiaki-ng/gui/src/`
-  (`discoverymanager.cpp`, `host.cpp`, `qmlbackend.cpp`, `RegistDialog.qml`).
-- **Data and interfaces:** `consoles.json` holds an array of consoles: host id,
-  nickname, last known address, PS5 flag, target/system version, server MAC,
-  `registKey` and `rpKey` as Base64 of DPAPI blobs, `rpKeyType`, last played
-  time. Version the file with a `version` field.
-- **Edge cases:** no network or discovery socket failure (banner, retry);
-  console answering from a new IP (update the saved address); duplicate
-  manual entries; wrong PIN, timeout, console already paired with the maximum
-  number of devices (each a clear message); a corrupt or foreign
-  `consoles.json` (keep a backup, start empty, log it); DPAPI failure.
-
 ### 1.3 Video
 
 - **Goal:** "Jogar" on a paired console opens the stream window and plays the
@@ -250,6 +188,11 @@ the step is done and green.
 - **Settled in planning:** defaults 1080p, 60 fps, H.265, the highest bitrate
   the console accepts on the LAN; the stream window opens borderless
   fullscreen on the monitor the main window is on.
+  From 1.2 (D12, D14): the minimal Configurações page
+  (`qml/settings/SettingsPage.qml`) becomes the design's Configurações with
+  the Vídeo and Sobre sections, and "Teste de vídeo" moves to Sobre; "Jogar"
+  stops showing the "not there yet" toast and starts the session
+  (`ConsolesController::play`).
 - **Changes:** `src/render/` (frame presenter, shaders), a new `src/media/`
   (decoder, frame source interface, file source), `src/remoteplay/` (session),
   `src/core/` (settings store), `src/app/` (controller actions, Vídeo
@@ -305,7 +248,9 @@ the step is done and green.
      the interface.
 - **Settled in planning:** DualSense over USB and Bluetooth; over Bluetooth
   fine haptics may fall back to plain rumble; microphone from the DualSense or
-  a PC headset.
+  a PC headset. From 1.2 (D13): add the rail's DualSense status and the
+  controller hint bar from the design, shown only while a controller is
+  detected.
 - **Changes:** a new `src/input/` (gamepad, mappings), `src/audio/` (output,
   microphone), `src/remoteplay/` (session hooks), `src/app/` (settings
   screens), `vcpkg.json` (sdl3), `tests/input/`, `tests/audio/`. Reference:
@@ -550,4 +495,52 @@ and show the error on the field.
   buttons).
 
 **Chosen: A**. Changing it: the design file and the matching QML component.
+
+#### D12 – A minimal Configurações page until 1.3 (1.2)
+
+The home design has no place for 1.1's diagnostics and "Teste de vídeo", and
+1.3 must keep the test working.
+
+- A. A minimal Configurações page in the rail with the version, Remote Play
+  state, GPU and the video test.
+- B. A hidden keyboard shortcut: the owner wouldn't find it.
+- C. Remove the test: breaks 1.3's guardrail.
+
+**Chosen: A**. Changing it: 1.3 replaces `qml/settings/SettingsPage.qml` with
+the design's Vídeo and Sobre sections and moves the test there.
+
+#### D13 – DualSense status and controller hints hidden until 1.4 (1.2)
+
+- A. Hide the rail's DualSense status and the controller hint bar until
+  controllers are detected.
+- B. Show them statically as designed: claims a connection and shortcuts that
+  don't exist yet.
+
+**Chosen: A**, because it shows nothing false. Changing it: 1.4 adds both.
+
+#### D14 – "Jogar" before streaming exists (1.2)
+
+- A. Keep the buttons as designed and show a toast that streaming is not there
+  yet.
+- B. Disable or hide them, departing from the design.
+
+**Chosen: A**. Changing it: `ConsolesController::play` in 1.3.
+
+#### D15 – nlohmann-json for the console store (1.2)
+
+- A. nlohmann-json (vcpkg, header-only): `remoteplay` and its tests stay free
+  of Qt.
+- B. `QJsonDocument`: pulls Qt Core into `remoteplay` and the tests.
+
+**Chosen: A**. Changing it: rewrite `ConsoleStore.cpp`.
+
+#### D16 – "Parear" in the card's menu (1.2)
+
+A console added by IP that doesn't answer discovery would never show the
+"Parear" button, yet pairing by IP is a real use case (chiaki-ng allows it).
+
+- A. A "Parear" item in the "…" menu of every unpaired console.
+- B. Pair only consoles that answer discovery.
+
+**Chosen: A**. Changing it: remove that menu row in `ConsolesPage.qml`.
 
