@@ -111,7 +111,7 @@ jobs:
         run: ctest --preset release
 
       - name: Package
-        run: cmake --install build/release --prefix dist/lynx-play
+        run: cmake --install build/release --prefix "${{ github.workspace }}/dist/lynx-play"
 
       - name: Upload the portable package
         uses: actions/upload-artifact@v7
