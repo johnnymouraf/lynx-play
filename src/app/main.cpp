@@ -1,4 +1,6 @@
 #include "app/AppController.h"
+#include "app/Fonts.h"
+#include "app/IconProvider.h"
 #include "app/QtLogBridge.h"
 #include "app/Version.h"
 #include "core/Log.h"
@@ -91,6 +93,8 @@ int main(int argc, char* argv[])
     spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
 
     QGuiApplication application(argc, argv);
+    lynx::app::loadBundledFonts();
+
     lynx::app::AppController controller({
         .remotePlayReady = startRemotePlay(),
         .gpuName = findStreamGpu(),
@@ -99,6 +103,7 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationVersion(controller.version());
 
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);
     engine.setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
 
     QObject::connect(

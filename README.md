@@ -84,6 +84,10 @@ ctest --preset release
 library, which is AGPL-3.0 with an OpenSSL exception. NVIDIA runtimes are
 downloaded at build time under NVIDIA's own licenses and are never committed.
 
+The interface bundles the Sora, Inter and JetBrains Mono fonts (SIL Open Font
+License 1.1) and Lucide icons (ISC License); their license files sit next to
+them in `src/app/assets` and ship in the package's `licenses` folder.
+
 PlayStation and PS5 are trademarks of Sony Interactive Entertainment. NVIDIA,
 RTX, DLSS and Reflex are trademarks of NVIDIA Corporation. This project is not
 affiliated with or endorsed by either company.
