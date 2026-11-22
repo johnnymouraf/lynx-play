@@ -294,13 +294,20 @@ the step is done and green.
      `NGX_D3D12_CREATE_DLSSG`/`NGX_D3D12_EVALUATE_DLSSG`), resources
      declared as never provided (HUD-less, UI, UI alpha, distortion).
   2. Inputs per frame: the real back buffer, a constant depth (`R32_FLOAT`
-     0.9), motion vectors densified from 2.4's flow at scale 1, and the
-     `MultiFrameCount = 1`/`MultiFrameIndex = 1` 2x call.
+     0.9, never 1.0 — the runtime linearizes as `1/(1 - depth)`), motion
+     vectors densified from 2.4's flow, and the
+     `MultiFrameCount = 1`/`MultiFrameIndex = 1` 2x call. The DLSSG
+     `MvecScaleX/Y` meaning is contested (the header says normalize; the
+     guide says rescale to pixels): start at `1/W`, `1/H`, validate the sign
+     on a real pan, and negate as Veyra does (`-1/W`, `-1/H`) if needed.
   3. Present scheduling: generate only after distinct frames (2.4's flag,
      no generation after a repeat), present real and generated frames with
-     the Reflex out-of-band notifications (`NvAPI_D3D12_NotifyOutOfBandCommandQueue`,
-     `SetAsyncFrameMarker`) if the driver asks for them, and count them in
-     the overlay.
+     the Reflex out-of-band notification
+     (`NvAPI_D3D12_NotifyOutOfBandCommandQueue(OUT_OF_BAND_RENDER_PRESENT = 3)`,
+     since the queue carries both real and generated presents; the
+     notification gates FG), latency markers on the out-of-band queue
+     (`NvAPI_D3D_SetLatencyMarker`, markers 9–12 — `SetAsyncFrameMarker`
+     returned -1 in practice), and count both in the overlay.
   4. Setting, RTX row, overlay (presented vs real fps, generated count) and
      the failure paths.
 - **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
@@ -309,6 +316,12 @@ the step is done and green.
   SDKs license and can be fetched in CI without a login; estimated 2–4 ms a
   frame on the 4060; the out-of-band queue is what the generated presents
   need, and Reflex markers must cover both real and generated presents.
+  Further research (addendum, same file): hardware GPU scheduling (HAGS) must
+  be on (read `HwSchMode`); the NGX project id must be GUID-like; and
+  Streamline advises against `GetFrameLatencyWaitableObject`/`SetMaximumFrameLatency`
+  with FG — Lynx Play uses both, so the frame pacer is the prototype's first
+  risk (Veyra keeps three buffers and latency 1 without Streamline and it
+  works, so this may survive).
 - **Changes:** `src/render/` (NGX host, DLSS-G stage, present scheduling),
   `src/core/` (settings), `src/app/` (RTX row), CI workflow, tests.
 - **Data and interfaces:** `settings.json` gains `rtx.frameGeneration`
