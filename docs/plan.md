@@ -11,8 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [2.5 DLSS Frame Generation 2x](#25-dlss-frame-generation-2x)
-  - [2.6 DLSS Super Resolution (experimental)](#26-dlss-super-resolution-experimental)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -32,7 +30,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         gyro); microphone with mute.
   - [x] **1.5 Keyboard/mouse, overlay and stats** [auto]: key mapping,
         in-stream menu, statistics and latency tuning.
-- [ ] **2. RTX features**: image enhancement and lower latency on the RTX.
+- [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
   - [x] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
@@ -40,9 +38,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
   - [x] **2.4 Optical flow and cadence detection**: find the repeated frames of
         30 fps games inside the 60 fps stream.
-  - [ ] **2.5 DLSS Frame Generation 2x**: 30→60 and 60→120 fps, with Reflex.
+  - [x] **2.5 DLSS Frame Generation 2x**: 30→60 and 60→120 fps, with Reflex.
     - Off by default: it adds about one source frame of latency.
-  - [ ] **2.6 DLSS Super Resolution (experimental)**, fed by optical-flow
+  - [x] **2.6 DLSS Super Resolution (experimental)**, fed by optical-flow
         motion vectors and compared with VSR.
 - [ ] **3. Internet**: play away from home.
   - [ ] **3.1 Manual address and network profiles**: VPN (Tailscale/ZeroTier) or
@@ -149,118 +147,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-### 2.5 DLSS Frame Generation 2x
-
-- **Goal:** DLSS Frame Generation doubles the presented rate (a 30 fps game
-  reaches 60, a 60 fps one 120) by interpolating between distinct real frames
-  with the optical flow from 2.4, with Reflex on; off by default.
-- **Guardrails:** no DLSS Super Resolution (2.6); off by default because it
-  adds about one source frame of latency; NGX runtimes downloaded in CI, never
-  committed; needs 2.4's flow and cadence.
-- **Success criteria:**
-  1. CI green on `auto/2.5`, unit tests included (the frame schedule: which
-     frames generate, the multiplier, cadence 30 vs 60, pause on repeats).
-  2. `--play-file` of the 30 fps stream in a 60 fps container with Frame
-     Generation on: the log shows the DLSS-G feature created and evaluated
-     per frame, and the overlay's presented fps around 60 from 30 distinct;
-     with a true 60 fps file, around 120 from 60 distinct (screenshots and
-     the present counters).
-  3. Reflex is on whenever Frame Generation is on (the log shows the sleep
-     mode active and markers for both real and generated presents), and the
-     overlay shows the generated-frame count.
-  4. The RTX screen has the Frame Generation setting (Desligado / Ligado 2x)
-     with the latency note, saved in `settings.json` and applied live; on a
-     GPU below Ada or without the runtime, it is disabled with an
-     explanation.
-  5. Owner check: smoothness gain and added latency in a real 30 fps game,
-     and the artifacts in motion.
-- **Deliveries:**
-  1. NGX core (`NVSDK_NGX_D3D12_Init` with the stream's device and an app
-     id, `nvngx_dlss.dll`/`nvngx_dlssg.dll` 310.9.16 and the import library
-     downloaded in CI from NVIDIA's public release, with the license notices),
-     the DLSS-G feature (`NVSDK_NGX_Feature_FrameGeneration` = 11,
-     `NGX_D3D12_CREATE_DLSSG`/`NGX_D3D12_EVALUATE_DLSSG`), resources
-     declared as never provided (HUD-less, UI, UI alpha, distortion).
-  2. Inputs per frame: the real back buffer, a constant depth (`R32_FLOAT`
-     0.9, never 1.0 — the runtime linearizes as `1/(1 - depth)`), motion
-     vectors densified from 2.4's flow, and the
-     `MultiFrameCount = 1`/`MultiFrameIndex = 1` 2x call. The DLSSG
-     `MvecScaleX/Y` meaning is contested (the header says normalize; the
-     guide says rescale to pixels): start at `1/W`, `1/H`, validate the sign
-     on a real pan, and negate as Veyra does (`-1/W`, `-1/H`) if needed.
-  3. Present scheduling: generate only after distinct frames (2.4's flag,
-     no generation after a repeat), present real and generated frames with
-     the Reflex out-of-band notification
-     (`NvAPI_D3D12_NotifyOutOfBandCommandQueue(OUT_OF_BAND_RENDER_PRESENT = 3)`,
-     since the queue carries both real and generated presents; the
-     notification gates FG), latency markers on the out-of-band queue
-     (`NvAPI_D3D_SetLatencyMarker`, markers 9–12 — `SetAsyncFrameMarker`
-     returned -1 in practice), and count both in the overlay.
-  4. Setting, RTX row, overlay (presented vs real fps, generated count) and
-     the failure paths.
-- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
-  feature id 11, Ada supports at most 2x (`MultiFrameCount = 1`; multi-frame
-  needs RTX 50), the DLLs are redistributable in object form under the RTX
-  SDKs license and can be fetched in CI without a login; estimated 2–4 ms a
-  frame on the 4060; the out-of-band queue is what the generated presents
-  need, and Reflex markers must cover both real and generated presents.
-  Further research (addendum, same file): hardware GPU scheduling (HAGS) must
-  be on (read `HwSchMode`); the NGX project id must be GUID-like; and
-  Streamline advises against `GetFrameLatencyWaitableObject`/`SetMaximumFrameLatency`
-  with FG — Lynx Play uses both, so the frame pacer is the prototype's first
-  risk (Veyra keeps three buffers and latency 1 without Streamline and it
-  works, so this may survive).
-- **Changes:** `src/render/` (NGX host, DLSS-G stage, present scheduling),
-  `src/core/` (settings), `src/app/` (RTX row), CI workflow, tests.
-- **Data and interfaces:** `settings.json` gains `rtx.frameGeneration`
-  (off/2x); the pipeline's frame schedule exposes real vs generated frames;
-  the overlay shows both rates.
-- **Edge cases:** GPU below Ada; the NGX runtime missing or refused; flow or
-  cadence off (disable with an explanation); HDR (generate in the same
-  10-bit space, per 2.3); resize; device lost; a 30 fps stream where every
-  other frame repeats (no generation after repeats).
-
-### 2.6 DLSS Super Resolution (experimental)
-
-- **Goal:** DLSS Super Resolution upscales the stream (1080p to 1440p/4K) fed
-  by the optical-flow motion vectors, shown side by side with RTX VSR in the
-  settings and the overlay.
-- **Guardrails:** experimental, off by default; may not beat VSR on video
-  content; needs 2.4's flow; the VSR path stays the default.
-- **Success criteria:**
-  1. CI green on `auto/2.6`, unit tests included (the size/ratio math and
-     the setting).
-  2. `--play-file` of 1080p in a 1440p window with DLSS SR on: the log
-     shows the feature created and evaluated with the flow's motion vectors,
-     the overlay shows its stage time, and screenshots compare DLSS SR vs
-     VSR vs the shader scale, with the differences described.
-  3. The RTX screen offers the upscaling choice (Shader / RTX Video Super
-     Resolution / DLSS Super Resolution) with DLSS marked experimental,
-     saved in `settings.json` and applied live.
-  4. With flow off, below Ada, or with the runtime missing, DLSS SR is
-     disabled with an explanation and VSR remains the default.
-  5. Owner check: real-game picture quality versus VSR at 1440p/4K.
-- **Deliveries:**
-  1. The NGX DLSS feature (`NVSDK_NGX_Feature_SuperSampling` = 1,
-     `NGX_D3D12_CREATE_DLSS_EXT`/`EVALUATE_DLSS_EXT`, `nvngx_dlss.dll`
-     310.9.16) in the same NGX host 2.5 built, with jitter 0 and sharpness 0.
-  2. Inputs: the current real frame at 1080p, constant depth, motion
-     vectors from the flow scaled to the output/render ratio, Width/OutWidth
-     for the 1.33x and 2x ratios.
-  3. The upscaling selector (shader / VSR / DLSS SR), the stage in
-     `GpuTimer` and the overlay, and the comparison screenshots.
-- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
-  the render ratio comes from Width/OutWidth (the performance/quality label
-  is cosmetic); the estimated cost is 1.5–2.2 ms at 1080p→1440p and
-  3.5–4.5 ms at 1080p→4K; video content lacks the game's temporal data, so
-  artifacts are expected — hence experimental.
-- **Changes:** `src/render/` (DLSS stage, selector), `src/core/` (settings),
-  `src/app/` (RTX row), tests.
-- **Data and interfaces:** `settings.json`'s `rtx.videoSuperResolution`
-  becomes `rtx.upscaling` (`shader`/`vsr`/`dlss`) with the old field
-  migrated.
-- **Edge cases:** ratios outside DLSS's range (fall back to VSR); flow off;
-  non-Ada GPU; HDR; resize; the runtime missing.
 
 ### Decisions to review
 
@@ -781,3 +667,137 @@ NvOF needs BGRA8 while PQ streams use a 10-bit intermediate.
 - B. Run the flow on the decoded frame or the swap chain.
 
 **Chosen: A**. Changing it: `FramePresenter`'s intermediate paths.
+
+#### D53 – A missing `HwSchMode` counts as on (2.5)
+
+Windows 11 may leave the value absent at the default.
+
+- A. Absent means off, which would disable FG here.
+- B. Assume on and let `FrameGeneration.Available` decide, the runtime's word
+  being final; `HwSchMode = 1` still disables with an explanation.
+
+**Chosen: B**. Changing it: `FrameGeneration::probe`.
+
+#### D54 – Motion-vector scale `-1/W, -1/H` (2.5)
+
+The DLSS-G header says "normalize", the guide says "pixels".
+
+- A. `1/W`.
+- B. `1`.
+- C. `-1/W`, as Veyra does with current→previous pixel vectors.
+
+**Chosen: C**; the sign still needs a real pan to confirm. Changing it:
+`kMotionVectorScaleSign`.
+
+#### D55 – The 30 fps schedule holds the real frame for the repeat (2.5)
+
+- A. Present generated and real on the distinct frame and the repeat too
+  (~90 fps).
+- B. Hold the real frame for the repeat: two presents per pair, 60 from 30.
+
+**Chosen: B**, unit-tested. Changing it: `FrameSchedule::observe`/`presentReal`.
+
+#### D56 – A source ring apart from the swap chain (2.5)
+
+With FG the swap chain advances twice per source frame, so slots would
+misalign.
+
+- A. Index by the swap chain buffer.
+- B. A ring of three source slots.
+
+**Chosen: B**. Changing it: `sourceSlot_`/`renderFrame`.
+
+#### D57 – One frame-slot wait per present (2.5)
+
+- A. Two waits per source frame.
+- B. One wait per present (the loop's wait grants the first).
+
+**Chosen: B**; it worked as is: 30→60 and 60→120 with no steady-state drops
+and `SetMaximumFrameLatency(1)` intact. Changing it: a cadence/Streamline
+pacer if the owner sees stutter.
+
+#### D58 – A segmented control for Frame Generation (2.5)
+
+- A. The design's toggle.
+- B. A two-state segmented control (Desligado / Ligado 2x), as the criterion
+  names.
+
+**Chosen: B**. Changing it: the design's toggle in `RtxSettings.qml`.
+
+#### D59 – A warm-up DLSS-G evaluate on creation (2.5)
+
+The runtime allocates internals on the first evaluate.
+
+- A. Let the first real frame pay for it.
+- B. A reset evaluate at creation, discarded if it fails.
+
+**Chosen: B**. Changing it: `prepareFrameGeneration`.
+
+#### D60 – One NGX host after the merge (2.6)
+
+Both steps built in parallel and each created a `NgxHost`.
+
+- A. Each step keeps its own host.
+- B. One host, created on first need by the renderer, owning the device,
+  `Init_with_ProjectID`, the log callback, the `%LOCALAPPDATA%` data and the
+  `PathListInfo` that lets the loader find the DLLs beside the exe; both
+  features are created against it and released before it.
+
+**Chosen: B** (each step built with its own during the parallel run).
+Changing it: split the host per feature again.
+
+#### D61 – The upscaler defaults to the shader, with VSR as fallback (2.6)
+
+- A. Shader by default; whenever DLSS can't run, VSR draws the stream.
+- B. VSR by default, paying its cost for everyone.
+- C. DLSS by default, despite being experimental.
+
+**Chosen: A**, keeping 2.2's opt-in cost. Changing it:
+`RtxSettings::upscaling` and the screen's text.
+
+#### D62 – DLSS depth through an upload-buffer copy (2.6)
+
+A `R32_FLOAT` depth-stencil view made `CreateFeature` fail.
+
+- A. A DSV in `R32_FLOAT` (failed).
+- B. An upload buffer copied into the resource (chosen).
+- C. A compute shader, another PSO.
+
+**Chosen: B**. Changing it: a DSV again only after finding the invalid call.
+
+#### D63 – On an HDR10 swap chain, DLSS falls back to VSR (2.6)
+
+The feature is 8-bit; writing SDR into an HDR10 chain would present it as PQ.
+
+- A. An SDR→PQ pass after DLSS.
+- B. Fall back to VSR on an HDR10 chain; a PQ stream runs DLSS on the
+  tone-mapped SDR copy.
+
+**Chosen: B**. Changing it: the SDR→PQ pass.
+
+#### D64 – An Ada gate through NVAPI (2.6)
+
+- A. Let NGX fail.
+- B. Allow every RTX.
+- C. `NvAPI_GPU_GetArchInfo >= AD100`, reading the architecture without
+  creating a device, with the reason on screen.
+
+**Chosen: C**. Changing it: `dlssArchitectureSupported`/`probeDlss`.
+
+#### D65 – Redraws reuse the slot's flow (2.6)
+
+With the overlay open, frames redraw continuously.
+
+- A. Switch to VSR on redraws.
+- B. Re-run the flow on every redraw.
+- C. Reuse the last flow of the slot (same source frame).
+
+**Chosen: C**. Changing it: require `plan.opticalFlow` again.
+
+#### D66 – One selector replaces the VSR row (2.6)
+
+- A. Three toggles.
+- B. One selector (Shader / VSR / DLSS) with the design's "Experimental"
+  badge.
+
+**Chosen: B**, matching `rtx.upscaling`. Changing it: separate rows.

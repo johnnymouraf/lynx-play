@@ -63,3 +63,26 @@
   `%LOCALAPPDATA%\LynxPlay\lynx-play.log`, so one run overwrites the other's
   settings (fields disappear) and the log lines interleave. Reproducible; a
   verification hazard, not a runtime bug.
+
+## Reflex reports no effective low-latency in --play-file
+
+- **Where:** `--play-file` playback with Reflex on.
+- **Steps:** run `lynx-play.exe --play-file <file> --fps 60`, open F2, read the
+  Reflex section.
+- **Expected:** the driver reports the low-latency mode as effective, and
+  `GetLatency` returns a valid report, as the "Teste de vídeo" window does.
+- **Actual:** `NvAPI_D3D_GetSleepStatus` returns `bLowLatencyMode = 0` and
+  the latency report is invalid, although `SetSleepMode` succeeded, the
+  driver sees the sleep and both kinds of markers are accepted. The live test
+  window shows both valid.
+
+## The first DLSS feature creation stalls for about two seconds
+
+- **Where:** `DlssSuperResolution::create` (and Frame Generation) on the
+  render thread.
+- **Steps:** start `--play-file` with `rtx.upscaling: "dlss"` and watch the
+  overlay for the first five seconds.
+- **Expected:** the rate holds near 60 fps while the feature is created.
+- **Actual:** `CreateFeature` blocks the render thread for ~1.8–2 s and the
+  first seconds show ~37–39 fps. The research suggests creating the feature
+  off the present thread.
