@@ -76,6 +76,12 @@ Out of scope for now: capture card input (planned for the future).
   with D3D12 (2.2); DLSS Super Resolution and Frame Generation through NGX,
   with runtimes downloaded in CI from NVIDIA's public releases; motion vectors
   from the driver's optical flow (NvOF).
+- NGX (DLSS Super Resolution and Frame Generation) runs through one
+  `NgxHost` created on first need, with `nvngx_dlss.dll` and `nvngx_dlssg.dll`
+  310.9.16 fetched in CI from NVIDIA's public release and shipped beside the
+  executable; Frame Generation requires Ada and HAGS, forces Reflex on, and
+  presents generated frames through the out-of-band queue. The upscaler is one
+  setting (shader / VSR / DLSS).
 - The in-stream overlay is Dear ImGui (vcpkg, DX12 + Win32 backends), brought
   in by 2.1 as a minimal statistics panel; 1.5 owns its final look.
 - Frame Generation detects the repeated frames of 30 fps games in the 60 fps
@@ -91,7 +97,9 @@ Out of scope for now: capture card input (planned for the future).
 
 Scope: up to 2.6 (extended from 2.2 at the owner's request, so DLSS
 and frame generation are included; phase 3 waits). Started on 2026-11-22 while
-the owner slept; nobody answers questions. Delivery: each step works on the branch
+the owner slept, and finished the same day: 1.1–1.5 and 2.1–2.6 are on
+main, green. Phase 3 remains for a later run (3.2 needs the owner's PSN
+login). Delivery: each step works on the branch
 `auto/<step>` (for example `auto/1.2`), commits and pushes each delivery there
 so CI builds it, and the orchestrator fast-forwards `main` to the branch once
 the step is done and green.
