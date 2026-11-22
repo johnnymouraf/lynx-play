@@ -129,10 +129,12 @@ void Haptics::setController(bool present, bool wired)
     {
         closeEndpointLocked();
         retryAttempt_ = 0;
+        retryExhausted_ = false;
     }
     else if (stream_ == nullptr)
     {
         retryAttempt_ = 0;
+        retryExhausted_ = false;
         nextRetry_ = std::chrono::steady_clock::now();
         tryOpenEndpointLocked();
     }
@@ -176,7 +178,8 @@ void Haptics::push(std::span<const std::uint8_t> packet)
         return;
     }
 
-    if (wired_ && stream_ == nullptr && std::chrono::steady_clock::now() >= nextRetry_)
+    if (wired_ && stream_ == nullptr && !retryExhausted_ &&
+        std::chrono::steady_clock::now() >= nextRetry_)
     {
         tryOpenEndpointLocked();
     }
@@ -263,6 +266,7 @@ void Haptics::onAudioDeviceAdded(bool recording)
     }
 
     retryAttempt_ = 0;
+    retryExhausted_ = false;
     nextRetry_ = std::chrono::steady_clock::now();
     tryOpenEndpointLocked();
 }
@@ -284,6 +288,7 @@ void Haptics::onAudioDeviceRemoved(bool recording, std::uint32_t device)
     spdlog::warn("The DualSense audio endpoint went away; haptics use rumble");
     closeEndpointLocked();
     retryAttempt_ = 0;
+    retryExhausted_ = false;
     scheduleRetryLocked();
 }
 
@@ -362,6 +367,7 @@ void Haptics::tryOpenEndpointLocked()
     device_ = SDL_GetAudioStreamDevice(stream_);
     SDL_ResumeAudioStreamDevice(stream_);
     retryAttempt_ = 0;
+    retryExhausted_ = false;
     dropLogged_ = false;
     spdlog::info("Haptics audio on '{}' (3 kHz stereo to 4-channel 48 kHz)", chosenName);
 }
@@ -382,6 +388,12 @@ void Haptics::scheduleRetryLocked()
 {
     if (retryAttempt_ >= static_cast<int>(kRetryDelaysMs.size()))
     {
+        if (!retryExhausted_)
+        {
+            spdlog::warn("The DualSense audio endpoint did not appear; haptics use rumble");
+            retryExhausted_ = true;
+        }
+
         return;
     }
 

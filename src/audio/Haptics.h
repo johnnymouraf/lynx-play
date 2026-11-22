@@ -85,6 +85,7 @@ private:
     SDL_AudioStream* stream_ = nullptr;
     SDL_AudioDeviceID device_ = 0;
     int retryAttempt_ = 0;
+    bool retryExhausted_ = false;
     std::chrono::steady_clock::time_point nextRetry_{};
     std::chrono::steady_clock::time_point lastRumble_{};
     bool rumbling_ = false;
