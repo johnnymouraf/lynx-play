@@ -29,16 +29,22 @@ The plan and its progress live in [docs/plan.md](docs/plan.md).
 
 ## Download
 
-Every push to `main` is built by GitHub Actions. Open the latest successful run
-of the **Build** workflow and download the `lynx-play-windows-x64` artifact, or
-use the GitHub CLI:
+Every green build of `main` publishes a versioned release
+(`v0.1.0-build.N`) with two assets:
+
+- `LynxPlay-Setup-<version>.exe`: the installer, with Start-menu and desktop
+  shortcuts and an uninstaller.
+- `lynx-play-windows-x64.zip`: the portable package; extract it anywhere and
+  run `lynx-play.exe`.
+
+Download the newest release with the GitHub CLI, or from the Releases page:
 
 ```powershell
-gh run download --repo johnnymouraf/lynx-play --name lynx-play-windows-x64
+gh release download --repo johnnymouraf/lynx-play --pattern "LynxPlay-Setup-*.exe"
 ```
 
-Extract the zip anywhere and run `lynx-play.exe`. Logs are written to
-`%LOCALAPPDATA%\LynxPlay\logs`. The saved and paired consoles live in
+Logs are written to `%LOCALAPPDATA%\LynxPlay\logs`. The newest twelve
+releases are kept; older ones are removed by the build. The saved and paired consoles live in
 `%APPDATA%\LynxPlay\consoles.json`, with their keys and the PSN account ID
 encrypted for the current Windows user (DPAPI), and the video settings in
 `%APPDATA%\LynxPlay\settings.json`.

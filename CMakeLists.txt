@@ -14,6 +14,8 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(LYNX_BUILD_TESTS "Build the unit tests" ON)
 
+set(LYNX_BUILD_NUMBER "" CACHE STRING "Build number appended to the app version")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(LynxWarnings)
 include(ChiakiLib)

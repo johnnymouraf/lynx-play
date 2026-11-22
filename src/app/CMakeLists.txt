@@ -5,6 +5,11 @@ set(CMAKE_INSTALL_BINDIR .)
 find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Qml Quick Svg)
 qt_standard_project_setup(REQUIRES 6.10)
 
+# CI passes the run number, so a downloaded build says which one it is.
+set(LYNX_VERSION "${PROJECT_VERSION}")
+if(LYNX_BUILD_NUMBER)
+    string(APPEND LYNX_VERSION "-build.${LYNX_BUILD_NUMBER}")
+endif()
 configure_file(Version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/app/Version.h" @ONLY)
 
 qt_add_executable(lynx-play WIN32
