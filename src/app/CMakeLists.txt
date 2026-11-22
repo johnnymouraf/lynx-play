@@ -25,6 +25,7 @@ target_include_directories(lynx-play PRIVATE
 target_link_libraries(lynx-play PRIVATE
     Lynx::core
     Lynx::remoteplay
+    Lynx::render
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick)

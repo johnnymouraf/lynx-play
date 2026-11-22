@@ -7,6 +7,8 @@ ApplicationWindow {
 
     required property AppController controller
 
+    property bool videoTestFailed: false
+
     width: 960
     height: 600
     minimumWidth: 720
@@ -46,6 +48,32 @@ ApplicationWindow {
 
         Label {
             Layout.alignment: Qt.AlignHCenter
+            text: window.controller.gpuName.length > 0
+                  ? "GPU: " + window.controller.gpuName
+                  : "Nenhuma GPU compatível com Direct3D 12 encontrada"
+            color: window.controller.gpuName.length > 0 ? "#9AA4B2" : "#F87171"
+            font.pixelSize: 14
+        }
+
+        Button {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 16
+            text: "Teste de vídeo"
+            enabled: window.controller.gpuName.length > 0
+            onClicked: window.videoTestFailed = !window.controller.openVideoTest()
+        }
+
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            visible: window.videoTestFailed
+            text: "Não foi possível abrir a janela de vídeo. Veja o log."
+            color: "#F87171"
+            font.pixelSize: 14
+        }
+
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 24
             text: "Versão " + window.controller.version
             color: "#5B6573"
             font.pixelSize: 12

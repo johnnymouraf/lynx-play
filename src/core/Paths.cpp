@@ -1,9 +1,8 @@
 #include "core/Paths.h"
 
-#include <format>
-#include <memory>
+#include "core/Windows.h"
 
-#include <windows.h>
+#include <memory>
 
 #include <shlobj.h>
 
@@ -34,8 +33,7 @@ std::expected<std::filesystem::path, std::string> localDataDir()
 
     if (FAILED(result))
     {
-        return std::unexpected(
-            std::format("SHGetKnownFolderPath failed: 0x{:08X}", static_cast<unsigned long>(result)));
+        return std::unexpected(describeFailure("SHGetKnownFolderPath", result));
     }
 
     return std::filesystem::path(knownFolder.get()) / kAppFolderName;

@@ -4,7 +4,9 @@ add_library(lynx_core STATIC
     Log.cpp
     Log.h
     Paths.cpp
-    Paths.h)
+    Paths.h
+    Windows.cpp
+    Windows.h)
 add_library(Lynx::core ALIAS lynx_core)
 
 target_include_directories(lynx_core PUBLIC "${PROJECT_SOURCE_DIR}/src")

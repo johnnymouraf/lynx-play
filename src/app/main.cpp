@@ -4,6 +4,8 @@
 #include "core/Log.h"
 #include "core/Paths.h"
 #include "remoteplay/ChiakiRuntime.h"
+#include "render/AdapterSelection.h"
+#include "render/GpuDevice.h"
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -12,6 +14,14 @@
 #include <cstdlib>
 
 #include <spdlog/spdlog.h>
+
+// Hybrid-graphics laptops read these exports to run the process on the
+// discrete GPU.
+extern "C"
+{
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
 
 namespace
 {
@@ -46,6 +56,32 @@ bool startRemotePlay()
     return true;
 }
 
+QString findStreamGpu()
+{
+    const auto adapters = lynx::render::listAdapters();
+
+    if (!adapters)
+    {
+        spdlog::error("Cannot list GPUs: {}", adapters.error());
+        return {};
+    }
+
+    for (const auto& adapter : *adapters)
+    {
+        spdlog::info("GPU found: {} (vendor 0x{:04X})", adapter.name, adapter.vendorId);
+    }
+
+    const auto chosen = lynx::render::selectAdapter(*adapters);
+
+    if (!chosen)
+    {
+        spdlog::error("No hardware GPU can render the stream");
+        return {};
+    }
+
+    return QString::fromStdString(adapters->at(*chosen).name);
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -55,7 +91,10 @@ int main(int argc, char* argv[])
     spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
 
     QGuiApplication application(argc, argv);
-    lynx::app::AppController controller(startRemotePlay());
+    lynx::app::AppController controller({
+        .remotePlayReady = startRemotePlay(),
+        .gpuName = findStreamGpu(),
+    });
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
