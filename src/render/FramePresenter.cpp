@@ -353,7 +353,7 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
     intermediates_.clear();
     intermediates_.resize(bufferCount_);
 
-    for (UINT index = 0; index < static_cast<UINT>(bufferCount); ++index)
+    for (UINT index = 0; index < bufferCount_; ++index)
     {
         ComPtr<ID3D12Resource>& texture = intermediates_.at(index);
 

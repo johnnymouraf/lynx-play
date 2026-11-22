@@ -249,7 +249,7 @@ void FrameRenderer::run(const std::stop_token& stop)
 
         if (stop.stop_requested())
         {
-            return;
+            break;
         }
 
         applyRequestedReflex();
@@ -263,11 +263,15 @@ void FrameRenderer::run(const std::stop_token& stop)
                 options_.onFailure();
             }
 
-            return;
+            break;
         }
 
         reportStatistics();
     }
+
+    // The overlay's buffers and the frames in flight are released below, so
+    // the GPU must be done with them first.
+    waitForGpu();
 }
 
 std::expected<void, std::string> FrameRenderer::renderFrame(Overlay* overlay)

@@ -106,7 +106,7 @@ ctest --preset release
 | `src/remoteplay`        | chiaki-ng bridge: discovery, pairing, wake, saved list  |
 | `tests`                 | Unit tests (Catch2)                                     |
 | `third_party/chiaki-ng` | chiaki-ng, pinned as a submodule                        |
-| `third_party/nvapi`    | NVIDIA's NVAPI headers, for Reflex                      |
+| `third_party/nvapi`     | NVIDIA's NVAPI headers, for Reflex                      |
 | `cmake`, `triplets`     | CMake helpers and the vcpkg triplet                     |
 
 ## License

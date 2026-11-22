@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <chrono>
 #include <format>
-#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -360,7 +359,7 @@ std::uint64_t ReflexSession::beginSourceFrame(std::uint32_t gpuWorkUs)
     if (status != NVAPI_OK)
     {
         failed_ = true;
-        applySleepMode(core::ReflexMode::Off);
+        (void)applySleepMode(core::ReflexMode::Off);
         spdlog::error("reflex: NvAPI_D3D_Sleep failed: {}", statusText(nvapi(), status));
         return frameId;
     }
@@ -593,7 +592,7 @@ void ReflexSession::shutdown()
 {
     if (available_ && configured_ && device_ != nullptr)
     {
-        applySleepMode(core::ReflexMode::Off);
+        (void)applySleepMode(core::ReflexMode::Off);
     }
 
     device_ = nullptr;
@@ -641,7 +640,7 @@ void ReflexSession::addSleepSample(double milliseconds)
 void ReflexSession::disableAfterStall(std::uint32_t sleepUs, std::uint32_t gpuWorkUs)
 {
     stalled_ = true;
-    applySleepMode(core::ReflexMode::Off);
+    (void)applySleepMode(core::ReflexMode::Off);
 
     spdlog::warn("reflex: sleep of {} us exceeds the frame's GPU work ({} us, with a {} us floor) "
                  "in {} of the last {} frames; low latency disabled for this stream",
