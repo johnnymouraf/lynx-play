@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [2.4 Optical flow and cadence detection](#24-optical-flow-and-cadence-detection)
   - [2.5 DLSS Frame Generation 2x](#25-dlss-frame-generation-2x)
   - [2.6 DLSS Super Resolution (experimental)](#26-dlss-super-resolution-experimental)
   - [Decisions to review](#decisions-to-review)
@@ -39,7 +38,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **2.2 RTX Video Super Resolution** [auto]: artifact cleanup at 1080p
         and upscaling to any output (1440p/4K monitors).
   - [x] **2.3 HDR**: the PS5's native HDR stream and RTX Video HDR.
-  - [ ] **2.4 Optical flow and cadence detection**: find the repeated frames of
+  - [x] **2.4 Optical flow and cadence detection**: find the repeated frames of
         30 fps games inside the 60 fps stream.
   - [ ] **2.5 DLSS Frame Generation 2x**: 30→60 and 60→120 fps, with Reflex.
     - Off by default: it adds about one source frame of latency.
@@ -150,58 +149,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-### 2.4 Optical flow and cadence detection
-
-- **Goal:** the renderer computes optical flow on the GPU and marks every
-  source frame as distinct or repeated, estimating the stream's cadence
-  (30/60 fps), shown in the overlay; the flow is exposed for DLSS in 2.5 and
-  2.6.
-- **Guardrails:** no DLSS or frame generation yet; with optical flow off, the
-  pipeline behaves exactly as 2.2's; no capture card.
-- **Success criteria:**
-  1. CI green on `auto/2.4`, unit tests included (cadence state machine:
-     windows, period, thresholds, resets; flow-vector scaling/densify math).
-  2. `--play-file` with a 30 fps stream carried in a 60 fps container: the
-     log and the overlay report cadence 30 and the repeated frames, the flow
-     stage's time, and the picture is unchanged; with a true 60 fps file:
-     cadence 60 and no repeated frames (screenshots of the overlay).
-  3. The overlay shows the optical-flow stage's GPU time and the cadence with
-     its repeated-frame count.
-  4. `rtx.opticalFlow` (Ligado/Desligado, default on) on the RTX screen,
-     saved and applied live.
-  5. Owner check: a real 30 fps game reports cadence 30.
-- **Deliveries:**
-  1. NVIDIA Optical Flow: headers vendored from SDK 5.0.7 into
-     `third_party/nvof` (MIT per file, with the license; the SDK zip needs a
-     login, so commit the headers, never the DLL), the D3D12 session
-     (`NvOFAPICreateInstanceD3D12(0x50, …)`, `nvCreateOpticalFlowD3D12`,
-     `nvOFRegisterResourceD3D12`/`nvOFExecuteD3D12`, fence points), input
-     BGRA8 S10.5 flow `R16G16_SINT` and cost `R8_UINT` at grid 4×4, loaded
-     from `System32\nvofapi64.dll`.
-  2. Flow stage in the pipeline (the presenter's intermediate becomes BGRA8),
-     with its time in `GpuTimer` and the overlay.
-  3. Cadence detection: a compute shader comparing the current and previous
-     luma in 4×4 blocks with a group reduction and one atomic, a 16-byte
-     readback fenced and read on the next frame; the state machine (a
-     repeated frame when under ~1% of blocks change; a 60-flag window, at
-     least 30 flags and 12 distinct, two windows agreeing within 1.6 fps;
-     reset on scene cut, resize, source change and dropped frames).
-  4. Setting, the RTX screen row and the overlay's cadence line.
-- **Settled in planning:** research in `scratchpad/research/nvof-ngx-dlss.md`:
-  the flow is only computed on `B8G8R8A8_UNORM` inputs at a 4×4 grid; the
-  estimated cost at 1080p on a 4060 is ~1.0–1.3 ms (medium) and ~2.0–2.4 ms
-  (slow); cadence needs a one-frame decision latency and no present stall.
-- **Changes:** `src/render/` (flow, cadence shader and state), `third_party/nvof`,
-  `src/core/` (settings), `src/app/` (RTX row), tests.
-- **Data and interfaces:** `settings.json` gains `rtx.opticalFlow`; each
-  frame carries a distinct/repeated flag and the window's cadence estimate;
-  the flow texture and cost are available to the DLSS steps.
-- **Edge cases:** `nvofapi64.dll` absent or too old (flow disabled with a
-  logged reason; cadence falls back to the block-difference metric alone);
-  30 fps source (no repeats); scene cuts; dropped frames; resize; HDR frames
-  (flow on the 8-bit SDR-converted intermediate).
-
 ### 2.5 DLSS Frame Generation 2x
 
 - **Goal:** DLSS Frame Generation doubles the presented rate (a 30 fps game
@@ -772,3 +719,65 @@ Both run in one `VideoProcessorBlt`.
 
 **Chosen: A**, each feature shows its real cost and the frame total doesn't
 change. Changing it: measure separately if the driver exposes it.
+
+#### D47 – Cadence windows in fixed 60-flag blocks (2.4)
+
+- A. Consecutive 60-flag blocks, published once two agree: real hysteresis,
+  settles in ~2 s, simple tests.
+- B. A sliding window against the previous one: faster, but 98% overlapping
+  and a weak filter.
+
+**Chosen: A**. Changing it: `CadenceDetector::addFlag`/`finishWindow`.
+
+#### D48 – Flow time from a fence-watching list (2.4)
+
+The flow engine runs outside the command queue.
+
+- A. An observer list with GPU timestamps, accurate, waiting for the flow
+  inside the 16.7 ms budget.
+- B. CPU clock: simple but not `GpuTimer`.
+- C. Only the frame total.
+
+**Chosen: A**. Changing it: remove `recordFlowWatch`.
+
+#### D49 – The intermediate is BGRA8 and the flow also runs with VSR (2.4)
+
+NvOF accepts only BGRA8, and VSR replaces the color conversion.
+
+- A. BGRA8 intermediate and an extra ~0.05 ms conversion with VSR.
+- B. Disable flow with VSR, which blocks VSR + FG in 2.5/2.6.
+- C. Keep RGBA8 and add a second conversion.
+
+**Chosen: A**. Changing it: skip the conversion in
+`recordVideoSuperResolutionFrame`.
+
+#### D50 – The panel shows the last source frame, not overlay redraws (2.4)
+
+With the overlay visible, redraws were zeroing the flow and cadence stages.
+
+- A. Keep the last new frame's times per back buffer.
+- B. Show every present (flickers to 0.00).
+- C. Stop redrawing the overlay.
+
+**Chosen: A**. Changing it: remove `bufferShowedNewFrame_`.
+
+#### D51 – The cadence assumes a 60 fps container (2.4)
+
+The PS5 always sends 60 and `--play-file` doesn't pass its rate.
+
+- A. Fixed at 60 (a different `--fps` would read wrong).
+- B. Carry the rate through `FrameRenderer::Options`.
+
+**Chosen: A**. Changing it: transport the rate.
+
+#### D52 – In HDR the flow reads a BGRA8 copy of the 10-bit intermediate (merge 2.3 + 2.4)
+
+NvOF needs BGRA8 while PQ streams use a 10-bit intermediate.
+
+- A. One presenter with two intermediates (SDR BGRA8, PQ RGBA10) and, in HDR,
+  a per-buffer BGRA8 copy produced by a scale pass (tone-mapped for PQ),
+  written only when flow is on; the cadence shader reads the decoded luma
+  plane (R16 for P010, R8 for NV12).
+- B. Run the flow on the decoded frame or the swap chain.
+
+**Chosen: A**. Changing it: `FramePresenter`'s intermediate paths.

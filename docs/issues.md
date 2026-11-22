@@ -52,3 +52,14 @@
 - **Actual:** Windows lists the paired controller and SDL reports 0 gamepads,
   so the rail shows "Desconectado" and the controller can't be used until it
   wakes.
+
+## Parallel test runs share the owner's settings and logs
+
+- **Where:** any two `lynx-play.exe` instances started from different builds
+  (the step agents' tests).
+- **Steps:** run two builds at the same time; change settings in one.
+- **Expected:** each run is isolated.
+- **Actual:** every build reads `%APPDATA%\LynxPlay\settings.json` and writes
+  `%LOCALAPPDATA%\LynxPlay\lynx-play.log`, so one run overwrites the other's
+  settings (fields disappear) and the log lines interleave. Reproducible; a
+  verification hazard, not a runtime bug.
