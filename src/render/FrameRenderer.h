@@ -204,6 +204,9 @@ private:
     ComPtr<ID3D12GraphicsCommandList> flowCommandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> flowAllocators_;
     std::array<UINT64, SwapChain::kBufferCount> flowAllocatorFenceValues_{};
+    // Whether the frame each back buffer last showed was a new source frame;
+    // the statistics report the video pipeline, not an overlay redraw.
+    std::array<bool, SwapChain::kBufferCount> bufferShowedNewFrame_{};
     // The frame each back buffer's last commands read, kept until the GPU is
     // done with them.
     std::array<std::optional<VideoFrame>, SwapChain::kBufferCount> framesInFlight_;

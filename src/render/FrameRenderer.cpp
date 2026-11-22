@@ -547,7 +547,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     waitForFence(flowAllocatorFenceValues_.at(bufferIndex));
     framesInFlight_.at(bufferIndex).reset();
 
-    if (auto times = timer_->take(bufferIndex))
+    if (auto times = timer_->take(bufferIndex); times && bufferShowedNewFrame_.at(bufferIndex))
     {
         lastGpuTimes_ = *times;
     }
@@ -670,6 +670,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
     allocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
     flowAllocatorFenceValues_.at(bufferIndex) = lastSignaledFence_;
+    bufferShowedNewFrame_.at(bufferIndex) = showsNewFrame;
     framesInFlight_.at(bufferIndex) = shownFrame_;
 
     if (shownFrame_)
