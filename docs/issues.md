@@ -21,3 +21,14 @@
   resize the window to 960×600.
 - **Expected:** the grid scrolls so the focused card stays fully visible.
 - **Actual:** the card stays cut off at the bottom until the focus moves.
+
+## Direct discovery query drops the card when the console answers on one port only
+
+- **Where:** `src/remoteplay/ConsoleDiscovery.cpp`, the direct query added by
+  "Adicionar pelo IP".
+- **Steps:** add a console by IP whose host answers the PS5 discovery port
+  (UDP 9302) but not the PS4 one (UDP 987), while discovery runs.
+- **Expected:** the card shows the answer from 9302.
+- **Actual:** the ICMP port-unreachable from 987 surfaces as `WSAECONNRESET`,
+  the log says "Discovery thread failed to read from socket", discovery stops
+  and the card stays offline.
