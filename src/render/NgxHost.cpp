@@ -217,8 +217,8 @@ bool ngxFailed(NVSDK_NGX_Result result)
 void NVSDK_CONV ngxLog(const char* message, NVSDK_NGX_Logging_Level level,
                         NVSDK_NGX_Feature source)
 {
-    spdlog::info("NGX[{}:{}]: {}", static_cast<int>(source), static_cast<int>(level),
-                 message != nullptr ? message : "");
+    spdlog::debug("NGX[{}:{}]: {}", static_cast<int>(source), static_cast<int>(level),
+                  message != nullptr ? message : "");
 }
 
 std::filesystem::path applicationDataPath()
@@ -353,7 +353,7 @@ std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
     const std::wstring dataPathText = dataPath.wstring();
     NVSDK_NGX_FeatureCommonInfo common{};
     common.LoggingInfo.LoggingCallback = ngxLog;
-    common.LoggingInfo.MinimumLoggingLevel = NVSDK_NGX_LOGGING_LEVEL_VERBOSE;
+    common.LoggingInfo.MinimumLoggingLevel = NVSDK_NGX_LOGGING_LEVEL_ON;
     common.LoggingInfo.DisableOtherLoggingSinks = true;
 
     const NVSDK_NGX_Result result = NVSDK_NGX_D3D12_Init_with_ProjectID(
