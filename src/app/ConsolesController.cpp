@@ -1,6 +1,7 @@
 #include "app/ConsolesController.h"
 
 #include "app/ConsolePresentation.h"
+#include "app/StreamController.h"
 #include "remoteplay/ConsoleDiscovery.h"
 #include "remoteplay/ConsoleWake.h"
 #include "remoteplay/HostAddress.h"
@@ -84,10 +85,11 @@ std::expected<void, std::string> sendWakeupTo(const SavedConsole& console,
 
 ConsolesController::ConsolesController(bool remotePlayReady,
                                        std::optional<remoteplay::ConsoleStore> store,
-                                       QObject* parent)
+                                       StreamController& stream, QObject* parent)
     : QObject(parent),
       model_(this),
       pairing_(*this, this),
+      stream_(stream),
       store_(std::move(store)),
       remotePlayReady_(remotePlayReady)
 {
@@ -95,6 +97,8 @@ ConsolesController::ConsolesController(bool remotePlayReady,
     {
         file_ = store_->load();
     }
+
+    connect(&stream_, &StreamController::streamStarted, this, &ConsolesController::markPlayed);
 
     clockTimer_.setInterval(kClockInterval);
     connect(&clockTimer_, &QTimer::timeout, this, &ConsolesController::refreshModel);
@@ -270,9 +274,44 @@ void ConsolesController::forget(const QString& key)
 
 void ConsolesController::play(const QString& key)
 {
-    spdlog::info("Play requested on {}; streaming isn't available yet", key.toStdString());
-    emit notice(u"info"_s, u"O streaming ainda não chegou"_s,
-                u"Esta versão encontra, pareia e liga o PS5. Jogar chega na próxima versão."_s);
+    const SavedConsole* console = findSaved(key);
+    const DiscoveredHost* host = findDiscovered(key);
+
+    StreamController::Target target{
+        .key = key,
+        .name = consoleName({.saved = console, .discovered = host}),
+        .host = {},
+        .ps5 = true,
+        .credentials = std::nullopt,
+    };
+
+    if (console != nullptr)
+    {
+        target.host = console->address.empty() ? console->manualHost : console->address;
+        target.ps5 = console->ps5;
+        target.credentials = console->credentials;
+    }
+
+    if (host != nullptr)
+    {
+        target.host = host->address;
+    }
+
+    stream_.play(std::move(target));
+}
+
+void ConsolesController::markPlayed(const QString& key)
+{
+    SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return;
+    }
+
+    console->lastPlayed = Clock::now();
+    saveFile();
+    refreshModel();
 }
 
 void ConsolesController::wake(const QString& key)

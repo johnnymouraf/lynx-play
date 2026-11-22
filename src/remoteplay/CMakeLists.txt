@@ -25,10 +25,12 @@ add_library(lynx_remoteplay STATIC
     HostAddress.h
     Pin.cpp
     Pin.h
-    SecretProtector.h)
+    SecretProtector.h
+    StreamSession.cpp
+    StreamSession.h)
 add_library(Lynx::remoteplay ALIAS lynx_remoteplay)
 
 target_link_libraries(lynx_remoteplay
-    PUBLIC Lynx::core
-    PRIVATE chiaki-lib nlohmann_json::nlohmann_json crypt32 iphlpapi ws2_32)
+    PUBLIC Lynx::core Lynx::render
+    PRIVATE Lynx::media chiaki-lib nlohmann_json::nlohmann_json crypt32 iphlpapi ws2_32)
 lynx_set_warnings(lynx_remoteplay)

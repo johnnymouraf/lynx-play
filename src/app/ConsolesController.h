@@ -28,6 +28,8 @@ class ConsoleDiscovery;
 namespace lynx::app
 {
 
+class StreamController;
+
 // The consoles the home screen lists, saved and answering, and the actions
 // on them.
 class ConsolesController : public QObject
@@ -53,7 +55,7 @@ public:
 
     // Without a store, nothing is remembered after the app closes.
     ConsolesController(bool remotePlayReady, std::optional<remoteplay::ConsoleStore> store,
-                       QObject* parent = nullptr);
+                       StreamController& stream, QObject* parent = nullptr);
     ~ConsolesController() override;
 
     [[nodiscard]] ConsoleListModel* model();
@@ -81,6 +83,7 @@ public:
     // Saves a console that wasn't; an empty name shows the console's own.
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
+    // Connects to a paired console and plays on it.
     Q_INVOKABLE void play(const QString& key);
     // Sends the wake-up packet to a paired console in rest mode; its card shows
     // it turning on until it answers ready or the wait runs out.
@@ -117,6 +120,8 @@ private:
     void expireWake(const std::string& key, std::uint64_t timer);
     // Ends the wait for the consoles that now answer ready.
     void finishWakes();
+    // Remembers when the console was last played on.
+    void markPlayed(const QString& key);
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
@@ -129,6 +134,7 @@ private:
 
     ConsoleListModel model_;
     PairingController pairing_;
+    StreamController& stream_;
     std::optional<remoteplay::ConsoleStore> store_;
     remoteplay::ConsoleFile file_;
     std::unique_ptr<remoteplay::ConsoleDiscovery> discovery_;

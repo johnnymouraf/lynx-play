@@ -28,6 +28,8 @@ qt_add_executable(lynx-play WIN32
     QtLogBridge.h
     SettingsController.cpp
     SettingsController.h
+    StreamController.cpp
+    StreamController.h
     main.cpp)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -90,6 +92,8 @@ qt_add_qml_module(lynx-play
         qml/settings/SectionHeader.qml
         qml/settings/SettingsPage.qml
         qml/settings/VideoSettings.qml
+        qml/stream/ConnectingPage.qml
+        qml/stream/ConnectionStep.qml
     RESOURCES
         ${lynx_fonts}
         ${lynx_licenses}
@@ -98,10 +102,12 @@ qt_add_qml_module(lynx-play
         assets/icons/circle-check.svg
         assets/icons/circle-exclamation-point.svg
         assets/icons/circle-question-mark.svg
+        assets/icons/circle.svg
         assets/icons/clock.svg
         assets/icons/ellipsis.svg
         assets/icons/external-link.svg
         assets/icons/folder-open.svg
+        assets/icons/house-wifi.svg
         assets/icons/info.svg
         assets/icons/link-2.svg
         assets/icons/loader-circle.svg

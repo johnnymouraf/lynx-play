@@ -13,6 +13,7 @@ add_executable(lynx_tests
     remoteplay/HostAddressTests.cpp
     remoteplay/PairingFailureTests.cpp
     remoteplay/PinTests.cpp
+    remoteplay/StreamSessionTests.cpp
     render/AdapterSelectionTests.cpp
     render/ColorConversionTests.cpp
     render/FrameMailboxTests.cpp

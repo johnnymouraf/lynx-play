@@ -5,6 +5,7 @@
 #include "app/IconProvider.h"
 #include "app/QtLogBridge.h"
 #include "app/SettingsController.h"
+#include "app/StreamController.h"
 #include "app/Version.h"
 #include "core/Log.h"
 #include "core/Paths.h"
@@ -201,7 +202,9 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
-    lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore());
+    lynx::app::StreamController stream(settings);
+    lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore(),
+                                           stream);
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);
@@ -209,6 +212,7 @@ int main(int argc, char* argv[])
         {QStringLiteral("controller"), QVariant::fromValue(&controller)},
         {QStringLiteral("consoles"), QVariant::fromValue(&consoles)},
         {QStringLiteral("settings"), QVariant::fromValue(&settings)},
+        {QStringLiteral("stream"), QVariant::fromValue(&stream)},
     });
 
     QObject::connect(
