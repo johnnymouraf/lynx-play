@@ -16,8 +16,10 @@ TEST_CASE("S10.5 flow vectors become pixels")
     CHECK(flowVectorPixels(16, 0).x == Catch::Approx(0.5F));
     CHECK(flowVectorPixels(0, 0).x == Catch::Approx(0.0F));
     CHECK(flowVectorPixels(-1, 1).x == Catch::Approx(-1.0F / 32.0F));
-    CHECK(flowVectorPixels(32'767, -32'768).x == Catch::Approx(32'767.0F / 32.0F));
-    CHECK(flowVectorPixels(32'767, -32'768).y == Catch::Approx(-1'024.0F));
+    CHECK(flowVectorPixels(static_cast<std::int16_t>(32'767), static_cast<std::int16_t>(-32'768))
+              .x == Catch::Approx(32'767.0F / 32.0F));
+    CHECK(flowVectorPixels(static_cast<std::int16_t>(32'767), static_cast<std::int16_t>(-32'768))
+              .y == Catch::Approx(-1'024.0F));
 }
 
 TEST_CASE("The vector grid rounds the picture up to whole cells")

@@ -179,13 +179,15 @@ bool supports(const std::vector<DXGI_FORMAT>& formats, DXGI_FORMAT format)
     return std::ranges::find(formats, format) != formats.end();
 }
 
+// nvOFGetCaps takes the number of uint32 elements, not bytes: a scalar is
+// one, and a list follows the two-call protocol.
 std::expected<std::uint32_t, std::string> cap(const NV_OF_D3D12_API_FUNCTION_LIST& functions,
                                              NvOFHandle handle, NV_OF_CAPS name)
 {
     std::uint32_t value = 0;
-    std::uint32_t size = sizeof(value);
+    std::uint32_t count = 1;
 
-    if (const NV_OF_STATUS status = functions.nvOFGetCaps(handle, name, &value, &size);
+    if (const NV_OF_STATUS status = functions.nvOFGetCaps(handle, name, &value, &count);
         status != NV_OF_SUCCESS)
     {
         return std::unexpected(std::string(statusName(status)));
@@ -197,27 +199,25 @@ std::expected<std::uint32_t, std::string> cap(const NV_OF_D3D12_API_FUNCTION_LIS
 bool supportsGrid(const NV_OF_D3D12_API_FUNCTION_LIST& functions, NvOFHandle handle,
                   std::uint32_t grid)
 {
-    std::array<std::uint32_t, 8> sizes{};
-    std::uint32_t bytes = sizeof(sizes);
+    std::uint32_t count = 0;
 
-    if (functions.nvOFGetCaps(handle, NV_OF_CAPS_SUPPORTED_OUTPUT_GRID_SIZES, sizes.data(),
-                               &bytes) != NV_OF_SUCCESS)
+    if (functions.nvOFGetCaps(handle, NV_OF_CAPS_SUPPORTED_OUTPUT_GRID_SIZES, nullptr, &count) !=
+            NV_OF_SUCCESS ||
+        count == 0 || count > 64)
     {
         return false;
     }
 
-    const std::size_t count =
-        std::min(sizes.size(), static_cast<std::size_t>(bytes) / sizeof(sizes.front()));
+    std::vector<std::uint32_t> sizes(count);
+    std::uint32_t filled = count;
 
-    for (std::size_t index = 0; index < count; ++index)
+    if (functions.nvOFGetCaps(handle, NV_OF_CAPS_SUPPORTED_OUTPUT_GRID_SIZES, sizes.data(),
+                               &filled) != NV_OF_SUCCESS)
     {
-        if (sizes.at(index) == grid)
-        {
-            return true;
-        }
+        return false;
     }
 
-    return false;
+    return std::ranges::find(sizes, grid) != sizes.end();
 }
 
 std::string lastError(const NV_OF_D3D12_API_FUNCTION_LIST& functions, NvOFHandle handle)

@@ -47,7 +47,8 @@ ColumnLayout {
         label: "Optical Flow"
         description: section.settings.opticalFlowAvailable
                      ? "Calcula os vetores de movimento entre os quadros. Identifica os quadros "
-                       + "repetidos dos jogos de 30 fps; o frame generation usa os vetores."
+                       + "repetidos dos jogos de 30 fps e prepara os vetores para o frame "
+                       + "generation."
                      : "Indisponível: " + section.settings.opticalFlowUnavailableReason
 
         Toggle {
