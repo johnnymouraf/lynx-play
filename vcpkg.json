@@ -8,6 +8,7 @@
     "json-c",
     "libevent",
     "miniupnpc",
+    "nlohmann-json",
     "openssl",
     "opus",
     "spdlog",

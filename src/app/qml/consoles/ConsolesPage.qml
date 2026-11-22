@@ -15,7 +15,6 @@ FocusScope {
 
     signal addByAddressRequested
     signal pairRequested(string key, string name)
-    signal menuRequested(string key, string name, bool saved, Item anchor)
 
     function focusFirstControl() {
         if (page.hasConsoles) {
@@ -193,11 +192,10 @@ FocusScope {
 
                             width: cardsArea.cardWidth
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
+                            onPlayRequested: page.consoles.play(consoleCard.key)
                             onPairRequested: page.pairRequested(consoleCard.key, consoleCard.name)
-                            onMenuRequested: anchor => page.menuRequested(consoleCard.key,
-                                                                          consoleCard.name,
-                                                                          consoleCard.saved,
-                                                                          anchor)
+                            onRefreshRequested: page.consoles.refresh(consoleCard.key)
+                            onMenuRequested: anchor => cardMenu.openFor(consoleCard, anchor)
                         }
                     }
                 }
@@ -219,5 +217,49 @@ FocusScope {
                 }
             }
         }
+    }
+
+    PopupMenu {
+        id: cardMenu
+
+        property string consoleKey
+        property string consoleName
+        property bool consoleSaved
+
+        function openFor(card, anchor) {
+            cardMenu.consoleKey = card.key;
+            cardMenu.consoleName = card.name;
+            cardMenu.consoleSaved = card.saved;
+            cardMenu.parent = anchor;
+            cardMenu.x = anchor.width - cardMenu.width;
+            cardMenu.y = anchor.height + Theme.space1;
+            cardMenu.open();
+        }
+
+        MenuRow {
+            text: "Renomear"
+            iconName: "pencil"
+            onTriggered: renameDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
+        }
+
+        MenuRow {
+            text: "Esquecer"
+            iconName: "trash"
+            danger: true
+            enabled: cardMenu.consoleSaved
+            onTriggered: forgetDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
+        }
+    }
+
+    RenameDialog {
+        id: renameDialog
+
+        onRenameRequested: (key, name) => page.consoles.rename(key, name)
+    }
+
+    ForgetDialog {
+        id: forgetDialog
+
+        onForgetRequested: key => page.consoles.forget(key)
     }
 }

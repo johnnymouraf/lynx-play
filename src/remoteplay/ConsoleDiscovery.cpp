@@ -150,6 +150,17 @@ std::vector<sockaddr_storage> broadcastAddresses()
             address.sin_addr.s_addr |= htonl(hostMask);
             address.sin_port = 0;
 
+            // Ethernet and Wi-Fi on the same network share its broadcast address.
+            const bool listed = std::ranges::any_of(addresses, [&address](const auto& stored) {
+                const auto& known = reinterpret_cast<const sockaddr_in&>(stored);
+                return known.sin_addr.s_addr == address.sin_addr.s_addr;
+            });
+
+            if (listed)
+            {
+                continue;
+            }
+
             sockaddr_storage storage{};
             std::memcpy(&storage, &address, sizeof(address));
             addresses.push_back(storage);
@@ -382,6 +393,11 @@ void ConsoleDiscovery::setManualHosts(const std::vector<std::string>& hosts)
             added.push_back(service.get());
             state_->manual.emplace(host, std::move(service));
         }
+    }
+
+    if (stopped.empty() && added.empty())
+    {
+        return;
     }
 
     for (const auto& service : stopped)

@@ -37,7 +37,12 @@ gh run download --repo johnnymouraf/lynx-play --name lynx-play-windows-x64
 ```
 
 Extract the zip anywhere and run `lynx-play.exe`. Logs are written to
-`%LOCALAPPDATA%\LynxPlay\logs`.
+`%LOCALAPPDATA%\LynxPlay\logs`. The saved and paired consoles live in
+`%APPDATA%\LynxPlay\consoles.json`, with their keys and the PSN account ID
+encrypted for the current Windows user (DPAPI).
+
+The first run asks Windows Firewall to let Lynx Play use the network: allow it,
+or the consoles' answers to the network search never reach the app.
 
 ## Requirements
 

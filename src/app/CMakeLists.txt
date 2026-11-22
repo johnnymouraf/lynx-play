@@ -12,6 +12,8 @@ qt_add_executable(lynx-play WIN32
     AppController.h
     ConsoleListModel.cpp
     ConsoleListModel.h
+    ConsolePresentation.cpp
+    ConsolePresentation.h
     ConsolesController.cpp
     ConsolesController.h
     Fonts.cpp
@@ -49,6 +51,8 @@ qt_add_qml_module(lynx-play
         qml/consoles/ConsolesPage.qml
         qml/consoles/DiscoveryBanner.qml
         qml/consoles/EmptyState.qml
+        qml/consoles/ForgetDialog.qml
+        qml/consoles/RenameDialog.qml
         qml/controls/ActionButton.qml
         qml/controls/AppRail.qml
         qml/controls/AppText.qml

@@ -1,7 +1,11 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(lynx_tests
+    remoteplay/AccountIdTests.cpp
     remoteplay/ChiakiRuntimeTests.cpp
+    remoteplay/ConsoleMergeTests.cpp
+    remoteplay/ConsoleStoreTests.cpp
+    remoteplay/PinTests.cpp
     render/AdapterSelectionTests.cpp)
 
 target_link_libraries(lynx_tests PRIVATE

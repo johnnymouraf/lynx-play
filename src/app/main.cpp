@@ -7,6 +7,7 @@
 #include "core/Log.h"
 #include "core/Paths.h"
 #include "remoteplay/ChiakiRuntime.h"
+#include "remoteplay/ConsoleStore.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
 
@@ -15,6 +16,7 @@
 #include <QVariantMap>
 
 #include <cstdlib>
+#include <optional>
 
 #include <spdlog/spdlog.h>
 
@@ -57,6 +59,20 @@ bool startRemotePlay()
 
     spdlog::info("chiaki-lib initialized");
     return true;
+}
+
+std::optional<lynx::remoteplay::ConsoleStore> openConsoleStore()
+{
+    const auto dataDir = lynx::core::roamingDataDir();
+
+    if (!dataDir)
+    {
+        spdlog::error("Saved consoles are unavailable: {}", dataDir.error());
+        return std::nullopt;
+    }
+
+    return lynx::remoteplay::ConsoleStore(*dataDir / "consoles.json",
+                                          lynx::remoteplay::dpapiProtector());
 }
 
 QString findStreamGpu()
@@ -103,7 +119,7 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
-    lynx::app::ConsolesController consoles(controller.remotePlayReady());
+    lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore());
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);

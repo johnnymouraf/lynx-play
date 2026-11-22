@@ -22,13 +22,10 @@ struct CoTaskMemDeleter
     }
 };
 
-} // namespace
-
-std::expected<std::filesystem::path, std::string> localDataDir()
+std::expected<std::filesystem::path, std::string> appFolderIn(const KNOWNFOLDERID& knownFolderId)
 {
     wchar_t* rawPath = nullptr;
-    const HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr,
-                                                &rawPath);
+    const HRESULT result = SHGetKnownFolderPath(knownFolderId, KF_FLAG_DEFAULT, nullptr, &rawPath);
     const std::unique_ptr<wchar_t, CoTaskMemDeleter> knownFolder(rawPath);
 
     if (FAILED(result))
@@ -37,6 +34,18 @@ std::expected<std::filesystem::path, std::string> localDataDir()
     }
 
     return std::filesystem::path(knownFolder.get()) / kAppFolderName;
+}
+
+} // namespace
+
+std::expected<std::filesystem::path, std::string> localDataDir()
+{
+    return appFolderIn(FOLDERID_LocalAppData);
+}
+
+std::expected<std::filesystem::path, std::string> roamingDataDir()
+{
+    return appFolderIn(FOLDERID_RoamingAppData);
 }
 
 } // namespace lynx::core
