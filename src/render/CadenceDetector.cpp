@@ -7,6 +7,10 @@
 namespace lynx::render
 {
 
+CadenceDetector::CadenceDetector() : CadenceDetector(Options{})
+{
+}
+
 CadenceDetector::CadenceDetector(Options options) : options_(options)
 {
 }

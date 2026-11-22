@@ -1,5 +1,6 @@
 #include "render/CadenceMetric.h"
 
+#include "render/Layout.h"
 #include "render/shaders/CadenceComputeShader.h"
 
 #include <algorithm>

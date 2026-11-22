@@ -66,7 +66,8 @@ public:
         std::size_t windowFrames = 0;
     };
 
-    explicit CadenceDetector(Options options = {});
+    CadenceDetector();
+    explicit CadenceDetector(Options options);
 
     // Adds one frame's comparison to the windows.
     Decision observe(const CadenceSample& sample);
