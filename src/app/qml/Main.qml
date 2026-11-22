@@ -10,6 +10,7 @@ ApplicationWindow {
     required property ConsolesController consoles
     required property SettingsController settings
     required property StreamController stream
+    required property InputController input
 
     property string section: "consoles"
 
@@ -68,26 +69,44 @@ ApplicationWindow {
             AppRail {
                 Layout.fillHeight: true
                 section: window.section
+                controllerConnected: window.input.controllerConnected
+                controllerTitle: window.input.controllerTitle
+                controllerDetail: window.input.controllerDetail
+                controllerBatteryLow: window.input.controllerBatteryLow
                 onSectionRequested: requested => window.section = requested
             }
 
-            StackLayout {
-                id: sections
+            ColumnLayout {
+                id: contentArea
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: window.section === "consoles" ? 0 : 1
+                spacing: 0
 
-                ConsolesPage {
-                    id: consolesPage
+                StackLayout {
+                    id: sections
 
-                    consoles: window.consoles
-                    onToastRequested: (tone, title, message) => toast.show(tone, title, message)
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    currentIndex: window.section === "consoles" ? 0 : 1
+
+                    ConsolesPage {
+                        id: consolesPage
+
+                        consoles: window.consoles
+                        onToastRequested: (tone, title, message) => toast.show(tone, title, message)
+                    }
+
+                    SettingsPage {
+                        controller: window.controller
+                        settings: window.settings
+                        input: window.input
+                    }
                 }
 
-                SettingsPage {
-                    controller: window.controller
-                    settings: window.settings
+                ControllerHintBar {
+                    Layout.fillWidth: true
+                    visible: window.input.controllerConnected && window.section === "consoles"
                 }
             }
         }
@@ -103,8 +122,8 @@ ApplicationWindow {
     Toast {
         id: toast
 
-        x: sections.x + (sections.width - width) / 2
+        x: contentArea.x + (contentArea.width - width) / 2
         y: window.height - height - Theme.space6
-        width: Math.min(400, sections.width - 2 * Theme.space8)
+        width: Math.min(400, contentArea.width - 2 * Theme.space8)
     }
 }

@@ -22,6 +22,8 @@ qt_add_executable(lynx-play WIN32
     Fonts.h
     IconProvider.cpp
     IconProvider.h
+    InputController.cpp
+    InputController.h
     PairingController.cpp
     PairingController.h
     QtLogBridge.cpp
@@ -68,6 +70,7 @@ qt_add_qml_module(lynx-play
         qml/controls/AppText.qml
         qml/controls/Banner.qml
         qml/controls/BrandLogo.qml
+        qml/controls/ControllerHintBar.qml
         qml/controls/DialogShell.qml
         qml/controls/FocusRing.qml
         qml/controls/Icon.qml
@@ -82,13 +85,17 @@ qt_add_qml_module(lynx-play
         qml/controls/ScanIndicator.qml
         qml/controls/SegmentItem.qml
         qml/controls/SegmentedControl.qml
+        qml/controls/Select.qml
         qml/controls/SettingRow.qml
         qml/controls/Spinner.qml
         qml/controls/StateBadge.qml
         qml/controls/ThinScrollBar.qml
         qml/controls/Toast.qml
+        qml/controls/Toggle.qml
         qml/controls/ValueSlider.qml
         qml/settings/AboutSettings.qml
+        qml/settings/AudioSettings.qml
+        qml/settings/ControllerSettings.qml
         qml/settings/RtxSettings.qml
         qml/settings/SectionHeader.qml
         qml/settings/SettingsPage.qml
@@ -99,6 +106,7 @@ qt_add_qml_module(lynx-play
         ${lynx_fonts}
         ${lynx_licenses}
         assets/icons/check.svg
+        assets/icons/chevron-down.svg
         assets/icons/chevron-right.svg
         assets/icons/circle-check.svg
         assets/icons/circle-exclamation-point.svg
@@ -108,11 +116,13 @@ qt_add_qml_module(lynx-play
         assets/icons/ellipsis.svg
         assets/icons/external-link.svg
         assets/icons/folder-open.svg
+        assets/icons/gamepad-2.svg
         assets/icons/house-wifi.svg
         assets/icons/info.svg
         assets/icons/link-2.svg
         assets/icons/loader-circle.svg
         assets/icons/lock-keyhole.svg
+        assets/icons/menu.svg
         assets/icons/monitor-play.svg
         assets/icons/monitor.svg
         assets/icons/moon.svg
@@ -126,8 +136,11 @@ qt_add_qml_module(lynx-play
         assets/icons/scroll-text.svg
         assets/icons/settings.svg
         assets/icons/sparkles.svg
+        assets/icons/square.svg
         assets/icons/trash.svg
+        assets/icons/triangle.svg
         assets/icons/tv-minimal-play.svg
+        assets/icons/volume-2.svg
         assets/icons/wifi-off.svg
         assets/icons/x.svg
         assets/images/brand-mark.png
@@ -139,7 +152,9 @@ target_include_directories(lynx-play PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx-play PRIVATE
+    Lynx::audio
     Lynx::core
+    Lynx::input
     Lynx::media
     Lynx::remoteplay
     Lynx::render

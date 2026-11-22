@@ -7,6 +7,8 @@ Rectangle {
     id: badge
 
     property string status: "offline"
+    // Replaces the status's default text when set.
+    property string label: ""
 
     readonly property var looks: ({
         ready: { icon: "circle-check", color: Theme.ready, fill: Theme.readySubtle, label: "Pronto" },
@@ -17,13 +19,14 @@ Rectangle {
         error: { icon: "circle-exclamation-point", color: Theme.danger, fill: Theme.dangerSubtle, label: "Erro" }
     })
     readonly property var look: looks[status]
+    readonly property string displayLabel: badge.label.length > 0 ? badge.label : badge.look.label
 
     implicitWidth: row.implicitWidth + 2 * Theme.space2
     implicitHeight: 28
     radius: Theme.radiusFull
     color: badge.look.fill
     Accessible.role: Accessible.StaticText
-    Accessible.name: badge.look.label
+    Accessible.name: badge.displayLabel
 
     Row {
         id: row
@@ -41,7 +44,7 @@ Rectangle {
 
         AppText {
             anchors.verticalCenter: parent.verticalCenter
-            text: badge.look.label
+            text: badge.displayLabel
             textStyle: "caption"
             color: badge.look.color
         }

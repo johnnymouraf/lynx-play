@@ -20,6 +20,7 @@
     "nlohmann-json",
     "openssl",
     "opus",
+    "sdl3",
     "spdlog",
     {
       "name": "pkgconf",

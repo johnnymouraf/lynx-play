@@ -1,11 +1,14 @@
 #include "app/StreamController.h"
 
 #include "app/Fonts.h"
+#include "app/InputController.h"
 #include "app/SettingsController.h"
+#include "input/GamepadManager.h"
 
 #include <QGuiApplication>
 #include <QWindow>
 
+#include <string>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -105,8 +108,9 @@ HWND focusedWindow()
 
 } // namespace
 
-StreamController::StreamController(const SettingsController& settings, QObject* parent)
-    : QObject(parent), settings_(settings)
+StreamController::StreamController(SettingsController& settings, InputController& input,
+                                   QObject* parent)
+    : QObject(parent), settings_(settings), input_(input)
 {
     connect(&settings_, &SettingsController::rtxChanged, this,
             [this]
@@ -115,6 +119,27 @@ StreamController::StreamController(const SettingsController& settings, QObject* 
                 {
                     window_->setReflexMode(settings_.reflexMode());
                 }
+            });
+
+    connect(&settings_, &SettingsController::audioChanged, this,
+            [this]
+            {
+                if (session_ == nullptr)
+                {
+                    return;
+                }
+
+                session_->setVolumePercent(settings_.volumePercent());
+                session_->setMicrophoneMuted(settings_.microphoneMuted());
+            });
+
+    connect(&input_, &InputController::microphoneButtonPressed, this,
+            [this]
+            {
+                const bool muted = !settings_.microphoneMuted();
+                settings_.setMicrophoneMuted(muted);
+                emit notice(u"info"_s, muted ? u"Microfone silenciado"_s : u"Microfone ativado"_s,
+                            QString());
             });
 }
 
@@ -221,6 +246,8 @@ void StreamController::startSession()
         .ps5 = target.ps5,
         .credentials = *target.credentials,
         .video = settings_.video(),
+        .audio = settings_.audio(),
+        .gamepads = input_.gamepads(),
     };
     auto started = remoteplay::StreamSession::start(*gpu, *mailbox, request, eventsFor(session));
 
@@ -244,6 +271,31 @@ remoteplay::StreamSession::Events StreamController::eventsFor(std::uint64_t sess
         .onFirstPicture = [this, session] { post([this, session] { onFirstPicture(session); }); },
         .onEnded = [this, session](SessionEnd end, const std::string&)
         { post([this, session, end] { onEnded(session, end); }); },
+        .onMicrophoneMuted = [this, session](bool muted)
+        {
+            post(
+                [this, session, muted]
+                {
+                    if (session == sessionNumber_)
+                    {
+                        settings_.setMicrophoneMuted(muted);
+                    }
+                });
+        },
+        .onNotice = [this, session](std::string title, std::string message)
+        {
+            post(
+                [this, session, title = std::move(title), message = std::move(message)]
+                {
+                    if (session != sessionNumber_)
+                    {
+                        return;
+                    }
+
+                    emit notice(u"standby"_s, QString::fromStdString(title),
+                                QString::fromStdString(message));
+                });
+        },
     };
 }
 

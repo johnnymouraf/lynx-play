@@ -11,6 +11,11 @@
 #include <memory>
 #include <string>
 
+namespace lynx::input
+{
+class GamepadManager;
+}
+
 namespace lynx::remoteplay
 {
 
@@ -57,6 +62,9 @@ struct SessionRequest
     bool ps5 = true;
     Credentials credentials;
     core::VideoSettings video;
+    core::AudioSettings audio;
+    // The controllers that drive the console; owned by the app. May be null.
+    input::GamepadManager* gamepads = nullptr;
 };
 
 // A Remote Play session with a paired console, through chiaki-lib, its video
@@ -64,12 +72,17 @@ struct SessionRequest
 class StreamSession
 {
 public:
-    // Each is called at most once, on chiaki's threads.
+    // Called from the session's threads; the interface posts them to its own.
     struct Events
     {
         std::function<void()> onConnected;
         std::function<void()> onFirstPicture;
         std::function<void(SessionEnd end, std::string detail)> onEnded;
+        // The microphone changed state on its own (it was lost, or could not
+        // open); the interface keeps its toggle in sync.
+        std::function<void(bool muted)> onMicrophoneMuted;
+        // A problem worth telling the player about, without ending the stream.
+        std::function<void(std::string title, std::string message)> onNotice;
     };
 
     [[nodiscard]] static std::expected<std::unique_ptr<StreamSession>, std::string> start(
@@ -84,6 +97,11 @@ public:
     // Stops the session if it still runs and waits for chiaki's threads. Never
     // call it from an event.
     ~StreamSession();
+
+    // Applies the interface's microphone toggle to the running console
+    // connection.
+    void setMicrophoneMuted(bool muted);
+    void setVolumePercent(int percent);
 
 private:
     struct State;

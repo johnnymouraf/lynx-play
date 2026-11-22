@@ -9,10 +9,11 @@ Item {
 
     required property AppController controller
     required property SettingsController settings
+    required property InputController input
 
     property string section: "video"
     // The sections the StackLayout below holds, in order.
-    readonly property var sectionIds: ["video", "rtx", "about"]
+    readonly property var sectionIds: ["video", "audio", "controls", "rtx", "about"]
 
     RowLayout {
         anchors.fill: parent
@@ -44,6 +45,22 @@ Item {
                     iconName: "monitor"
                     selected: page.section === "video"
                     onClicked: page.section = "video"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    text: "Áudio e microfone"
+                    iconName: "volume-2"
+                    selected: page.section === "audio"
+                    onClicked: page.section = "audio"
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    text: "Controles"
+                    iconName: "gamepad-2"
+                    selected: page.section === "controls"
+                    onClicked: page.section = "controls"
                 }
 
                 NavItem {
@@ -82,7 +99,8 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: width
-            contentHeight: sections.children[sections.currentIndex].implicitHeight + 2 * Theme.space8
+            contentHeight: sections.children[sections.currentIndex].implicitHeight
+                           + 2 * Theme.space8
             clip: true
             boundsBehavior: Flickable.StopAtBounds
 
@@ -98,6 +116,15 @@ Item {
 
                 VideoSettings {
                     settings: page.settings
+                }
+
+                AudioSettings {
+                    settings: page.settings
+                }
+
+                ControllerSettings {
+                    settings: page.settings
+                    input: page.input
                 }
 
                 RtxSettings {

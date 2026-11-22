@@ -3,9 +3,12 @@
 #include "app/FilePlayback.h"
 #include "app/Fonts.h"
 #include "app/IconProvider.h"
+#include "app/InputController.h"
 #include "app/QtLogBridge.h"
 #include "app/SettingsController.h"
 #include "app/StreamController.h"
+#include "input/GamepadManager.h"
+#include "input/Sdl.h"
 #include "app/Version.h"
 #include "core/Log.h"
 #include "core/Paths.h"
@@ -23,7 +26,9 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <optional>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -202,7 +207,32 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
-    lynx::app::StreamController stream(settings);
+    auto sdl = lynx::input::SdlRuntime::create();
+
+    if (!sdl)
+    {
+        spdlog::error("Controllers and audio are unavailable: {}", sdl.error());
+    }
+
+    std::unique_ptr<lynx::input::GamepadManager> gamepads;
+
+    if (sdl)
+    {
+        auto created = lynx::input::GamepadManager::create(
+            settings.preferredController().toStdString());
+
+        if (created)
+        {
+            gamepads = std::move(*created);
+        }
+        else
+        {
+            spdlog::error("Controllers are unavailable: {}", created.error());
+        }
+    }
+
+    lynx::app::InputController input(settings, std::move(gamepads), sdl.has_value());
+    lynx::app::StreamController stream(settings, input);
     lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore(),
                                            stream);
 
@@ -213,6 +243,7 @@ int main(int argc, char* argv[])
         {QStringLiteral("consoles"), QVariant::fromValue(&consoles)},
         {QStringLiteral("settings"), QVariant::fromValue(&settings)},
         {QStringLiteral("stream"), QVariant::fromValue(&stream)},
+        {QStringLiteral("input"), QVariant::fromValue(&input)},
     });
 
     QObject::connect(

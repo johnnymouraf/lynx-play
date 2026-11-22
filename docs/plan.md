@@ -11,7 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [1.3 Video](#13-video)
   - [1.4 Audio, DualSense and microphone](#14-audio-dualsense-and-microphone)
   - [1.5 Keyboard/mouse, overlay and stats](#15-keyboardmouse-overlay-and-stats)
   - [2.1 Reflex + Boost and the effects pipeline](#21-reflex--boost-and-the-effects-pipeline)
@@ -27,7 +26,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.2 Consoles** [auto]: LAN discovery, wake from rest mode, pairing
         (Account ID + PIN), saved consoles, manual IP, screens from the Drafia
         design.
-  - [ ] **1.3 Video** [auto]: streaming session, hardware H.265/H.264 decode
+  - [x] **1.3 Video** [auto]: streaming session, hardware H.265/H.264 decode
         straight into D3D12, low-latency presentation, 1080p60 at the highest
         bitrate.
   - [ ] **1.4 Audio, DualSense and microphone** [auto]: low-latency audio;
@@ -143,72 +142,6 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-### 1.3 Video
-
-- **Goal:** "Jogar" on a paired console opens the stream window and plays the
-  PS5's video, decoded by the GPU and presented with minimal latency; a
-  developer file source plays a local H.265/H.264 stream through the same
-  path.
-- **Guardrails:** no audio or input yet (1.4); no overlay (1.5); no RTX
-  features (phase 2); keep the "Teste de vídeo" test pattern working.
-- **Success criteria:**
-  1. CI green on `auto/1.3`, unit tests included.
-  2. `lynx-play.exe --play-file <file.h265|file.h264> [--fps 60]` opens the
-     stream window and plays the file in a loop through the real decoder and
-     renderer; the log shows hardware decoding (D3D12VA), the decoded and
-     presented frame rates (about 60 for a 60 fps file) and the decode time
-     per frame. Checked with a 1080p60 H.265 test stream and a 720p H.264 one.
-  3. The picture is correct: a screenshot of the window shows the test
-     pattern with correct colors (BT.709, limited range) and no stretching
-     (aspect ratio kept, black bars when the window's shape differs).
-  4. Resizing, F11/Alt+Enter fullscreen and Esc keep working during playback,
-     and closing the window frees the decoder (no crash, log shows teardown).
-  5. Video settings (resolution 1080p/720p/540p/360p, 60/30 fps, H.265/H.264,
-     bitrate, "VSync" vs "Menor latência") are saved in
-     `%APPDATA%\LynxPlay\settings.json` and shown on the Configurações › Vídeo
-     screen from the design.
-  6. Owner checks: streaming from the real PS5 at 1080p60 H.265, and the
-     highest bitrate the console accepts.
-- **Deliveries:**
-  1. Frame source abstraction and the renderer drawing decoded NV12/P010
-     frames: YUV→RGB shader (HLSL compiled at build time with the Windows SDK
-     `fxc`/`dxc`), aspect-ratio-preserving scaling, the test pattern kept as a
-     source.
-  2. Decoder: FFmpeg from vcpkg (only the needed features: avcodec, avutil,
-     H.264/HEVC, D3D12VA — check the port's feature names) creating its D3D12
-     device context from the renderer's `ID3D12Device`, low-delay flags, no
-     frame threading.
-  3. File source and the `--play-file` flag: reads an Annex B elementary
-     stream, splits access units, paces them at the given fps.
-  4. Settings store and the Vídeo screen.
-  5. Session: `ChiakiSession` with the saved credentials and video profile;
-     its video callback feeding the decoder; connect/quit events to the
-     interface ("Conectando…", quit reason); "Jogar" opens the stream window.
-- **Settled in planning:** defaults 1080p, 60 fps, H.265, the highest bitrate
-  the console accepts on the LAN; the stream window opens borderless
-  fullscreen on the monitor the main window is on.
-  From 1.2 (D12, D14): the minimal Configurações page
-  (`qml/settings/SettingsPage.qml`) becomes the design's Configurações with
-  the Vídeo and Sobre sections, and "Teste de vídeo" moves to Sobre; "Jogar"
-  stops showing the "not there yet" toast and starts the session
-  (`ConsolesController::play`).
-- **Changes:** `src/render/` (frame presenter, shaders), a new `src/media/`
-  (decoder, frame source interface, file source), `src/remoteplay/` (session),
-  `src/core/` (settings store), `src/app/` (controller actions, Vídeo
-  settings screen, connecting screen), `vcpkg.json` (ffmpeg),
-  `.github/workflows/build.yml` only if shader tools need it. Reference:
-  `third_party/chiaki-ng/gui/src/streamsession.cpp` and
-  `lib/src/ffmpegdecoder.c`.
-- **Data and interfaces:** `settings.json` with a `version` field and a
-  `video` object (resolution, fps, codec, bitrateKbps, presentMode).
-  Decoded frames carry the texture, its format, color space/range and a
-  timestamp.
-- **Edge cases:** decoder can't use D3D12VA (log, fall back to D3D11VA or show
-  an error, never silently to software at 1080p60); corrupt data or packet
-  loss (request an IDR with `chiaki_session_request_idr`); resolution change
-  mid-stream; device removed; the console refusing the connection or the
-  session ending (quit reason shown); the window closed during connect.
 
 ### 1.4 Audio, DualSense and microphone
 
@@ -543,4 +476,20 @@ A console added by IP that doesn't answer discovery would never show the
 - B. Pair only consoles that answer discovery.
 
 **Chosen: A**. Changing it: remove that menu row in `ConsolesPage.qml`.
+
+#### D17 – Report a session's end from the interface, not the video thread (1.3)
+
+- A. Call `chiaki_session_stop` from the video callback: risks a deadlock.
+- B. Report the end to the interface and stop the session from the UI thread.
+
+**Chosen: B**. Changing it: call stop in the callback and drop the `endReported`
+guard.
+
+#### D18 – Cancel only while connecting (1.3)
+
+- A. Cancel at any session phase.
+- B. Cancel and Esc act only in Connecting, StartingVideo and Failed, because
+  Esc belongs to the stream window during playback.
+
+**Chosen: B**. Changing it: remove the three-line phase guard.
 

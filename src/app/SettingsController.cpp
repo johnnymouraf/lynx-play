@@ -1,8 +1,11 @@
 #include "app/SettingsController.h"
 
+#include "audio/Devices.h"
+
 #include <algorithm>
 #include <array>
 #include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
@@ -70,6 +73,16 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
 const core::VideoSettings& SettingsController::video() const
 {
     return settings_.video;
+}
+
+const core::AudioSettings& SettingsController::audio() const
+{
+    return settings_.audio;
+}
+
+const core::ControllerSettings& SettingsController::controller() const
+{
+    return settings_.controller;
 }
 
 render::PresentTiming SettingsController::presentTiming() const
@@ -167,6 +180,121 @@ int SettingsController::maxBitrateMbps() const
     return static_cast<int>(core::kMaxBitrateKbps) / kKbpsPerMbps;
 }
 
+void SettingsController::refreshAudioDevices()
+{
+    const std::vector<audio::AudioDeviceInfo> outputs = audio::outputDevices();
+    const std::vector<audio::AudioDeviceInfo> microphones = audio::inputDevices();
+    QStringList outputNames;
+    QStringList microphoneNames;
+
+    for (const audio::AudioDeviceInfo& device : outputs)
+    {
+        outputNames << QString::fromStdString(device.name);
+    }
+
+    for (const audio::AudioDeviceInfo& device : microphones)
+    {
+        microphoneNames << QString::fromStdString(device.name);
+    }
+
+    const bool changed =
+        outputNames != outputDevices_ || microphoneNames != microphoneDevices_;
+    outputDevices_ = outputNames;
+    microphoneDevices_ = microphoneNames;
+
+    if (!devicesLogged_ || changed)
+    {
+        for (const audio::AudioDeviceInfo& device : outputs)
+        {
+            spdlog::info("Audio output '{}': {} Hz, {} channels", device.name, device.sampleRate,
+                         device.channels);
+        }
+
+        for (const audio::AudioDeviceInfo& device : microphones)
+        {
+            spdlog::info("Audio input '{}': {} Hz, {} channels", device.name, device.sampleRate,
+                         device.channels);
+        }
+
+        devicesLogged_ = true;
+    }
+
+    if (changed)
+    {
+        emit audioDevicesChanged();
+    }
+}
+
+QStringList SettingsController::outputDevices() const
+{
+    return outputDevices_;
+}
+
+QStringList SettingsController::microphoneDevices() const
+{
+    return microphoneDevices_;
+}
+
+QString SettingsController::outputDevice() const
+{
+    return QString::fromStdString(settings_.audio.outputDevice);
+}
+
+void SettingsController::setOutputDevice(const QString& name)
+{
+    core::AudioSettings audio = settings_.audio;
+    audio.outputDevice = name.toStdString();
+    apply(audio);
+}
+
+QString SettingsController::microphoneDevice() const
+{
+    return QString::fromStdString(settings_.audio.microphoneDevice);
+}
+
+void SettingsController::setMicrophoneDevice(const QString& name)
+{
+    core::AudioSettings audio = settings_.audio;
+    audio.microphoneDevice = name.toStdString();
+    apply(audio);
+}
+
+bool SettingsController::microphoneMuted() const
+{
+    return settings_.audio.microphoneMuted;
+}
+
+void SettingsController::setMicrophoneMuted(bool muted)
+{
+    core::AudioSettings audio = settings_.audio;
+    audio.microphoneMuted = muted;
+    apply(audio);
+}
+
+int SettingsController::volumePercent() const
+{
+    return settings_.audio.volumePercent;
+}
+
+void SettingsController::setVolumePercent(int percent)
+{
+    core::AudioSettings audio = settings_.audio;
+    audio.volumePercent = std::clamp(percent, 0, 100);
+    apply(audio);
+}
+
+QString SettingsController::preferredController() const
+{
+    return QString::fromStdString(settings_.controller.preferred);
+}
+
+void SettingsController::setPreferredController(const QString& name)
+{
+    core::ControllerSettings controllerSettings;
+    controllerSettings.preferred = name.toStdString();
+    apply(controllerSettings);
+}
+
 core::ReflexMode SettingsController::reflexMode() const
 {
     return settings_.rtx.reflex;
@@ -245,6 +373,37 @@ void SettingsController::apply(const core::VideoSettings& video)
                  video.framesPerSecond, core::codecName(video.codec), bitrateMbps(),
                  presentModeName(video.presentMode));
     emit videoChanged();
+    save();
+}
+
+void SettingsController::apply(const core::AudioSettings& audio)
+{
+    if (audio == settings_.audio)
+    {
+        return;
+    }
+
+    settings_.audio = audio;
+    spdlog::info("Audio settings: output '{}', microphone '{}', {}, {}%",
+                 audio.outputDevice.empty() ? "Windows default" : audio.outputDevice,
+                 audio.microphoneDevice.empty() ? "Windows default" : audio.microphoneDevice,
+                 audio.microphoneMuted ? "muted" : "unmuted", audio.volumePercent);
+    emit audioChanged();
+    save();
+}
+
+void SettingsController::apply(const core::ControllerSettings& controllerSettings)
+{
+    if (controllerSettings == settings_.controller)
+    {
+        return;
+    }
+
+    settings_.controller = controllerSettings;
+    spdlog::info("Controller settings: preferred '{}'",
+                 controllerSettings.preferred.empty() ? "first connected"
+                                                      : controllerSettings.preferred);
+    emit controllerChanged();
     save();
 }
 

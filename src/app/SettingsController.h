@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QtQmlIntegration>
 
 #include <optional>
@@ -13,8 +14,8 @@
 namespace lynx::app
 {
 
-// The Configurações options (Vídeo and RTX), saved to settings.json on every
-// change.
+// The Configurações options (Vídeo, Áudio e microfone, Controles and RTX),
+// saved to settings.json on every change.
 class SettingsController : public QObject
 {
     Q_OBJECT
@@ -29,6 +30,17 @@ class SettingsController : public QObject
     Q_PROPERTY(bool lowestLatency READ lowestLatency WRITE setLowestLatency NOTIFY videoChanged)
     Q_PROPERTY(int minBitrateMbps READ minBitrateMbps CONSTANT)
     Q_PROPERTY(int maxBitrateMbps READ maxBitrateMbps CONSTANT)
+    Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY audioDevicesChanged)
+    Q_PROPERTY(QStringList microphoneDevices READ microphoneDevices NOTIFY audioDevicesChanged)
+    Q_PROPERTY(QString outputDevice READ outputDevice WRITE setOutputDevice NOTIFY audioChanged)
+    Q_PROPERTY(
+        QString microphoneDevice READ microphoneDevice WRITE setMicrophoneDevice NOTIFY audioChanged)
+    Q_PROPERTY(
+        bool microphoneMuted READ microphoneMuted WRITE setMicrophoneMuted NOTIFY audioChanged)
+    Q_PROPERTY(int volumePercent READ volumePercent WRITE setVolumePercent NOTIFY audioChanged)
+    Q_PROPERTY(
+        QString preferredController READ preferredController WRITE setPreferredController NOTIFY
+            controllerChanged)
     Q_PROPERTY(QString reflex READ reflex WRITE setReflex NOTIFY rtxChanged)
     Q_PROPERTY(bool reflexAvailable READ reflexAvailable CONSTANT)
     Q_PROPERTY(QString reflexUnavailableReason READ reflexUnavailableReason CONSTANT)
@@ -39,6 +51,8 @@ public:
                                 QObject* parent = nullptr);
 
     [[nodiscard]] const core::VideoSettings& video() const;
+    [[nodiscard]] const core::AudioSettings& audio() const;
+    [[nodiscard]] const core::ControllerSettings& controller() const;
     [[nodiscard]] render::PresentTiming presentTiming() const;
 
     // The lines of the resolution asked of the PS5: 360, 540, 720 or 1080.
@@ -62,6 +76,28 @@ public:
     [[nodiscard]] int minBitrateMbps() const;
     [[nodiscard]] int maxBitrateMbps() const;
 
+    // Refreshes the device lists after SDL has enumerated them or Windows
+    // reported a change.
+    void refreshAudioDevices();
+
+    [[nodiscard]] QStringList outputDevices() const;
+    [[nodiscard]] QStringList microphoneDevices() const;
+
+    // Empty means the Windows default.
+    [[nodiscard]] QString outputDevice() const;
+    void setOutputDevice(const QString& name);
+    [[nodiscard]] QString microphoneDevice() const;
+    void setMicrophoneDevice(const QString& name);
+
+    [[nodiscard]] bool microphoneMuted() const;
+    void setMicrophoneMuted(bool muted);
+
+    [[nodiscard]] int volumePercent() const;
+    void setVolumePercent(int percent);
+
+    [[nodiscard]] QString preferredController() const;
+    void setPreferredController(const QString& name);
+
     [[nodiscard]] core::ReflexMode reflexMode() const;
     // "off", "on" or "boost".
     [[nodiscard]] QString reflex() const;
@@ -73,18 +109,26 @@ public:
 
 signals:
     void videoChanged();
+    void audioChanged();
+    void audioDevicesChanged();
+    void controllerChanged();
     void rtxChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 
 private:
     void apply(const core::VideoSettings& video);
+    void apply(const core::AudioSettings& audio);
+    void apply(const core::ControllerSettings& controller);
     void applyRtx(const core::RtxSettings& rtx);
     void save();
 
     std::optional<core::SettingsStore> store_;
     core::Settings settings_;
     render::ReflexAvailability reflexAvailability_;
+    QStringList outputDevices_;
+    QStringList microphoneDevices_;
+    bool devicesLogged_ = false;
 };
 
 } // namespace lynx::app
