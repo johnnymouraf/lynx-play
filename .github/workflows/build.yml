@@ -39,7 +39,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .ngx
-          key: ngx-v310.9.16
+          key: ngx-v310.9.16-${{ hashFiles('scripts/fetch-ngx.ps1') }}
 
       - name: Fetch the NGX SDK
         id: ngx-fetch

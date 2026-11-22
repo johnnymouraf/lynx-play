@@ -589,9 +589,13 @@ std::expected<void, std::string> DlssSuperResolution::record(
                    D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     const auto colorToCompute = transition(&color, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
                                             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    // The engine leaves its grid in COMMON, where it reads it again next
+    // frame; the densify pass takes it as a shader resource.
+    const auto flowToShader = transition(&flow, D3D12_RESOURCE_STATE_COMMON,
+                                         D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     const auto outputToUav = transition(entry.output.Get(), entry.outputState,
                                         D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    const std::array beforeBarriers{motionToUav, colorToCompute, outputToUav};
+    const std::array beforeBarriers{motionToUav, colorToCompute, flowToShader, outputToUav};
     commandList.ResourceBarrier(static_cast<UINT>(beforeBarriers.size()), beforeBarriers.data());
 
     const std::array<ID3D12DescriptorHeap*, 1> heaps{impl.viewHeap.Get()};
@@ -659,7 +663,9 @@ std::expected<void, std::string> DlssSuperResolution::record(
                    D3D12_RESOURCE_STATE_COMMON);
     const auto colorToShader = transition(&color, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
                                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    const std::array afterBarriers{outputToShader, motionToCommon, colorToShader};
+    const auto flowToCommon = transition(&flow, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                                          D3D12_RESOURCE_STATE_COMMON);
+    const std::array afterBarriers{outputToShader, motionToCommon, colorToShader, flowToCommon};
     commandList.ResourceBarrier(static_cast<UINT>(afterBarriers.size()), afterBarriers.data());
 
     entry.outputState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

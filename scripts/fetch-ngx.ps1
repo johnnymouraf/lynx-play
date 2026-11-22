@@ -15,6 +15,7 @@ $headers = @(
     'nvsdk_ngx_params.h',
     'nvsdk_ngx_helpers.h',
     'nvsdk_ngx_helpers_d3d.h',
+    'nvsdk_ngx_helpers_cuda.h',
     'nvsdk_ngx_loader.h'
 )
 

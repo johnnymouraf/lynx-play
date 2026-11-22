@@ -1549,12 +1549,12 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
         const std::uint64_t inputValue = opticalFlow_->nextInputValue();
         gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
 
-        const auto output = opticalFlow_->execute(bufferIndex, inputValue);
+        const auto flowValue = opticalFlow_->execute(bufferIndex, inputValue);
         flowConsumed = true;
 
-        if (output)
+        if (flowValue)
         {
-            flowOutput = *output;
+            flowOutput = *flowValue;
             waitForFlow = true;
             flowSlotValid_.at(bufferIndex) = true;
         }
@@ -1563,7 +1563,7 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
             flowFailed = true;
             opticalFlowFailed_ = true;
             dlssResetPending_ = true;
-            noteDlssFallback(output.error());
+            noteDlssFallback(flowValue.error());
         }
     }
 
