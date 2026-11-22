@@ -2328,6 +2328,10 @@ OverlayStats FrameRenderer::overlayStats()
     {
         reflex.state = ReflexOverlayStats::State::Active;
     }
+    else
+    {
+        reflex.state = ReflexOverlayStats::State::Waiting;
+    }
 
     return stats;
 }
