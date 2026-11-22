@@ -53,7 +53,8 @@ the reference for the toolchain:
 
 - The Visual Studio C++ build tools (Windows SDK and libraries), LLVM 20+
   `clang-cl`, CMake 3.28+ and Ninja.
-- Qt 6.12 (`msvc2022_64`).
+- Qt 6.10 (`msvc2022_64`); newer Qt releases use a repository layout the CI's
+  installer (aqtinstall) can't read yet.
 - vcpkg, in manifest mode (`vcpkg.json`).
 - Python 3 with `protobuf` and `grpcio-tools`, for chiaki-ng's protocol buffers.
 

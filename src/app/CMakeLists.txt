@@ -2,8 +2,8 @@
 # must put its libraries there too.
 set(CMAKE_INSTALL_BINDIR .)
 
-find_package(Qt6 6.12 REQUIRED COMPONENTS Gui Qml Quick)
-qt_standard_project_setup(REQUIRES 6.12)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Qml Quick)
+qt_standard_project_setup(REQUIRES 6.10)
 
 configure_file(Version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/app/Version.h" @ONLY)
 
