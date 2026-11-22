@@ -24,8 +24,8 @@ add_library(lynx_render STATIC
     VideoFrame.h)
 add_library(Lynx::render ALIAS lynx_render)
 
-# Shaders compile at build time into headers holding their bytecode, included
-# as render/shaders/<Name>.h.
+# Shaders compile at build time into headers holding their bytecode:
+# render/shaders/<Name>.h defines the byte array k<Name>.
 find_program(LYNX_FXC fxc REQUIRED HINTS "$ENV{WindowsSdkVerBinPath}x64")
 set(lynx_shader_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/render/shaders")
 
@@ -34,7 +34,7 @@ function(lynx_compile_shader source entry profile name)
     add_custom_command(
         OUTPUT "${output}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${lynx_shader_dir}"
-        COMMAND "${LYNX_FXC}" /nologo /WX /O3 /T ${profile} /E ${entry} /Vn ${name}
+        COMMAND "${LYNX_FXC}" /nologo /WX /O3 /T ${profile} /E ${entry} /Vn k${name}
                 /Fh "${output}" "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
         COMMENT "Compiling ${source} (${entry})"
@@ -42,8 +42,8 @@ function(lynx_compile_shader source entry profile name)
     target_sources(lynx_render PRIVATE "${output}")
 endfunction()
 
-lynx_compile_shader(shaders/VideoFrame.hlsl vertexMain vs_5_1 kVideoFrameVertexShader)
-lynx_compile_shader(shaders/VideoFrame.hlsl pixelMain ps_5_1 kVideoFramePixelShader)
+lynx_compile_shader(shaders/VideoFrame.hlsl vertexMain vs_5_1 VideoFrameVertexShader)
+lynx_compile_shader(shaders/VideoFrame.hlsl pixelMain ps_5_1 VideoFramePixelShader)
 
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx_render
