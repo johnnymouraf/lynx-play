@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 env:
   VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\.vcpkg-cache,readwrite
@@ -27,6 +28,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # Artifacts count against the account's storage; keep only the newest
+      # eight and nothing older than three hours (runs are tested within
+      # minutes of finishing).
+      - name: Purge old artifacts
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $artifacts = (gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" | ConvertFrom-Json).artifacts |
+            Sort-Object created_at -Descending
+          $cutoff = (Get-Date).ToUniversalTime().AddHours(-3)
+          $artifacts | Select-Object -Skip 8 | Where-Object {
+            [datetime]$_.created_at -lt $cutoff -or $true
+          } | ForEach-Object {
+            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$($_.id)" | Out-Null
+          }
 
       - name: Fetch chiaki-ng
         run: ./scripts/init-chiaki-submodules.ps1
