@@ -9,6 +9,24 @@ ColumnLayout {
     required property SettingsController settings
     property string gpuName
 
+    function upscalingDescription() {
+        if (!section.settings.dlssAvailable) {
+            return "DLSS Super Resolution indisponível: "
+                    + section.settings.dlssUnavailableReason
+                    + " O RTX VSR amplia a imagem.";
+        }
+
+        if (!section.settings.videoSuperResolutionAvailable) {
+            return "RTX VSR indisponível: "
+                    + section.settings.videoSuperResolutionUnavailableReason
+                    + " O shader amplia a imagem.";
+        }
+
+        return "Como a imagem é ampliada para a resolução da tela. RTX Video Super "
+                + "Resolution remove artefatos de compressão; DLSS Super Resolution é "
+                + "experimental e usa os vetores do fluxo óptico.";
+    }
+
     spacing: Theme.space2
 
     SectionHeader {
@@ -22,23 +40,24 @@ ColumnLayout {
 
     SettingRow {
         Layout.fillWidth: true
-        label: "RTX Video Super Resolution"
-        description: section.settings.videoSuperResolutionAvailable
-                     ? "Remove artefatos de compressão e amplia a imagem para a resolução da "
-                       + "tela. Também requer Super Resolution ligado no NVIDIA App "
-                       + "(Sistema › Vídeo › RTX Video Enhancements)."
-                     : "Indisponível: " + section.settings.videoSuperResolutionUnavailableReason
+        label: "Upscaling"
+        description: section.upscalingDescription()
 
-        Toggle {
-            checked: section.settings.videoSuperResolution
-            enabled: section.settings.videoSuperResolutionAvailable
-            opacity: enabled ? 1 : 0.5
-            Accessible.name: "RTX Video Super Resolution"
-            onCheckedChanged: {
-                if (checked !== section.settings.videoSuperResolution) {
-                    section.settings.videoSuperResolution = checked;
-                }
-            }
+        SegmentedControl {
+            name: "Upscaling"
+            options: [
+                { label: "Shader", value: "shader" },
+                { label: "RTX VSR", value: "vsr",
+                  enabled: section.settings.videoSuperResolutionAvailable },
+                { label: "DLSS SR", value: "dlss", enabled: section.settings.dlssAvailable }
+            ]
+            currentValue: section.settings.upscaling
+            onActivated: value => section.settings.upscaling = value
+        }
+
+        StateBadge {
+            status: "waking"
+            label: "Experimental"
         }
     }
 

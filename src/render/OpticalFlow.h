@@ -112,6 +112,10 @@ public:
     // The fence the renderer signals and waits on.
     [[nodiscard]] ID3D12Fence* fence() const;
 
+    // The last output value execute() returned; zero before the first run.
+    // Waiting on it covers every flow the engine has written.
+    [[nodiscard]] std::uint64_t lastOutputValue() const;
+
     // The R16G16_SINT vectors and the R8_UINT cost of a slot, kept in
     // D3D12_RESOURCE_STATE_COMMON while the engine owns them.
     [[nodiscard]] ID3D12Resource* flow(UINT slot) const;

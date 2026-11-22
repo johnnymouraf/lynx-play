@@ -144,7 +144,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
     requestedReflex_.store(options_.reflex);
-    requestedVideoSuperResolution_.store(options_.videoSuperResolution);
+    requestedUpscaling_.store(options_.upscaling);
     requestedOpticalFlow_.store(options_.opticalFlow);
     requestedHdr_.store(options_.hdr);
     requestedHdrApplied_ = options_.hdr;
@@ -206,9 +206,9 @@ void FrameRenderer::setReflexMode(core::ReflexMode mode)
     SetEvent(wakeEvent_.get());
 }
 
-void FrameRenderer::setVideoSuperResolution(bool enabled)
+void FrameRenderer::setUpscaling(core::Upscaling upscaling)
 {
-    requestedVideoSuperResolution_.store(enabled);
+    requestedUpscaling_.store(upscaling);
     SetEvent(wakeEvent_.get());
 }
 
@@ -365,6 +365,8 @@ void FrameRenderer::run(const std::stop_token& stop)
     requestedReflexApplied_ = requestedReflex_.load();
     reflex_.configure(requestedReflexApplied_, gpu_.device.Get());
     requestedOpticalFlowApplied_ = requestedOpticalFlow_.load();
+    requestedUpscalingApplied_ = requestedUpscaling_.load();
+    spdlog::info("Upscaling: {}", core::upscalingName(requestedUpscalingApplied_));
 
     if (auto metric = CadenceMetric::create(*gpu_.device.Get()); metric)
     {
@@ -423,7 +425,7 @@ void FrameRenderer::run(const std::stop_token& stop)
         }
 
         applyRequestedReflex();
-        applyRequestedVideoSuperResolution();
+        applyRequestedUpscaling();
         applyRequestedOpticalFlow();
         applyRequestedHdr();
         applyOverlayToggles();
@@ -558,6 +560,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             droppedFrames_ += dropped;
             cadence_.reset();
             cadenceReferenceValid_ = false;
+            dlssResetPending_ = true;
         }
     }
 
@@ -572,6 +575,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         cadence_.reset();
         cadenceReferenceValid_ = false;
         flowReferenceValid_ = false;
+        flowSlotValid_.fill(false);
+        dlssResetPending_ = true;
     }
 
     const Presentation presentation = presentationFor(shownFrame_ ? &*shownFrame_ : nullptr);
@@ -600,6 +605,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             cadence_.reset();
             cadenceReferenceValid_ = false;
             flowReferenceValid_ = false;
+            flowSlotValid_.fill(false);
+            dlssResetPending_ = true;
         }
     }
 
@@ -635,6 +642,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     const bool marked = reflexFrameId_.has_value();
     const std::uint64_t reflexFrameId = reflexFrameId_.value_or(0);
+    bool flowConsumed = false;
+    dlssActive_ = false;
 
     if (marked)
     {
@@ -643,7 +652,16 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         reflex_.mark(reflexFrameId, LatencyMarker::RenderSubmitStart);
     }
 
-    if (prepareVideoSuperResolution())
+    if (prepareDlssSuperResolution(bufferIndex, plan.opticalFlow))
+    {
+        const auto recorded = recordDlssSuperResolutionFrame(bufferIndex, plan, flowConsumed);
+
+        if (!recorded)
+        {
+            return std::unexpected(recorded.error());
+        }
+    }
+    else if (prepareVideoSuperResolution())
     {
         const auto recorded = recordVideoSuperResolutionFrame(bufferIndex, plan);
 
@@ -683,7 +701,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     std::uint64_t flowOutput = 0;
     bool flowSubmitted = false;
 
-    if (plan.opticalFlow)
+    if (plan.opticalFlow && !flowConsumed)
     {
         const std::uint64_t inputValue = opticalFlow_->nextInputValue();
         gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
@@ -694,6 +712,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         {
             flowOutput = *output;
             flowSubmitted = true;
+            flowSlotValid_.at(bufferIndex) = true;
         }
         else
         {
@@ -723,7 +742,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         return std::unexpected(describePresentFailure(presentResult));
     }
 
-    if (plan.opticalFlow)
+    if (plan.opticalFlow && !flowConsumed)
     {
         if (auto watched = recordFlowWatch(bufferIndex, flowSubmitted, flowOutput); !watched)
         {
@@ -799,18 +818,22 @@ void FrameRenderer::applyRequestedReflex()
     reflex_.configure(requested, gpu_.device.Get());
 }
 
-void FrameRenderer::applyRequestedVideoSuperResolution()
+void FrameRenderer::applyRequestedUpscaling()
 {
-    const bool requested = requestedVideoSuperResolution_.load();
+    const core::Upscaling requested = requestedUpscaling_.load();
 
-    if (requested == requestedVideoSuperResolutionApplied_)
+    if (requested == requestedUpscalingApplied_)
     {
         return;
     }
 
-    requestedVideoSuperResolutionApplied_ = requested;
+    requestedUpscalingApplied_ = requested;
     videoSuperResolutionFailed_ = false;
-    spdlog::info("VSR: {}", requested ? "on" : "off");
+    dlssFailed_ = false;
+    dlssActive_ = false;
+    dlssResetPending_ = true;
+    dlssFallback_.clear();
+    spdlog::info("Upscaling: {}", core::upscalingName(requested));
 }
 
 void FrameRenderer::applyRequestedHdr()
@@ -885,14 +908,27 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
         {
             for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
             {
-                presenter_.writeVideoSuperResolutionView(
-                    index, *videoSuperResolution_->output(index));
+                presenter_.writeUpscaledView(index, *videoSuperResolution_->output(index));
+            }
+        }
+
+        if (dlssSuperResolution_)
+        {
+            for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+            {
+                if (ID3D12Resource* const output = dlssSuperResolution_->output(index);
+                    output != nullptr)
+                {
+                    presenter_.writeUpscaledView(index, *output);
+                }
             }
         }
 
         // The engine registered the old intermediate textures.
         opticalFlow_.reset();
         flowReferenceValid_ = false;
+        flowSlotValid_.fill(false);
+        dlssResetPending_ = true;
 
         if (targetChanged && overlay_ != nullptr)
         {
@@ -944,8 +980,9 @@ bool FrameRenderer::prepareVideoSuperResolution()
     const SurfaceSize input{.width = shownFrame_->width, .height = shownFrame_->height};
     const PixelRect area = fitPicture(swapChain_.size(), input);
     const SurfaceSize output{.width = area.width, .height = area.height};
+    const bool upscaling = requestedUpscalingApplied_ != core::Upscaling::Shader;
     const bool superResolution =
-        requestedVideoSuperResolutionApplied_ && !videoSuperResolutionFailed_ &&
+        upscaling && !videoSuperResolutionFailed_ &&
         videoSuperResolutionEligible(true, gpu_.info.vendorId, input, output);
     const bool trueHdr = presentation_.rtxVideoHdr;
 
@@ -1042,7 +1079,7 @@ bool FrameRenderer::prepareVideoSuperResolution()
 
     for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
     {
-        presenter_.writeVideoSuperResolutionView(index, *videoSuperResolution_->output(index));
+        presenter_.writeUpscaledView(index, *videoSuperResolution_->output(index));
     }
 
     preparedSuperResolution_ = superResolution;
@@ -1061,8 +1098,137 @@ void FrameRenderer::applyRequestedOpticalFlow()
 
     requestedOpticalFlowApplied_ = requested;
     opticalFlowFailed_ = false;
+    dlssFailed_ = false;
     flowReferenceValid_ = false;
+    flowSlotValid_.fill(false);
+    dlssResetPending_ = true;
     spdlog::info("Optical flow: {}", requested ? "on" : "off");
+}
+
+bool FrameRenderer::prepareDlssSuperResolution(UINT bufferIndex, bool flowThisFrame)
+{
+    if (requestedUpscalingApplied_ != core::Upscaling::Dlss)
+    {
+        return false;
+    }
+
+    if (!shownFrame_)
+    {
+        return false;
+    }
+
+    if (presentation_.hdrSwapChain)
+    {
+        noteDlssFallback("the HDR display needs VSR's 10-bit output");
+        return false;
+    }
+
+    const SurfaceSize input{.width = shownFrame_->width, .height = shownFrame_->height};
+    const PixelRect area = fitPicture(swapChain_.size(), input);
+
+    if (!dlssSuperResolutionEligible(input, {.width = area.width, .height = area.height}))
+    {
+        noteDlssFallback(
+            std::format("{}x{} in a {}x{} window is outside DLSS's upscale range", input.width,
+                        input.height, swapChain_.size().width, swapChain_.size().height));
+        return false;
+    }
+
+    if (!requestedOpticalFlowApplied_ || opticalFlowFailed_)
+    {
+        noteDlssFallback("the optical flow is off");
+        return false;
+    }
+
+    if (!flowReferenceValid_ || (!flowThisFrame && !flowSlotValid_.at(bufferIndex)))
+    {
+        noteDlssFallback("waiting for the first optical flow vectors");
+        return false;
+    }
+
+    if (dlssFailed_)
+    {
+        return false;
+    }
+
+    if (!ngxHost_)
+    {
+        auto host = NgxHost::create(*gpu_.device.Get());
+
+        if (!host)
+        {
+            dlssFailed_ = true;
+            noteDlssFallback(host.error());
+            return false;
+        }
+
+        ngxHost_ = std::move(*host);
+    }
+
+    if (!dlssSuperResolution_)
+    {
+        auto created = DlssSuperResolution::create(*ngxHost_, *gpu_.queue.Get(),
+                                                   SwapChain::kBufferCount);
+
+        if (!created)
+        {
+            dlssFailed_ = true;
+            noteDlssFallback(created.error());
+            return false;
+        }
+
+        dlssSuperResolution_ = std::move(*created);
+    }
+
+    const DlssPicture picture{
+        .input = input,
+        .output = {.width = area.width, .height = area.height},
+        .toneMappedInput = presentation_.intermediateFormat != kIntermediateFormat,
+    };
+
+    if (!dlssSuperResolution_->configuredFor(picture))
+    {
+        waitForGpu();
+
+        if (auto configured = dlssSuperResolution_->configure(picture); !configured)
+        {
+            dlssFailed_ = true;
+            noteDlssFallback(configured.error());
+            return false;
+        }
+
+        for (UINT index = 0; index < SwapChain::kBufferCount; ++index)
+        {
+            if (ID3D12Resource* const output = dlssSuperResolution_->output(index);
+                output != nullptr)
+            {
+                presenter_.writeUpscaledView(index, *output);
+            }
+        }
+
+        dlssResetPending_ = true;
+    }
+
+    if (!dlssFallback_.empty())
+    {
+        dlssFallback_.clear();
+        spdlog::info("DLSS SR: on ({}x{} -> {}x{})", picture.input.width, picture.input.height,
+                     picture.output.width, picture.output.height);
+    }
+
+    dlssActive_ = true;
+    return true;
+}
+
+void FrameRenderer::noteDlssFallback(std::string reason)
+{
+    if (reason == dlssFallback_)
+    {
+        return;
+    }
+
+    dlssFallback_ = std::move(reason);
+    spdlog::info("DLSS SR: {}; VSR draws the stream", dlssFallback_);
 }
 
 bool FrameRenderer::prepareOpticalFlow()
@@ -1120,6 +1286,7 @@ bool FrameRenderer::prepareOpticalFlow()
     }
 
     flowReferenceValid_ = false;
+    flowSlotValid_.fill(false);
     spdlog::info("Optical flow: {}", opticalFlow_->description());
     return true;
 }
@@ -1156,6 +1323,7 @@ void FrameRenderer::drainCadence()
 
         if (cadence_.observe(comparison) == CadenceDetector::Decision::SceneCut)
         {
+            dlssResetPending_ = true;
             spdlog::debug("Cadence: scene cut, window restarted");
         }
     }
@@ -1187,26 +1355,41 @@ std::expected<void, std::string> FrameRenderer::recordFlowWatch(UINT bufferIndex
     return {};
 }
 
-FlowOverlayState FrameRenderer::opticalFlowState() const
+StageOverlayState FrameRenderer::opticalFlowState() const
 {
     if (!requestedOpticalFlowApplied_)
     {
-        return FlowOverlayState::Off;
+        return StageOverlayState::Off;
     }
 
     if (opticalFlowFailed_)
     {
-        return FlowOverlayState::Unavailable;
+        return StageOverlayState::Unavailable;
     }
 
     if (!opticalFlow_ || !shownFrame_)
     {
-        return FlowOverlayState::Off;
+        return StageOverlayState::Off;
     }
 
     const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
-    return opticalFlow_->configuredFor(picture) ? FlowOverlayState::Running
-                                                 : FlowOverlayState::Off;
+    return opticalFlow_->configuredFor(picture) ? StageOverlayState::Running
+                                                 : StageOverlayState::Off;
+}
+
+StageOverlayState FrameRenderer::dlssState() const
+{
+    if (requestedUpscalingApplied_ != core::Upscaling::Dlss)
+    {
+        return StageOverlayState::Off;
+    }
+
+    if (dlssFailed_ || !dlssActive_)
+    {
+        return StageOverlayState::Unavailable;
+    }
+
+    return StageOverlayState::Running;
 }
 
 ToneMapParameters FrameRenderer::flowToneMap() const
@@ -1297,6 +1480,209 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan)
         timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
         timer_->endFrame(*commandList_.Get(), bufferIndex);
     }
+}
+
+std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
+    UINT bufferIndex, const FramePlan& plan, bool& flowConsumed)
+{
+    const SurfaceSize picture{.width = shownFrame_->width, .height = shownFrame_->height};
+    const PixelRect area = fitPicture(swapChain_.size(), picture);
+    const SurfaceSize output{.width = area.width, .height = area.height};
+    const bool toneMappedInput = presentation_.intermediateFormat != kIntermediateFormat;
+
+    // First submission: the color conversion (and the SDR copy a 10-bit
+    // intermediate needs), the cadence sample and, for a new frame, the flow
+    // engine. DLSS waits for that engine before it runs.
+    copyAllocators_.at(bufferIndex)->Reset();
+    copyCommandList_->Reset(copyAllocators_.at(bufferIndex).Get(), nullptr);
+    timer_->beginFrame(*copyCommandList_.Get(), bufferIndex);
+
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    timer_->endStage(*copyCommandList_.Get(), bufferIndex, EffectStage::RtxVideoHdr);
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+    timer_->endStage(*copyCommandList_.Get(), bufferIndex, EffectStage::VideoSuperResolution);
+
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+    presenter_.recordConversion(*copyCommandList_.Get(), bufferIndex, *shownFrame_);
+
+    if (plan.writeFlowPicture && toneMappedInput)
+    {
+        presenter_.recordFlowPicture(*copyCommandList_.Get(), bufferIndex, flowToneMap());
+    }
+
+    timer_->endStage(*copyCommandList_.Get(), bufferIndex, EffectStage::ColorConversion);
+
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::Cadence);
+
+    if (plan.cadence && cadenceMetric_)
+    {
+        cadenceSignal_ = cadenceMetric_->record(*copyCommandList_.Get(), *shownFrame_,
+                                                 *plan.previous);
+    }
+
+    timer_->endStage(*copyCommandList_.Get(), bufferIndex, EffectStage::Cadence);
+    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+
+    if (const HRESULT result = copyCommandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (DLSS)", result));
+    }
+
+    if (shownFrame_->fence)
+    {
+        gpu_.queue->Wait(shownFrame_->fence.Get(), shownFrame_->fenceValue);
+    }
+
+    const std::array<ID3D12CommandList*, 1> copyLists{copyCommandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(copyLists.size()), copyLists.data());
+    signalCadence();
+
+    copyAllocatorFenceValues_.at(bufferIndex) = ++lastSignaledFence_;
+    gpu_.queue->Signal(fence_.Get(), lastSignaledFence_);
+
+    std::uint64_t flowOutput = 0;
+    bool waitForFlow = false;
+    bool flowFailed = false;
+
+    if (plan.opticalFlow)
+    {
+        const std::uint64_t inputValue = opticalFlow_->nextInputValue();
+        gpu_.queue->Signal(opticalFlow_->fence(), inputValue);
+
+        const auto output = opticalFlow_->execute(bufferIndex, inputValue);
+        flowConsumed = true;
+
+        if (output)
+        {
+            flowOutput = *output;
+            waitForFlow = true;
+            flowSlotValid_.at(bufferIndex) = true;
+        }
+        else
+        {
+            flowFailed = true;
+            opticalFlowFailed_ = true;
+            dlssResetPending_ = true;
+            noteDlssFallback(output.error());
+        }
+    }
+
+    // Second submission: DLSS with the vectors in, then the draw. When the
+    // feature fails, the converted picture is drawn instead, so the frame
+    // still reaches the screen.
+    allocators_.at(bufferIndex)->Reset();
+    commandList_->Reset(allocators_.at(bufferIndex).Get(), nullptr);
+
+    if (waitForFlow)
+    {
+        gpu_.queue->Wait(opticalFlow_->fence(), flowOutput);
+    }
+    else if (const std::uint64_t lastFlow = opticalFlow_->lastOutputValue(); lastFlow != 0)
+    {
+        // A redraw reads this slot's last vectors; waiting on the engine's
+        // newest value covers every flow it has written.
+        gpu_.queue->Wait(opticalFlow_->fence(), lastFlow);
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
+
+    bool drewDlss = false;
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
+
+    if (!flowFailed)
+    {
+        ID3D12Resource* const color = presenter_.flowIntermediate(bufferIndex);
+        ID3D12Resource* const flow = opticalFlow_->flow(bufferIndex);
+
+        if (color != nullptr && flow != nullptr)
+        {
+            const bool reset = std::exchange(dlssResetPending_, false);
+
+            if (auto recorded = dlssSuperResolution_->record(*commandList_.Get(), bufferIndex,
+                                                             *color, *flow, reset);
+                recorded)
+            {
+                drewDlss = true;
+            }
+            else
+            {
+                dlssFailed_ = true;
+                dlssResetPending_ = true;
+                noteDlssFallback(recorded.error());
+            }
+        }
+        else
+        {
+            dlssFailed_ = true;
+            noteDlssFallback("the picture or the flow textures are missing");
+        }
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::DlssSuperResolution);
+    dlssActive_ = drewDlss;
+
+    if (drewDlss)
+    {
+        if (ID3D12Resource* const upscaled = dlssSuperResolution_->output(bufferIndex);
+            upscaled != nullptr)
+        {
+            presenter_.writeUpscaledView(bufferIndex, *upscaled);
+        }
+    }
+
+    ID3D12Resource* const backBuffer = swapChain_.backBuffer(bufferIndex);
+    const D3D12_CPU_DESCRIPTOR_HANDLE target = swapChain_.renderTargetView(bufferIndex);
+
+    const auto toRenderTarget =
+        transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    commandList_->ResourceBarrier(1, &toRenderTarget);
+    commandList_->ClearRenderTargetView(target, kBlack.data(), 0, nullptr);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+
+    // DLSS writes SDR; the fallback draws the (possibly PQ) intermediate,
+    // which the scaling pass tone-maps for an SDR target.
+    const ToneMapParameters dlssToneMap{
+        .enabled = false,
+        .contentPeakNits = presentation_.contentPeakNits,
+        .sdrWhiteNits = presentation_.sdrWhiteNits,
+    };
+    const ToneMapParameters convertedToneMap{
+        .enabled = presentation_.toneMap,
+        .contentPeakNits = presentation_.contentPeakNits,
+        .sdrWhiteNits = presentation_.sdrWhiteNits,
+    };
+
+    presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(),
+                              drewDlss ? output : picture,
+                              drewDlss ? ScaledPicture::Upscaled : ScaledPicture::Converted,
+                              drewDlss ? dlssToneMap : convertedToneMap);
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
+
+    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
+
+    if (overlay_ != nullptr)
+    {
+        overlay_->render(*commandList_.Get(), target, overlayStats(), gamepadState());
+    }
+
+    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
+
+    const auto toPresent =
+        transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    commandList_->ResourceBarrier(1, &toPresent);
+
+    timer_->endFrame(*commandList_.Get(), bufferIndex);
+
+    if (const HRESULT result = commandList_->Close(); FAILED(result))
+    {
+        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (DLSS)", result));
+    }
+
+    const std::array<ID3D12CommandList*, 1> lists{commandList_.Get()};
+    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    return {};
 }
 
 std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
@@ -1433,7 +1819,7 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
         .sdrWhiteNits = presentation_.sdrWhiteNits,
     };
     presenter_.recordScaling(*commandList_.Get(), bufferIndex, target, swapChain_.size(), picture,
-                              ScaledPicture::VideoSuperResolution, toneMap);
+                              ScaledPicture::Upscaled, toneMap);
     timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::Scaling);
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
@@ -1545,6 +1931,7 @@ OverlayStats FrameRenderer::overlayStats()
     }
 
     stats.opticalFlow = opticalFlowState();
+    stats.dlss = dlssState();
 
     if (const auto& cadence = cadence_.estimate())
     {

@@ -92,7 +92,8 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Licença"
-        description: "Lynx Play é software livre sob a AGPL-3.0, baseado no chiaki-ng."
+        description: "Lynx Play é software livre sob a AGPL-3.0, baseado no chiaki-ng. "
+                     + "NVIDIA, RTX, DLSS e Reflex são marcas da NVIDIA Corporation."
 
         LinkButton {
             iconName: "scroll-text"

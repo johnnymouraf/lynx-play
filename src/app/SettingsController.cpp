@@ -198,6 +198,17 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
         spdlog::info("Optical flow is unavailable: {}", opticalFlowAvailability_.detail);
     }
 
+    dlssAvailability_ = render::probeDlss();
+
+    if (dlssAvailability_.available)
+    {
+        spdlog::info("DLSS SR is available ({})", dlssAvailability_.detail);
+    }
+    else
+    {
+        spdlog::info("DLSS SR is unavailable: {}", dlssAvailability_.detail);
+    }
+
     hdrDisplay_ = render::detectHdrDisplay(nullptr);
     spdlog::info("HDR display: '{}', HDR supported {}, HDR active {}, SDR white {:.0f} nits",
                  hdrDisplay_.name.empty() ? "unknown" : hdrDisplay_.name,
@@ -597,15 +608,37 @@ QString SettingsController::reflexUnavailableReason() const
     return {};
 }
 
-bool SettingsController::videoSuperResolution() const
+core::Upscaling SettingsController::upscalingMode() const
 {
-    return settings_.rtx.videoSuperResolution;
+    return settings_.rtx.upscaling;
 }
 
-void SettingsController::setVideoSuperResolution(bool enabled)
+QString SettingsController::upscaling() const
+{
+    return QString::fromLatin1(core::upscalingName(settings_.rtx.upscaling));
+}
+
+void SettingsController::setUpscaling(const QString& name)
 {
     core::RtxSettings rtx = settings_.rtx;
-    rtx.videoSuperResolution = enabled;
+
+    if (name == u"shader"_s)
+    {
+        rtx.upscaling = core::Upscaling::Shader;
+    }
+    else if (name == u"vsr"_s)
+    {
+        rtx.upscaling = core::Upscaling::Vsr;
+    }
+    else if (name == u"dlss"_s)
+    {
+        rtx.upscaling = core::Upscaling::Dlss;
+    }
+    else
+    {
+        return;
+    }
+
     applyRtx(rtx);
 }
 
@@ -629,6 +662,49 @@ QString SettingsController::videoSuperResolutionUnavailableReason() const
     case render::VsrUnavailable::ExtensionRejected:
         return u"O driver não aceitou a extensão do RTX Video Super Resolution."_s;
     case render::VsrUnavailable::None:
+        break;
+    }
+
+    return {};
+}
+
+bool SettingsController::dlssAvailable() const
+{
+    return dlssAvailability_.available && settings_.rtx.opticalFlow &&
+           opticalFlowAvailability_.available;
+}
+
+QString SettingsController::dlssUnavailableReason() const
+{
+    if (!settings_.rtx.opticalFlow)
+    {
+        return u"O Optical Flow está desligado; o DLSS usa os vetores de movimento."_s;
+    }
+
+    if (!opticalFlowAvailability_.available)
+    {
+        return u"O Optical Flow está indisponível."_s;
+    }
+
+    switch (dlssAvailability_.reason)
+    {
+    case render::DlssUnavailable::NoNvidiaGpu:
+        return u"A GPU usada para o vídeo não é NVIDIA."_s;
+    case render::DlssUnavailable::NoOpticalFlow:
+        return u"O Optical Flow está indisponível."_s;
+    case render::DlssUnavailable::GpuTooOld:
+        return u"O DLSS Super Resolution requer uma GPU Ada ou mais nova."_s;
+    case render::DlssUnavailable::ArchitectureUnknown:
+        return u"Não foi possível identificar a arquitetura da GPU."_s;
+    case render::DlssUnavailable::NoNgxCore:
+        return u"O driver NVIDIA não trouxe o NGX (nvngx.dll)."_s;
+    case render::DlssUnavailable::NoDlssRuntime:
+        return u"O nvngx_dlss.dll não está na pasta do app."_s;
+    case render::DlssUnavailable::InitFailed:
+        return u"O NGX não inicializou com a GPU da transmissão."_s;
+    case render::DlssUnavailable::FeatureFailed:
+        return u"O DLSS não criou o recurso para esta imagem."_s;
+    case render::DlssUnavailable::None:
         break;
     }
 
@@ -957,8 +1033,8 @@ void SettingsController::applyRtx(const core::RtxSettings& rtx)
     }
 
     settings_.rtx = rtx;
-    spdlog::info("RTX settings: Reflex {}, VSR {}, optical flow {}",
-                 render::reflexModeName(rtx.reflex), rtx.videoSuperResolution ? "on" : "off",
+    spdlog::info("RTX settings: Reflex {}, upscaling {}, optical flow {}",
+                 render::reflexModeName(rtx.reflex), core::upscalingName(rtx.upscaling),
                  rtx.opticalFlow ? "on" : "off");
     emit rtxChanged();
     save();

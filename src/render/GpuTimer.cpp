@@ -30,6 +30,8 @@ std::string_view stageName(EffectStage stage)
         return "RTX HDR";
     case EffectStage::VideoSuperResolution:
         return "VSR";
+    case EffectStage::DlssSuperResolution:
+        return "DLSS SR";
     case EffectStage::Cadence:
         return "cadence";
     case EffectStage::Scaling:

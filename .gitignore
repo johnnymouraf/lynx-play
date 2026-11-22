@@ -7,3 +7,4 @@
 CMakeUserPresets.json
 *.user
 /.vcpkg-cache/
+/.ngx/

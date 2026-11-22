@@ -6,11 +6,13 @@
 #include "core/Windows.h"
 #include "render/CadenceDetector.h"
 #include "render/CadenceMetric.h"
+#include "render/DlssSuperResolution.h"
 #include "render/FrameMailbox.h"
 #include "render/FramePresenter.h"
 #include "render/GpuDevice.h"
 #include "render/GpuTimer.h"
 #include "render/Hdr.h"
+#include "render/NgxHost.h"
 #include "render/OpticalFlow.h"
 #include "render/Overlay.h"
 #include "render/ReflexSession.h"
@@ -44,11 +46,11 @@ public:
     {
         PresentTiming timing = PresentTiming::VSync;
         core::ReflexMode reflex = core::ReflexMode::Off;
-        // Runs the stream through RTX Video Super Resolution when the GPU
-        // and the driver support it, instead of the shader's scaling pass.
-        bool videoSuperResolution = false;
+        // How the stream is scaled to the window: the shader's pass, RTX
+        // Video Super Resolution or DLSS Super Resolution.
+        core::Upscaling upscaling = core::Upscaling::Shader;
         // Computes the driver's optical flow between the picture and the one
-        // before it; cadence detection runs either way.
+        // before it; cadence detection runs either way, DLSS needs it.
         bool opticalFlow = true;
         // What to ask of HDR and what to do with the stream's PQ pictures.
         core::HdrMode hdr = core::HdrMode::Auto;
@@ -87,8 +89,8 @@ public:
     void setReflexMode(core::ReflexMode mode);
 
     // Safe from any thread; the pipeline switches between the video
-    // processor and the shader's path before the next frame.
-    void setVideoSuperResolution(bool enabled);
+    // processor, DLSS and the shader's path before the next frame.
+    void setUpscaling(core::Upscaling upscaling);
 
     // Safe from any thread; optical flow starts or stops on the next frame.
     void setOpticalFlow(bool enabled);
@@ -146,12 +148,17 @@ private:
     [[nodiscard]] std::expected<void, std::string> renderFrame();
     [[nodiscard]] std::expected<void, std::string> applyRequestedSize();
     void applyRequestedReflex();
-    void applyRequestedVideoSuperResolution();
+    void applyRequestedUpscaling();
     void applyRequestedOpticalFlow();
     void applyRequestedHdr();
     // Configures the video processor for the picture on screen and the
     // window it fits; false means the shader's path draws this frame.
     [[nodiscard]] bool prepareVideoSuperResolution();
+    // Configures the DLSS feature for the picture on screen; false leaves
+    // the frame to VSR or the shader, with the reason in the log.
+    [[nodiscard]] bool prepareDlssSuperResolution(UINT bufferIndex, bool flowThisFrame);
+    // Logs why DLSS is not drawing the stream, once per reason.
+    void noteDlssFallback(std::string reason);
     // Builds the optical flow session for the picture on screen; false leaves
     // the frame on the block-difference cadence metric alone.
     [[nodiscard]] bool prepareOpticalFlow();
@@ -163,6 +170,11 @@ private:
     // draw; false when the frame was dropped and the shader path retakes it.
     [[nodiscard]] std::expected<bool, std::string> recordVideoSuperResolutionFrame(
         UINT bufferIndex, const FramePlan& plan);
+    // Converts the picture, runs the flow and evaluates DLSS: two
+    // submissions, since the feature needs this frame's vectors. Falls back
+    // to the shader's draw of the converted picture when the feature fails.
+    [[nodiscard]] std::expected<void, std::string> recordDlssSuperResolutionFrame(
+        UINT bufferIndex, const FramePlan& plan, bool& flowConsumed);
     void recordInputCopy(ID3D12GraphicsCommandList& commandList, UINT bufferIndex);
     // Signals the cadence fence after a list that recorded a sample.
     void signalCadence();
@@ -173,7 +185,8 @@ private:
     [[nodiscard]] std::expected<void, std::string> recordFlowWatch(UINT bufferIndex,
                                                                    bool waitForFlow,
                                                                    std::uint64_t outputValue);
-    [[nodiscard]] FlowOverlayState opticalFlowState() const;
+    [[nodiscard]] StageOverlayState opticalFlowState() const;
+    [[nodiscard]] StageOverlayState dlssState() const;
     [[nodiscard]] OverlayStats overlayStats();
     [[nodiscard]] std::uint32_t lastGpuWorkUs() const;
     [[nodiscard]] std::string describePresentFailure(HRESULT result) const;
@@ -196,8 +209,8 @@ private:
     ReflexUnavailable reflexReason_ = ReflexUnavailable::NoNvidiaGpu;
     std::atomic<core::ReflexMode> requestedReflex_;
     core::ReflexMode requestedReflexApplied_ = core::ReflexMode::Off;
-    std::atomic<bool> requestedVideoSuperResolution_;
-    bool requestedVideoSuperResolutionApplied_ = false;
+    std::atomic<core::Upscaling> requestedUpscaling_;
+    core::Upscaling requestedUpscalingApplied_ = core::Upscaling::Shader;
     // The processor model that the current frame was prepared with, for the
     // stage stamps.
     bool preparedSuperResolution_ = false;
@@ -206,6 +219,18 @@ private:
     // a failure falls back to the shader until the setting changes.
     std::optional<VideoSuperResolution> videoSuperResolution_;
     bool videoSuperResolutionFailed_ = false;
+    // NGX is initialized with the stream's device the first time DLSS is
+    // asked for; the feature is rebuilt for each picture and output size.
+    std::optional<NgxHost> ngxHost_;
+    std::optional<DlssSuperResolution> dlssSuperResolution_;
+    bool dlssFailed_ = false;
+    // Whether the last prepared frame goes through DLSS, for the overlay.
+    bool dlssActive_ = false;
+    // DLSS's history must restart after a cut, a dropped frame, a source
+    // change or a new feature.
+    bool dlssResetPending_ = true;
+    // The last reason DLSS left the stream to VSR, so it is logged once.
+    std::string dlssFallback_;
     std::atomic<bool> requestedOpticalFlow_;
     bool requestedOpticalFlowApplied_ = false;
     // Built the first time the setting is on with a picture; a failure keeps
@@ -214,6 +239,9 @@ private:
     bool opticalFlowFailed_ = false;
     // The previous picture's intermediate is usable as flow's reference.
     bool flowReferenceValid_ = false;
+    // Whether each back buffer's flow texture holds vectors for its picture;
+    // DLSS reads them again on a redraw of the same frame.
+    std::array<bool, SwapChain::kBufferCount> flowSlotValid_{};
     // The block metric is optional: a failure only loses the cadence line.
     std::unique_ptr<CadenceMetric> cadenceMetric_;
     CadenceDetector cadence_;

@@ -2,6 +2,7 @@
 
 #include "core/Settings.h"
 #include "render/Hdr.h"
+#include "render/NgxHost.h"
 #include "render/OpticalFlow.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
@@ -51,11 +52,12 @@ class SettingsController : public QObject
     Q_PROPERTY(QString reflex READ reflex WRITE setReflex NOTIFY rtxChanged)
     Q_PROPERTY(bool reflexAvailable READ reflexAvailable CONSTANT)
     Q_PROPERTY(QString reflexUnavailableReason READ reflexUnavailableReason CONSTANT)
-    Q_PROPERTY(bool videoSuperResolution READ videoSuperResolution WRITE setVideoSuperResolution
-                   NOTIFY rtxChanged)
+    Q_PROPERTY(QString upscaling READ upscaling WRITE setUpscaling NOTIFY rtxChanged)
     Q_PROPERTY(bool videoSuperResolutionAvailable READ videoSuperResolutionAvailable CONSTANT)
     Q_PROPERTY(QString videoSuperResolutionUnavailableReason READ
                    videoSuperResolutionUnavailableReason CONSTANT)
+    Q_PROPERTY(bool dlssAvailable READ dlssAvailable NOTIFY rtxChanged)
+    Q_PROPERTY(QString dlssUnavailableReason READ dlssUnavailableReason NOTIFY rtxChanged)
     Q_PROPERTY(bool opticalFlow READ opticalFlow WRITE setOpticalFlow NOTIFY rtxChanged)
     Q_PROPERTY(bool opticalFlowAvailable READ opticalFlowAvailable CONSTANT)
     Q_PROPERTY(QString opticalFlowUnavailableReason READ opticalFlowUnavailableReason CONSTANT)
@@ -136,13 +138,20 @@ public:
     [[nodiscard]] QString reflex() const;
     void setReflex(const QString& name);
 
-    [[nodiscard]] bool videoSuperResolution() const;
-    void setVideoSuperResolution(bool enabled);
+    [[nodiscard]] core::Upscaling upscalingMode() const;
+    // "shader", "vsr" or "dlss".
+    [[nodiscard]] QString upscaling() const;
+    void setUpscaling(const QString& name);
 
     // False without an NVIDIA stream GPU or a driver that accepts the
     // extension; the stream then scales with the shader.
     [[nodiscard]] bool videoSuperResolutionAvailable() const;
     [[nodiscard]] QString videoSuperResolutionUnavailableReason() const;
+
+    // False below Ada, without the NGX runtime or with the optical flow off;
+    // VSR then draws the stream.
+    [[nodiscard]] bool dlssAvailable() const;
+    [[nodiscard]] QString dlssUnavailableReason() const;
 
     [[nodiscard]] bool opticalFlow() const;
     void setOpticalFlow(bool enabled);
@@ -195,6 +204,7 @@ private:
     core::Settings settings_;
     render::ReflexAvailability reflexAvailability_;
     render::VsrAvailability videoSuperResolutionAvailability_;
+    render::DlssAvailability dlssAvailability_;
     render::OpticalFlowAvailability opticalFlowAvailability_;
     render::HdrDisplayState hdrDisplay_;
     render::RtxHdrAvailability rtxHdrAvailability_;

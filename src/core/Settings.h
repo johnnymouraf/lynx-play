@@ -169,14 +169,39 @@ struct OverlaySettings
     bool operator==(const OverlaySettings&) const = default;
 };
 
+// How the stream is scaled to the window.
+enum class Upscaling
+{
+    // The renderer's own scaling pass.
+    Shader,
+    // RTX Video Super Resolution through the driver's video processor.
+    Vsr,
+    // DLSS Super Resolution through NGX, fed by the optical flow.
+    Dlss,
+};
+
+[[nodiscard]] constexpr std::string_view upscalingName(Upscaling upscaling)
+{
+    switch (upscaling)
+    {
+    case Upscaling::Shader:
+        return "shader";
+    case Upscaling::Vsr:
+        return "vsr";
+    case Upscaling::Dlss:
+        return "dlss";
+    }
+
+    return "shader";
+}
+
 // The NVIDIA features applied to the stream.
 struct RtxSettings
 {
     ReflexMode reflex = ReflexMode::On;
-    // RTX Video Super Resolution through the driver's video processor.
-    bool videoSuperResolution = false;
-    // The driver's optical flow between frames, for cadence detection now and
-    // DLSS later.
+    Upscaling upscaling = Upscaling::Shader;
+    // The driver's optical flow between frames, for cadence detection and
+    // for DLSS's motion vectors.
     bool opticalFlow = true;
 
     bool operator==(const RtxSettings&) const = default;

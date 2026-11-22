@@ -34,6 +34,25 @@ jobs:
       - name: Fetch NVAPI headers
         run: ./scripts/init-nvapi-submodule.ps1
 
+      - name: Restore the NGX SDK
+        id: ngx-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ngx
+          key: ngx-v310.9.16
+
+      - name: Fetch the NGX SDK
+        id: ngx-fetch
+        if: steps.ngx-cache.outputs.cache-hit != 'true'
+        run: ./scripts/fetch-ngx.ps1
+
+      - name: Save the NGX SDK
+        if: steps.ngx-fetch.outcome == 'success'
+        uses: actions/cache/save@v6
+        with:
+          path: .ngx
+          key: ${{ steps.ngx-cache.outputs.cache-primary-key }}
+
       - name: Set up Python
         id: python
         uses: actions/setup-python@v7

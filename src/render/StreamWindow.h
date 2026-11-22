@@ -44,7 +44,7 @@ struct StreamWindowOptions
     std::wstring title;
     PresentTiming timing = PresentTiming::VSync;
     core::ReflexMode reflex = core::ReflexMode::Off;
-    bool videoSuperResolution = false;
+    core::Upscaling upscaling = core::Upscaling::Shader;
     bool opticalFlow = true;
     core::HdrMode hdr = core::HdrMode::Auto;
     bool rtxVideoHdrAvailable = false;
@@ -87,7 +87,7 @@ public:
     [[nodiscard]] bool isOpen() const;
     void bringToFront();
     void setReflexMode(core::ReflexMode mode);
-    void setVideoSuperResolution(bool enabled);
+    void setUpscaling(core::Upscaling upscaling);
     void setOpticalFlow(bool enabled);
     void setHdrMode(core::HdrMode mode);
     // Ends the stream as the player would with Esc.

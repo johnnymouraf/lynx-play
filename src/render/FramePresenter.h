@@ -16,11 +16,12 @@ namespace lynx::render
 {
 
 // Which RGB picture the scaling pass draws: the shader's YUV-to-RGB
-// intermediate, or the video processor's output (VSR).
+// intermediate, or an upscaler's output (RTX Video Super Resolution's video
+// processor or DLSS).
 enum class ScaledPicture
 {
     Converted,
-    VideoSuperResolution,
+    Upscaled,
 };
 
 // The SDR intermediate is BGRA8 so NVIDIA's optical flow engine can read it
@@ -57,8 +58,9 @@ public:
     // when it is BGRA8, otherwise the copy recordFlowPicture fills.
     [[nodiscard]] ID3D12Resource* flowIntermediate(UINT bufferIndex) const;
 
-    // Points this buffer's VSR view at the video processor's output texture.
-    void writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resource& texture);
+    // Points this buffer's upscaled-picture view at the video processor's or
+    // DLSS's output texture.
+    void writeUpscaledView(UINT bufferIndex, ID3D12Resource& texture);
 
     // YUV to RGB into this buffer's intermediate picture.
     void recordConversion(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,

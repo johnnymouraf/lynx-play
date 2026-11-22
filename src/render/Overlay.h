@@ -57,8 +57,8 @@ struct ReflexOverlayStats
     double latencyQueueMs = 0.0;
 };
 
-// How the optical flow stage reads in the statistics panel.
-enum class FlowOverlayState
+// How a pipeline stage that can be unavailable reads in the statistics panel.
+enum class StageOverlayState
 {
     Off,
     Running,
@@ -79,7 +79,8 @@ struct OverlayStats
     bool gpuTimingsValid = false;
     std::array<double, kEffectStageCount> stageMilliseconds{};
     double totalMilliseconds = 0.0;
-    FlowOverlayState opticalFlow = FlowOverlayState::Off;
+    StageOverlayState opticalFlow = StageOverlayState::Off;
+    StageOverlayState dlss = StageOverlayState::Off;
 
     // The published cadence, once two windows agree.
     bool cadenceValid = false;

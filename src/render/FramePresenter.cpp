@@ -40,12 +40,12 @@ struct ScalingConstants
 
 constexpr UINT kConstantCount = sizeof(ConversionConstants) / sizeof(float);
 constexpr UINT kScalingConstantCount = sizeof(ScalingConstants) / sizeof(float);
-// Luma and chroma views, the intermediate picture and, when VSR runs, the
-// video processor's output.
+// Luma and chroma views, the intermediate picture and, when an upscaler
+// runs, its output.
 constexpr UINT kLumaView = 0;
 constexpr UINT kChromaView = 1;
 constexpr UINT kIntermediateView = 2;
-constexpr UINT kVideoSuperResolutionView = 3;
+constexpr UINT kUpscaledView = 3;
 constexpr UINT kViewsPerBuffer = 4;
 constexpr UINT kConstantsParameter = 0;
 constexpr UINT kViewsParameter = 1;
@@ -493,7 +493,7 @@ ID3D12Resource* FramePresenter::flowIntermediate(UINT bufferIndex) const
     return flowPictures_.at(bufferIndex).Get();
 }
 
-void FramePresenter::writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resource& texture)
+void FramePresenter::writeUpscaledView(UINT bufferIndex, ID3D12Resource& texture)
 {
     if (bufferIndex >= bufferCount_)
     {
@@ -501,7 +501,7 @@ void FramePresenter::writeVideoSuperResolutionView(UINT bufferIndex, ID3D12Resou
     }
 
     device_->CreateShaderResourceView(
-        &texture, nullptr, cpuView(bufferIndex * kViewsPerBuffer + kVideoSuperResolutionView));
+        &texture, nullptr, cpuView(bufferIndex * kViewsPerBuffer + kUpscaledView));
 }
 
 void FramePresenter::recordConversion(ID3D12GraphicsCommandList& commandList, UINT bufferIndex,
@@ -563,9 +563,8 @@ void FramePresenter::recordScaling(ID3D12GraphicsCommandList& commandList, UINT 
                                    const ToneMapParameters& toneMap)
 {
     const PixelRect area = fitPicture(targetSize, pictureSize);
-    const UINT pictureView =
-        picture == ScaledPicture::VideoSuperResolution ? kVideoSuperResolutionView
-                                                       : kIntermediateView;
+    const UINT pictureView = picture == ScaledPicture::Upscaled ? kUpscaledView
+                                                                 : kIntermediateView;
 
     drawPicture(commandList, bufferIndex, *scalingPipeline_.Get(), target, area, pictureView,
                  toneMap);

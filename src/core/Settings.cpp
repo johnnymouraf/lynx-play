@@ -59,6 +59,12 @@ constexpr Names<ReflexMode, 3> kReflexNames{{
     {"boost", ReflexMode::Boost},
 }};
 
+constexpr Names<Upscaling, 3> kUpscalingNames{{
+    {"shader", Upscaling::Shader},
+    {"vsr", Upscaling::Vsr},
+    {"dlss", Upscaling::Dlss},
+}};
+
 template <typename Value, std::size_t Size>
 std::string nameOf(const Names<Value, Size>& names, Value value)
 {
@@ -215,8 +221,19 @@ RtxSettings readRtx(const Json& rtx)
     }
 
     settings.reflex = namedValue(kReflexNames, rtx, "reflex", settings.reflex);
-    settings.videoSuperResolution =
-        booleanAt(rtx, "videoSuperResolution", settings.videoSuperResolution);
+
+    const auto upscaling = rtx.find("upscaling");
+
+    if (upscaling != rtx.end() && upscaling->is_string())
+    {
+        settings.upscaling = namedValue(kUpscalingNames, rtx, "upscaling", settings.upscaling);
+    }
+    else if (booleanAt(rtx, "videoSuperResolution", false))
+    {
+        // The field before the selector existed: on meant VSR, off the shader.
+        settings.upscaling = Upscaling::Vsr;
+    }
+
     settings.opticalFlow = booleanAt(rtx, "opticalFlow", settings.opticalFlow);
 
     return settings;
@@ -427,7 +444,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
         {"rtx",
          {
              {"reflex", nameOf(kReflexNames, rtx.reflex)},
-             {"videoSuperResolution", rtx.videoSuperResolution},
+             {"upscaling", nameOf(kUpscalingNames, rtx.upscaling)},
              {"opticalFlow", rtx.opticalFlow},
          }},
         {"overlay",

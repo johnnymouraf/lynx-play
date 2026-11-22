@@ -39,8 +39,7 @@ AppController::AppController(StartupState state, SettingsController& settings,
                 if (videoTestWindow_ != nullptr)
                 {
                     videoTestWindow_->setReflexMode(settings_.reflexMode());
-                    videoTestWindow_->setVideoSuperResolution(
-                        settings_.videoSuperResolution());
+                    videoTestWindow_->setUpscaling(settings_.upscalingMode());
                     videoTestWindow_->setOpticalFlow(settings_.opticalFlow());
                 }
             });
@@ -133,8 +132,7 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .title = kVideoTestTitle,
                                                  .timing = settings_.presentTiming(),
                                                  .reflex = settings_.reflexMode(),
-                                                 .videoSuperResolution =
-                                                     settings_.videoSuperResolution(),
+                                                 .upscaling = settings_.upscalingMode(),
                                                  .opticalFlow = settings_.opticalFlow(),
                                                  .overlayFonts = overlayFonts(),
                                                  .overlay =

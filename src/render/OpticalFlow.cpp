@@ -844,6 +844,11 @@ ID3D12Fence* OpticalFlow::fence() const
     return impl_ != nullptr ? impl_->fence.Get() : nullptr;
 }
 
+std::uint64_t OpticalFlow::lastOutputValue() const
+{
+    return impl_ != nullptr ? impl_->lastOutputValue : 0;
+}
+
 ID3D12Resource* OpticalFlow::flow(UINT slot) const
 {
     if (impl_ == nullptr || slot >= impl_->flows.size())

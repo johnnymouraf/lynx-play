@@ -38,7 +38,7 @@ TEST_CASE("Settings survive a write and a read")
     settings.controller.preferred = "DualSense Wireless Controller";
     settings.rtx = {
         .reflex = ReflexMode::Boost,
-        .videoSuperResolution = true,
+        .upscaling = Upscaling::Dlss,
         .opticalFlow = false,
     };
     settings.overlay.statisticsVisible = true;
@@ -66,7 +66,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.video.presentMode == PresentMode::VSync);
     CHECK(defaults.video.hdr == HdrMode::Auto);
     CHECK(defaults.rtx.reflex == ReflexMode::On);
-    CHECK_FALSE(defaults.rtx.videoSuperResolution);
+    CHECK(defaults.rtx.upscaling == Upscaling::Shader);
     CHECK(defaults.rtx.opticalFlow);
 }
 
@@ -105,7 +105,7 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
         },
         "rtx": {
             "reflex": "turbo",
-            "videoSuperResolution": "yes",
+            "upscaling": "turbo",
             "opticalFlow": "yes"
         }
     })");
@@ -122,4 +122,19 @@ TEST_CASE("Settings refuse files that aren't theirs")
     CHECK_FALSE(read("not json").has_value());
     CHECK_FALSE(read("[1, 2]").has_value());
     CHECK_FALSE(read(R"({"version": 2, "video": {}})").has_value());
+}
+
+TEST_CASE("An old videoSuperResolution setting migrates to the upscaling choice")
+{
+    const auto withVsr = read(R"({"version": 1, "rtx": {"videoSuperResolution": true}})");
+    const auto withShader = read(R"({"version": 1, "rtx": {"videoSuperResolution": false}})");
+    const auto withBoth =
+        read(R"({"version": 1, "rtx": {"upscaling": "dlss", "videoSuperResolution": true}})");
+
+    REQUIRE(withVsr.has_value());
+    REQUIRE(withShader.has_value());
+    REQUIRE(withBoth.has_value());
+    CHECK(withVsr->rtx.upscaling == Upscaling::Vsr);
+    CHECK(withShader->rtx.upscaling == Upscaling::Shader);
+    CHECK(withBoth->rtx.upscaling == Upscaling::Dlss);
 }

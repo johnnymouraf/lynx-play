@@ -7,6 +7,8 @@ add_library(lynx_render STATIC
     CadenceMetric.h
     ColorConversion.cpp
     ColorConversion.h
+    DlssSuperResolution.cpp
+    DlssSuperResolution.h
     FrameMailbox.cpp
     FrameMailbox.h
     FramePresenter.cpp
@@ -21,6 +23,8 @@ add_library(lynx_render STATIC
     Hdr.h
     Layout.cpp
     Layout.h
+    NgxHost.cpp
+    NgxHost.h
     OpticalFlow.cpp
     OpticalFlow.h
     Overlay.cpp
@@ -63,6 +67,22 @@ lynx_compile_shader(shaders/VideoFrame.hlsl pixelMain ps_5_1 VideoFramePixelShad
 lynx_compile_shader(shaders/Scale.hlsl vertexMain vs_5_1 ScaleVertexShader)
 lynx_compile_shader(shaders/Scale.hlsl pixelMain ps_5_1 ScalePixelShader)
 lynx_compile_shader(shaders/Cadence.hlsl main cs_5_1 CadenceComputeShader)
+lynx_compile_shader(shaders/DlssMotion.hlsl main cs_5_1 DlssMotionComputeShader)
+
+# NVIDIA's NGX SDK: the headers, the loader import library and the DLSS
+# runtime fetched by scripts/fetch-ngx.ps1. A checkout without the download
+# still builds, with DLSS reporting itself unavailable.
+set(LYNX_NGX_ROOT "${PROJECT_SOURCE_DIR}/.ngx" CACHE PATH
+    "NVIDIA NGX SDK fetched by scripts/fetch-ngx.ps1")
+
+if(EXISTS "${LYNX_NGX_ROOT}/include/nvsdk_ngx.h" AND
+   EXISTS "${LYNX_NGX_ROOT}/lib/nvsdk_ngx_d.lib")
+    add_library(lynx_ngx INTERFACE)
+    target_include_directories(lynx_ngx SYSTEM INTERFACE "${LYNX_NGX_ROOT}/include")
+    target_link_libraries(lynx_ngx INTERFACE "${LYNX_NGX_ROOT}/lib/nvsdk_ngx_d.lib")
+    target_compile_definitions(lynx_ngx INTERFACE LYNX_HAVE_NGX=1)
+    target_link_libraries(lynx_render PRIVATE lynx_ngx)
+endif()
 
 find_package(imgui CONFIG REQUIRED)
 

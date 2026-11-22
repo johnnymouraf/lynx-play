@@ -121,7 +121,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                 if (window_ != nullptr)
                 {
                     window_->setReflexMode(settings_.reflexMode());
-                    window_->setVideoSuperResolution(settings_.videoSuperResolution());
+                    window_->setUpscaling(settings_.upscalingMode());
                     window_->setOpticalFlow(settings_.opticalFlow());
                 }
             });
@@ -397,8 +397,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                           target_->name.toStdWString(),
                                                  .timing = settings_.presentTiming(),
                                                  .reflex = settings_.reflexMode(),
-                                                 .videoSuperResolution =
-                                                     settings_.videoSuperResolution(),
+                                                 .upscaling = settings_.upscalingMode(),
                                                  .opticalFlow = settings_.opticalFlow(),
                                                  .hdr = settings_.hdrMode(),
                                                  .rtxVideoHdrAvailable =

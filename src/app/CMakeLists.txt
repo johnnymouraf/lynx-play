@@ -171,6 +171,16 @@ install(FILES "$<TARGET_PDB_FILE:lynx-play>" DESTINATION ${CMAKE_INSTALL_BINDIR}
 install(FILES ${lynx_licenses} DESTINATION licenses)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
         DESTINATION licenses RENAME NVAPI-License.txt)
+install(FILES assets/NGX-Notices.txt DESTINATION licenses RENAME NGX-Notices.txt)
+
+# NVIDIA's DLSS runtime ships next to the executable, with its license; the
+# loader imports nvsdk_ngx_d.lib and finds the DLL in the application folder.
+if(EXISTS "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll")
+    install(FILES "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll"
+            DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES "${LYNX_NGX_ROOT}/LICENSE.txt"
+            DESTINATION licenses RENAME NGX-License.txt)
+endif()
 
 # Dear ImGui is static inside the executable; its notice ships with it.
 find_file(LYNX_IMGUI_COPYRIGHT NAMES copyright

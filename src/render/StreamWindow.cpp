@@ -149,7 +149,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     FrameRenderer::Options rendererOptions{
         .timing = options.timing,
         .reflex = options.reflex,
-        .videoSuperResolution = options.videoSuperResolution,
+        .upscaling = options.upscaling,
         .opticalFlow = options.opticalFlow,
         .hdr = options.hdr,
         .rtxVideoHdrAvailable = options.rtxVideoHdrAvailable,
@@ -228,11 +228,11 @@ void StreamWindow::setReflexMode(core::ReflexMode mode)
     }
 }
 
-void StreamWindow::setVideoSuperResolution(bool enabled)
+void StreamWindow::setUpscaling(core::Upscaling upscaling)
 {
     if (renderer_ != nullptr)
     {
-        renderer_->setVideoSuperResolution(enabled);
+        renderer_->setUpscaling(upscaling);
     }
 }
 

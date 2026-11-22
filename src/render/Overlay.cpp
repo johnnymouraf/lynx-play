@@ -105,6 +105,8 @@ const char* stageLabel(EffectStage stage)
         return "RTX HDR";
     case EffectStage::VideoSuperResolution:
         return "VSR";
+    case EffectStage::DlssSuperResolution:
+        return "DLSS SR";
     case EffectStage::Cadence:
         return "Cadência";
     case EffectStage::Scaling:
@@ -374,9 +376,14 @@ void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
         const auto stage = static_cast<EffectStage>(index);
         std::string value = "—";
 
-        if (stage == EffectStage::OpticalFlow && stats.opticalFlow != FlowOverlayState::Running)
+        if (stage == EffectStage::OpticalFlow && stats.opticalFlow != StageOverlayState::Running)
         {
-            value = stats.opticalFlow == FlowOverlayState::Off ? "desligado" : "indisponível";
+            value = stats.opticalFlow == StageOverlayState::Off ? "desligado" : "indisponível";
+        }
+        else if (stage == EffectStage::DlssSuperResolution &&
+                 stats.dlss != StageOverlayState::Running)
+        {
+            value = stats.dlss == StageOverlayState::Off ? "desligado" : "indisponível";
         }
         else if (stats.gpuTimingsValid)
         {
