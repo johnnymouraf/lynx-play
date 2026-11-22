@@ -73,5 +73,5 @@ target_compile_definitions(lynx_render PRIVATE LYNX_NVAPI=1)
 target_include_directories(lynx_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(lynx_render
     PUBLIC Lynx::core d3d12 dxgi
-    PRIVATE dxguid user32 imgui::imgui Lynx::input)
+    PRIVATE d3d11 dxguid user32 imgui::imgui Lynx::input)
 lynx_set_warnings(lynx_render)

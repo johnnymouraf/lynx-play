@@ -523,18 +523,13 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
 
     for (std::size_t index = 0; index < kModes.size(); ++index)
     {
-        widths.at(index) =
-            2.0F * kSegmentPadding + textWidth(fonts.label, kBodySize, reflexModeLabel(kModes.at(index)));
+        widths.at(index) = 2.0F * kSegmentPadding +
+                           textWidth(fonts.label, kBodySize, reflexModeLabel(kModes.at(index)));
     }
 
     const float containerWidth = 2.0F * kOuterPadding + widths.at(0) + widths.at(1) + widths.at(2) +
                                  2.0F * kGap;
-
-    ImGui::SetCursorScreenPos(start);
-    ImGui::InvisibleButton("reflex-modes", ImVec2(containerWidth, kContainerHeight));
-    const bool clicked = ImGui::IsItemClicked() &&
-                         reflex.state != ReflexOverlayStats::State::Unavailable;
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const bool available = reflex.state != ReflexOverlayStats::State::Unavailable;
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     drawList->AddRectFilled(start, ImVec2(start.x + containerWidth, start.y + kContainerHeight),
@@ -542,6 +537,7 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
     drawList->AddRect(start, ImVec2(start.x + containerWidth, start.y + kContainerHeight),
                        kBorderStrong, 10.0F);
 
+    bool clicked = false;
     float x = start.x + kOuterPadding;
 
     for (std::size_t index = 0; index < kModes.size(); ++index)
@@ -550,17 +546,22 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
         const ImVec2 segmentTop(x, start.y + kOuterPadding);
         const ImVec2 segmentBottom(x + width, segmentTop.y + kHeight);
         const bool selected = kModes.at(index) == current;
-        const bool available = reflex.state != ReflexOverlayStats::State::Unavailable;
 
         if (selected)
         {
             drawList->AddRectFilled(segmentTop, segmentBottom, kAccentSubtle, 6.0F);
         }
 
-        if (clicked && mouse.x >= segmentTop.x && mouse.x < segmentBottom.x)
+        ImGui::SetCursorScreenPos(segmentTop);
+        ImGui::PushID(static_cast<int>(index));
+
+        if (ImGui::InvisibleButton("segment", ImVec2(width, kHeight)) && available)
         {
             *chosen = kModes.at(index);
+            clicked = true;
         }
+
+        ImGui::PopID();
 
         const char* label = reflexModeLabel(kModes.at(index));
         const float labelWidth = textWidth(fonts.label, kBodySize, label);

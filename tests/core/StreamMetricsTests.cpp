@@ -64,9 +64,10 @@ TEST_CASE("StreamMetrics keeps present intervals for the frame time plot")
 {
     StreamMetrics metrics(kStart);
 
-    metrics.addPresented(kStart + 100ms, std::nullopt, 2ms);
-    metrics.addPresented(kStart + 116ms, 16ms, 3ms);
-    metrics.addPresented(kStart + 133ms, 17ms, 4ms);
+    metrics.addPresented(kStart + 100ms, std::nullopt, 2ms, true);
+    metrics.addPresented(kStart + 116ms, 16ms, 3ms, true);
+    metrics.addPresented(kStart + 133ms, 17ms, 4ms, true);
+    metrics.addPresented(kStart + 137ms, std::nullopt, std::nullopt, false);
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
 

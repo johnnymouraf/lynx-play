@@ -2,6 +2,7 @@
 
 #include "core/Windows.h"
 
+#include <d3d11.h>
 #include <spdlog/spdlog.h>
 
 namespace lynx::render
@@ -140,23 +141,31 @@ std::expected<GpuDevice, std::string> createGpuDevice()
         return std::unexpected(describeFailure("CreateCommandQueue", result));
     }
 
+    // DXGI keeps the per-thread GPU priority on an IDXGIDevice; a bare D3D11
+    // device on the same adapter is how a D3D12 renderer reaches it.
+    ComPtr<ID3D11Device> d3d11Device;
+    const HRESULT d3d11Result =
+        D3D11CreateDevice(gpu.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0,
+                          D3D11_SDK_VERSION, &d3d11Device, nullptr, nullptr);
+
+    if (FAILED(d3d11Result))
+    {
+        spdlog::warn("{}", describeFailure("D3D11CreateDevice (GPU thread priority)", d3d11Result));
+    }
+    else if (const HRESULT result = d3d11Device.As(&gpu.dxgiDevice); FAILED(result))
+    {
+        spdlog::warn("{}", describeFailure("ID3D11Device as IDXGIDevice", result));
+    }
+
     spdlog::info("Rendering on {} (vendor 0x{:04X}), tearing {}", gpu.info.name,
                  gpu.info.vendorId, gpu.supportsTearing ? "supported" : "unsupported");
 
     return gpu;
 }
 
-void raiseCurrentThreadGpuPriority(ID3D12Device& device)
+void raiseCurrentThreadGpuPriority(IDXGIDevice& device)
 {
-    ComPtr<IDXGIDevice> dxgiDevice;
-
-    if (const HRESULT result = device.QueryInterface(IID_PPV_ARGS(&dxgiDevice)); FAILED(result))
-    {
-        spdlog::warn("{}", describeFailure("ID3D12Device as IDXGIDevice", result));
-        return;
-    }
-
-    if (const HRESULT result = dxgiDevice->SetGPUThreadPriority(kHighestGpuThreadPriority);
+    if (const HRESULT result = device.SetGPUThreadPriority(kHighestGpuThreadPriority);
         FAILED(result))
     {
         spdlog::warn("{}", describeFailure("SetGPUThreadPriority", result));

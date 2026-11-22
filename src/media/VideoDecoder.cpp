@@ -248,7 +248,7 @@ struct VideoDecoder::Context
     core::VideoCodec codec = core::VideoCodec::H265;
     std::shared_ptr<render::FrameMailbox> mailbox;
     std::shared_ptr<core::StreamMetrics> metrics;
-    ID3D12Device* device = nullptr;
+    Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
     CodecContextPtr codecContext;
     PacketPtr packet;
     FramePtr frame;
@@ -293,7 +293,7 @@ std::expected<std::unique_ptr<VideoDecoder>, std::string> VideoDecoder::create(
     context->codec = codec;
     context->mailbox = std::move(mailbox);
     context->metrics = std::move(metrics);
-    context->device = gpu.device.Get();
+    context->dxgiDevice = gpu.dxgiDevice;
     context->codecContext.reset(avcodec_alloc_context3(decoder));
     context->packet.reset(av_packet_alloc());
     context->frame.reset(av_frame_alloc());
@@ -348,9 +348,9 @@ std::expected<void, std::string> VideoDecoder::decode(std::span<const std::uint8
         SetThreadDescription(GetCurrentThread(), L"Lynx video decoder");
         mmcss.emplace(core::MmcssRegistration::enable(L"Games"));
 
-        if (context_->device != nullptr)
+        if (context_->dxgiDevice)
         {
-            render::raiseCurrentThreadGpuPriority(*context_->device);
+            render::raiseCurrentThreadGpuPriority(*context_->dxgiDevice.Get());
         }
     }
 

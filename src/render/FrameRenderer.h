@@ -117,7 +117,7 @@ private:
     std::shared_ptr<FrameMailbox> mailbox_;
     Options options_;
     std::shared_ptr<core::StreamMetrics> metrics_;
-    std::optional<std::chrono::steady_clock::time_point> lastPresentTime_;
+    std::optional<std::chrono::steady_clock::time_point> lastNewFramePresentTime_;
     ComPtr<ID3D12GraphicsCommandList> commandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> allocators_;
     std::array<UINT64, SwapChain::kBufferCount> allocatorFenceValues_{};

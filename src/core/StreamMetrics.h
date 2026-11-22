@@ -63,10 +63,11 @@ public:
     void addDecoded(Clock::time_point at, double milliseconds);
     // Packet counters since the previous call, from the session.
     void addPacketStats(Clock::time_point at, std::uint64_t received, std::uint64_t lost);
-    // One present; the interval is absent for the first one, and the time
-    // from the frame being ready only when the frame is new.
+    // One present; `uniqueFrame` says it showed a new decoded picture, so it
+    // counts as a presented frame. The interval is absent for the first new
+    // frame, and the time from the frame being ready only for new frames.
     void addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
-                       std::optional<Clock::duration> readyToPresent);
+                       std::optional<Clock::duration> readyToPresent, bool uniqueFrame);
 
     [[nodiscard]] StreamMetricsSnapshot snapshot(Clock::time_point now);
 

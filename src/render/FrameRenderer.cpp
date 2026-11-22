@@ -237,7 +237,11 @@ void FrameRenderer::run(const std::stop_token& stop)
 {
     SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
     const core::MmcssRegistration mmcss = core::MmcssRegistration::enable(L"Games");
-    raiseCurrentThreadGpuPriority(*gpu_.device.Get());
+
+    if (gpu_.dxgiDevice)
+    {
+        raiseCurrentThreadGpuPriority(*gpu_.dxgiDevice.Get());
+    }
 
     const ReflexAvailability availability = ReflexSession::probe();
     reflexReason_ = availability.reason;
@@ -500,19 +504,20 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     const Clock::time_point now = Clock::now();
     const std::optional<Clock::duration> interval =
-        lastPresentTime_ ? std::optional(now - *lastPresentTime_) : std::nullopt;
+        showsNewFrame && lastNewFramePresentTime_
+            ? std::optional(now - *lastNewFramePresentTime_)
+            : std::nullopt;
     const std::optional<Clock::duration> readyToPresent =
         showsNewFrame ? std::optional(now - shownFrame_->timestamp) : std::nullopt;
 
     if (metrics_ != nullptr)
     {
-        metrics_->addPresented(now, interval, readyToPresent);
+        metrics_->addPresented(now, interval, readyToPresent, showsNewFrame);
     }
-
-    lastPresentTime_ = now;
 
     if (showsNewFrame)
     {
+        lastNewFramePresentTime_ = now;
         presented_.add(now - shownFrame_->timestamp);
     }
 

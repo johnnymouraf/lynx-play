@@ -156,7 +156,9 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                     .statisticsVisible = settings.overlayStatisticsVisible(),
                     .reflex = settings.reflexMode(),
                     .microphoneMuted = settings.microphoneMuted(),
-                    .microphoneDetail = gamepads != nullptr ? "DualSense" : "Sem controle",
+                    .microphoneDetail = gamepads != nullptr && gamepads->activeName().has_value()
+                                             ? "DualSense"
+                                             : "Sem controle",
                     .sessionName = "Arquivo de teste",
                 },
             .overlayActions = overlayActions,

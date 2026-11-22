@@ -74,10 +74,14 @@ void StreamMetrics::addPacketStats(Clock::time_point at, std::uint64_t received,
 }
 
 void StreamMetrics::addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
-                                 std::optional<Clock::duration> readyToPresent)
+                                 std::optional<Clock::duration> readyToPresent, bool uniqueFrame)
 {
     const std::scoped_lock lock(mutex_);
-    presented_.add(at);
+
+    if (uniqueFrame)
+    {
+        presented_.add(at);
+    }
 
     if (interval)
     {

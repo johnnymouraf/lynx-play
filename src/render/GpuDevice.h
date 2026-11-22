@@ -22,6 +22,9 @@ struct GpuDevice
     ComPtr<IDXGIAdapter4> adapter;
     ComPtr<ID3D12Device> device;
     ComPtr<ID3D12CommandQueue> queue;
+    // A D3D11 device on the same adapter; DXGI's GPU thread priority only
+    // exists on its IDXGIDevice.
+    ComPtr<IDXGIDevice> dxgiDevice;
     AdapterInfo info;
     bool supportsTearing = false;
 };
@@ -33,6 +36,6 @@ struct GpuDevice
 
 // Raises the calling thread's priority to DXGI's highest for GPU work. Call it
 // on the render and decode threads, once each.
-void raiseCurrentThreadGpuPriority(ID3D12Device& device);
+void raiseCurrentThreadGpuPriority(IDXGIDevice& device);
 
 } // namespace lynx::render
