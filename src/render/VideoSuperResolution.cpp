@@ -265,9 +265,71 @@ std::expected<VideoProcessor, VsrFailure> createProcessor(ID3D11VideoDevice& vid
     return processor;
 }
 
-std::expected<ComPtr<ID3D11Texture2D>, std::string> createSharedTexture(
-    ID3D11Device& device, SurfaceSize size, DXGI_FORMAT format, UINT bindFlags,
-    std::string_view what)
+// Textures the renderer and the video processor both use are created on
+// D3D12, which only validates them for sharing at the shared heap, and opened
+// on D3D11: the D3D11 runtime rejects some NV12 shared combinations that
+// D3D12 accepts. The D3D11 side sees the bind flags the D3D12 flags imply.
+struct SharedTexture
+{
+    ComPtr<ID3D12Resource> texture12;
+    ComPtr<ID3D11Texture2D> texture11;
+};
+
+std::expected<SharedTexture, std::string> createSharedTexture(ID3D12Device& device12,
+                                                              ID3D11Device5& device11,
+                                                              SurfaceSize size,
+                                                              DXGI_FORMAT format,
+                                                              std::string_view what)
+{
+    const D3D12_RESOURCE_DESC description{
+        .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        .Alignment = 0,
+        .Width = size.width,
+        .Height = size.height,
+        .DepthOrArraySize = 1,
+        .MipLevels = 1,
+        .Format = format,
+        .SampleDesc = {.Count = 1, .Quality = 0},
+        .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+    };
+    const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
+
+    SharedTexture texture;
+
+    if (const HRESULT result = device12.CreateCommittedResource(
+            &defaultHeap, D3D12_HEAP_FLAG_SHARED, &description,
+            D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&texture.texture12));
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure(what, result));
+    }
+
+    HANDLE handle = nullptr;
+
+    if (const HRESULT result = device12.CreateSharedHandle(texture.texture12.Get(), nullptr,
+                                                           GENERIC_ALL, nullptr, &handle);
+        FAILED(result))
+    {
+        return std::unexpected(describeFailure(what, result));
+    }
+
+    const HRESULT opened =
+        device11.OpenSharedResource1(handle, IID_PPV_ARGS(&texture.texture11));
+    CloseHandle(handle);
+
+    if (FAILED(opened))
+    {
+        return std::unexpected(describeFailure(what, opened));
+    }
+
+    return texture;
+}
+
+std::expected<ComPtr<ID3D11Texture2D>, std::string> createLocalTexture(ID3D11Device& device,
+                                                                      SurfaceSize size,
+                                                                      DXGI_FORMAT format,
+                                                                      std::string_view what)
 {
     const D3D11_TEXTURE2D_DESC description{
         .Width = size.width,
@@ -277,9 +339,9 @@ std::expected<ComPtr<ID3D11Texture2D>, std::string> createSharedTexture(
         .Format = format,
         .SampleDesc = {.Count = 1, .Quality = 0},
         .Usage = D3D11_USAGE_DEFAULT,
-        .BindFlags = bindFlags,
+        .BindFlags = static_cast<UINT>(D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE),
         .CPUAccessFlags = 0,
-        .MiscFlags = static_cast<UINT>(D3D11_RESOURCE_MISC_SHARED_NTHANDLE),
+        .MiscFlags = 0,
     };
 
     ComPtr<ID3D11Texture2D> texture;
@@ -292,40 +354,6 @@ std::expected<ComPtr<ID3D11Texture2D>, std::string> createSharedTexture(
     }
 
     return texture;
-}
-
-std::expected<ComPtr<ID3D12Resource>, std::string> shareTexture(ID3D11Texture2D& texture,
-                                                               ID3D12Device& device,
-                                                               std::string_view what)
-{
-    ComPtr<IDXGIResource1> resource;
-
-    if (const HRESULT result = texture.QueryInterface(IID_PPV_ARGS(&resource)); FAILED(result))
-    {
-        return std::unexpected(describeFailure(what, result));
-    }
-
-    HANDLE handle = nullptr;
-
-    if (const HRESULT result = resource->CreateSharedHandle(
-            nullptr,
-            static_cast<DWORD>(DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE),
-            nullptr, &handle);
-        FAILED(result))
-    {
-        return std::unexpected(describeFailure(what, result));
-    }
-
-    ComPtr<ID3D12Resource> shared;
-    const HRESULT result = device.OpenSharedHandle(handle, IID_PPV_ARGS(&shared));
-    CloseHandle(handle);
-
-    if (FAILED(result))
-    {
-        return std::unexpected(describeFailure(what, result));
-    }
-
-    return shared;
 }
 
 } // namespace
@@ -508,27 +536,17 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
 {
     Slot slot;
 
-    auto inputTexture = createSharedTexture(
-        *device_.Get(), picture.input, inputFormatOf(picture.format),
-        static_cast<UINT>(D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE),
-        "CreateTexture2D (VSR input)");
-
-    if (!inputTexture)
-    {
-        return std::unexpected(inputTexture.error());
-    }
-
-    slot.inputTexture = std::move(*inputTexture);
-
-    auto input = shareTexture(*slot.inputTexture.Get(), *device12_.Get(), "OpenSharedHandle (VSR "
-                                                                         "input)");
+    auto input = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.input,
+                                      inputFormatOf(picture.format),
+                                      "CreateCommittedResource (VSR input)");
 
     if (!input)
     {
         return std::unexpected(input.error());
     }
 
-    slot.input = std::move(*input);
+    slot.input = std::move(input->texture12);
+    slot.inputTexture = std::move(input->texture11);
 
     const D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputDescription{
         .FourCC = 0,
@@ -536,35 +554,46 @@ std::expected<VideoSuperResolution::Slot, std::string> VideoSuperResolution::cre
         .Texture2D = {.MipSlice = 0, .ArraySlice = 0},
     };
 
-    if (const HRESULT result = videoDevice_->CreateVideoProcessorInputView(
-            slot.inputTexture.Get(), enumerator_.Get(), &inputDescription,
-            slot.inputView.GetAddressOf());
-        FAILED(result))
+    const HRESULT sharedView = videoDevice_->CreateVideoProcessorInputView(
+        slot.inputTexture.Get(), enumerator_.Get(), &inputDescription,
+        slot.inputView.GetAddressOf());
+
+    if (FAILED(sharedView))
     {
-        return std::unexpected(describeFailure("CreateVideoProcessorInputView", result));
+        auto local = createLocalTexture(*device_.Get(), picture.input,
+                                        inputFormatOf(picture.format),
+                                        "CreateTexture2D (VSR input copy)");
+
+        if (!local)
+        {
+            return std::unexpected(local.error());
+        }
+
+        slot.inputLocal = std::move(*local);
+
+        if (const HRESULT result = videoDevice_->CreateVideoProcessorInputView(
+                slot.inputLocal.Get(), enumerator_.Get(), &inputDescription,
+                slot.inputView.ReleaseAndGetAddressOf());
+            FAILED(result))
+        {
+            return std::unexpected(
+                describeFailure("CreateVideoProcessorInputView (local)", result));
+        }
+
+        spdlog::info("VSR: the processor rejected the shared input texture; each frame is copied "
+                     "into a local one");
     }
 
-    auto outputTexture =
-        createSharedTexture(*device_.Get(), picture.output, kOutputFormat,
-                            static_cast<UINT>(D3D11_BIND_RENDER_TARGET),
-                            "CreateTexture2D (VSR output)");
-
-    if (!outputTexture)
-    {
-        return std::unexpected(outputTexture.error());
-    }
-
-    slot.outputTexture = std::move(*outputTexture);
-
-    auto output = shareTexture(*slot.outputTexture.Get(), *device12_.Get(),
-                               "OpenSharedHandle (VSR output)");
+    auto output = createSharedTexture(*device12_.Get(), *device5_.Get(), picture.output,
+                                      kOutputFormat, "CreateCommittedResource (VSR output)");
 
     if (!output)
     {
         return std::unexpected(output.error());
     }
 
-    slot.output = std::move(*output);
+    slot.output = std::move(output->texture12);
+    slot.outputTexture = std::move(output->texture11);
 
     const D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outputDescription{
         .ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D,
@@ -615,6 +644,11 @@ std::expected<UINT64, std::string> VideoSuperResolution::blit(UINT slot, UINT64 
     if (const HRESULT result = context4_->Wait(fence11_.Get(), inputReady); FAILED(result))
     {
         return std::unexpected(describeFailure("ID3D11DeviceContext4::Wait", result));
+    }
+
+    if (target.inputLocal)
+    {
+        context_->CopyResource(target.inputLocal.Get(), target.inputTexture.Get());
     }
 
     D3D11_VIDEO_PROCESSOR_STREAM stream{};

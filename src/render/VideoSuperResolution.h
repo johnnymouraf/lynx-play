@@ -109,11 +109,14 @@ private:
 
     struct Slot
     {
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> inputTexture;
         Microsoft::WRL::ComPtr<ID3D12Resource> input;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> inputTexture;
+        // Set when the processor rejects the shared input texture: the shared
+        // one is copied into this local one before the blit.
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> inputLocal;
         Microsoft::WRL::ComPtr<ID3D11VideoProcessorInputView> inputView;
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> outputTexture;
         Microsoft::WRL::ComPtr<ID3D12Resource> output;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> outputTexture;
         Microsoft::WRL::ComPtr<ID3D11VideoProcessorOutputView> outputView;
     };
 
