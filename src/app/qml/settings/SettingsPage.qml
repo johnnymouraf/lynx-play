@@ -56,8 +56,9 @@ Item {
                 spacing: Theme.space5
 
                 RoundedImage {
-                    implicitWidth: 72
-                    implicitHeight: 72
+                    Layout.preferredWidth: 72
+                    Layout.preferredHeight: 72
+                    Layout.fillWidth: false
                     source: Theme.brandMark
                     sourceWidth: 216
                     topLeftRadius: 18

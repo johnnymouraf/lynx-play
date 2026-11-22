@@ -7,10 +7,98 @@ import LynxPlay
 FocusScope {
     id: page
 
+    required property ConsolesController consoles
+
+    readonly property bool hasConsoles: page.consoles.model.count > 0
+    readonly property int minimumCardWidth: 280
+    property int currentIndex: 0
+
     signal addByAddressRequested
+    signal pairRequested(string key, string name)
+    signal menuRequested(string key, string name, bool saved, Item anchor)
 
     function focusFirstControl() {
+        if (page.hasConsoles) {
+            cardsArea.forceActiveFocus(Qt.TabFocusReason);
+            return;
+        }
+
         emptyState.focusAction();
+    }
+
+    function moveCurrent(step) {
+        const next = page.currentIndex + step;
+
+        if (next < 0 || next >= cards.count) {
+            return;
+        }
+
+        page.currentIndex = next;
+        page.revealCard(cards.itemAt(next));
+    }
+
+    function revealCard(card) {
+        if (!card) {
+            return;
+        }
+
+        const cardTop = card.mapToItem(content, 0, 0).y + content.y;
+        const top = cardTop - Theme.space2;
+        const bottom = cardTop + card.height + Theme.space2;
+
+        if (top < scroller.contentY) {
+            scroller.contentY = top;
+            return;
+        }
+
+        if (bottom > scroller.contentY + scroller.height) {
+            scroller.contentY = bottom - scroller.height;
+        }
+    }
+
+    function handleCardKey(event) {
+        const current = cards.itemAt(page.currentIndex);
+
+        switch (event.key) {
+        case Qt.Key_Left:
+            page.moveCurrent(-1);
+            break;
+        case Qt.Key_Right:
+            page.moveCurrent(1);
+            break;
+        case Qt.Key_Up:
+            page.moveCurrent(-cardsArea.columns);
+            break;
+        case Qt.Key_Down:
+            page.moveCurrent(cardsArea.columns);
+            break;
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+        case Qt.Key_Space:
+            current?.triggerPrimary();
+            break;
+        case Qt.Key_Menu:
+            current?.openMenu();
+            break;
+        default:
+            return;
+        }
+
+        event.accepted = true;
+    }
+
+    onHasConsolesChanged: {
+        if (page.activeFocus) {
+            page.focusFirstControl();
+        }
+    }
+
+    Connections {
+        target: page.consoles.model
+
+        function onCountChanged() {
+            page.currentIndex = Math.min(page.currentIndex, Math.max(0, cards.count - 1));
+        }
     }
 
     Flickable {
@@ -44,6 +132,7 @@ FocusScope {
 
                 ColumnLayout {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignBottom
                     spacing: Theme.space1
 
                     AppText {
@@ -52,7 +141,65 @@ FocusScope {
                         Accessible.role: Accessible.Heading
                     }
 
-                    ScanIndicator {}
+                    ScanIndicator {
+                        visible: page.consoles.discoveryStatus === ConsolesController.Searching
+                    }
+                }
+
+                ActionButton {
+                    Layout.alignment: Qt.AlignBottom
+                    visible: page.hasConsoles
+                    iconName: "plus"
+                    text: "Adicionar pelo IP"
+                    onClicked: page.addByAddressRequested()
+                }
+            }
+
+            DiscoveryBanner {
+                Layout.fillWidth: true
+                status: page.consoles.discoveryStatus
+                onRetryRequested: page.consoles.retryDiscovery()
+            }
+
+            FocusScope {
+                id: cardsArea
+
+                readonly property int columns: Math.max(1, Math.floor(
+                    (width + Theme.space6) / (page.minimumCardWidth + Theme.space6)))
+                readonly property real cardWidth: (width - Theme.space6 * (columns - 1)) / columns
+
+                Layout.fillWidth: true
+                implicitHeight: grid.implicitHeight
+                visible: page.hasConsoles
+                activeFocusOnTab: true
+                Accessible.role: Accessible.List
+                Accessible.name: "Consoles"
+                Keys.onPressed: event => page.handleCardKey(event)
+
+                Grid {
+                    id: grid
+
+                    columns: cardsArea.columns
+                    columnSpacing: Theme.space6
+                    rowSpacing: Theme.space6
+
+                    Repeater {
+                        id: cards
+
+                        model: page.consoles.model
+
+                        delegate: ConsoleCard {
+                            id: consoleCard
+
+                            width: cardsArea.cardWidth
+                            focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
+                            onPairRequested: page.pairRequested(consoleCard.key, consoleCard.name)
+                            onMenuRequested: anchor => page.menuRequested(consoleCard.key,
+                                                                          consoleCard.name,
+                                                                          consoleCard.saved,
+                                                                          anchor)
+                        }
+                    }
                 }
             }
 
@@ -61,6 +208,7 @@ FocusScope {
                 Layout.preferredHeight: Math.max(emptyState.implicitHeight,
                                                  scroller.height - 2 * Theme.space2
                                                  - header.height - content.spacing)
+                visible: !page.hasConsoles
 
                 EmptyState {
                     id: emptyState

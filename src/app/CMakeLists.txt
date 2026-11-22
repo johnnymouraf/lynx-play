@@ -10,6 +10,10 @@ configure_file(Version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/app/Version.h
 qt_add_executable(lynx-play WIN32
     AppController.cpp
     AppController.h
+    ConsoleListModel.cpp
+    ConsoleListModel.h
+    ConsolesController.cpp
+    ConsolesController.h
     Fonts.cpp
     Fonts.h
     IconProvider.cpp
@@ -41,7 +45,9 @@ qt_add_qml_module(lynx-play
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
+        qml/consoles/ConsoleCard.qml
         qml/consoles/ConsolesPage.qml
+        qml/consoles/DiscoveryBanner.qml
         qml/consoles/EmptyState.qml
         qml/controls/ActionButton.qml
         qml/controls/AppRail.qml

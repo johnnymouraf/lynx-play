@@ -1,4 +1,5 @@
 #include "app/AppController.h"
+#include "app/ConsolesController.h"
 #include "app/Fonts.h"
 #include "app/IconProvider.h"
 #include "app/QtLogBridge.h"
@@ -102,9 +103,14 @@ int main(int argc, char* argv[])
     QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
     QGuiApplication::setApplicationVersion(controller.version());
 
+    lynx::app::ConsolesController consoles(controller.remotePlayReady());
+
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);
-    engine.setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+    engine.setInitialProperties({
+        {QStringLiteral("controller"), QVariant::fromValue(&controller)},
+        {QStringLiteral("consoles"), QVariant::fromValue(&consoles)},
+    });
 
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &application,

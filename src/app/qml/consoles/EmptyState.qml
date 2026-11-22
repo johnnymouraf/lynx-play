@@ -115,6 +115,7 @@ ColumnLayout {
 
     ColumnLayout {
         Layout.alignment: Qt.AlignHCenter
+        Layout.fillWidth: false
         Layout.preferredWidth: Math.min(560, empty.width)
         spacing: Theme.space2
 
