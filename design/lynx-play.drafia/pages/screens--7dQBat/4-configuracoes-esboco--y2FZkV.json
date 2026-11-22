@@ -1,0 +1,2703 @@
+{
+  "id": "y2FZkV",
+  "type": "section",
+  "name": "4 · Configurações (esboço)",
+  "x": 0,
+  "y": 3966,
+  "width": 8480,
+  "height": 1040,
+  "fills": ["#13161B"],
+  "children": [
+    {
+      "id": "Sxrlje",
+      "type": "frame",
+      "name": "Configurações — Vídeo",
+      "x": 100,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "sU3HWI",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "YnCf8j",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "IAHCuj",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "eHUjXw",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "HkVLcn",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "6KrduB",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "QM2xdQ",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "mDnSOY",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "xhODin",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "Keyepf",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "bfgV1R",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "hES9Zc",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "Vídeo",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "sTRM0x",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "Qualidade da imagem pedida ao PS5. Valores mais altos exigem uma rede mais estável.",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "KRxIf1",
+              "type": "instance",
+              "name": "Resolução",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Resolução pedida ao PS5. A imagem é ampliada para a sua tela.",
+                "Label": "Resolução",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "Xj5Qto",
+                      "type": "instance",
+                      "name": "Segmented",
+                      "component": "syDELE"
+                    }
+                  ]
+                },
+                "Xj5Qto/NHlVfm": {
+                  "children": [
+                    {
+                      "id": "GLjc5s",
+                      "type": "instance",
+                      "name": "1080p",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "1080p",
+                        "State": "selected"
+                      }
+                    },
+                    {
+                      "id": "U949WJ",
+                      "type": "instance",
+                      "name": "720p",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "720p",
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "RSp3gZ",
+                      "type": "instance",
+                      "name": "540p",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "540p",
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "YB1rwh",
+                      "type": "instance",
+                      "name": "360p",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "360p",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "Xnc8sj",
+              "type": "instance",
+              "name": "Taxa de quadros",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "",
+                "Label": "Taxa de quadros",
+                "Show description": false
+              },
+              "overrides": {
+                "5BBO6b/NHlVfm": {
+                  "children": [
+                    {
+                      "id": "DwLSuq",
+                      "type": "instance",
+                      "name": "60 fps",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "60 fps",
+                        "State": "selected"
+                      }
+                    },
+                    {
+                      "id": "0d0GYQ",
+                      "type": "instance",
+                      "name": "30 fps",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "30 fps",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "5BBO6b",
+                      "type": "instance",
+                      "name": "Segmented",
+                      "component": "syDELE"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "WZJ4bq",
+              "type": "instance",
+              "name": "Codec",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "H.265 entrega mais qualidade no mesmo bitrate.",
+                "Label": "Codec",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "lTJSAj",
+                      "type": "instance",
+                      "name": "Segmented",
+                      "component": "syDELE"
+                    }
+                  ]
+                },
+                "lTJSAj/NHlVfm": {
+                  "children": [
+                    {
+                      "id": "LBxBey",
+                      "type": "instance",
+                      "name": "H.265",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "H.265",
+                        "State": "selected"
+                      }
+                    },
+                    {
+                      "id": "fL2nri",
+                      "type": "instance",
+                      "name": "H.264",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "H.264",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "NiSZXj",
+              "type": "instance",
+              "name": "Bitrate",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Na rede local, o máximo que o PS5 aceita costuma ser o melhor.",
+                "Label": "Bitrate",
+                "Show description": true
+              },
+              "overrides": {
+                "EJAgF5/nu8lXV": {
+                  "width": 174
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "EJAgF5",
+                      "type": "instance",
+                      "name": "Slider",
+                      "width": 240,
+                      "component": "HqI7nU",
+                      "props": {
+                        "State": "focus"
+                      }
+                    },
+                    {
+                      "id": "7XV5U4",
+                      "type": "text",
+                      "name": "Value",
+                      "width": 76,
+                      "fills": ["$color/text"],
+                      "content": "40 Mbps",
+                      "textStyle": "ACC6X8",
+                      "textAlign": "right",
+                      "textGrowth": "fixed-width"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "bYpm9q",
+              "type": "instance",
+              "name": "Sincronização vertical",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Menor latência pode mostrar cortes na imagem (tearing).",
+                "Label": "Sincronização vertical",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "g0fU72",
+                      "type": "instance",
+                      "name": "Segmented",
+                      "component": "syDELE"
+                    }
+                  ]
+                },
+                "g0fU72/NHlVfm": {
+                  "children": [
+                    {
+                      "id": "4nNL8Z",
+                      "type": "instance",
+                      "name": "Menor latência",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "Menor latência",
+                        "State": "selected"
+                      }
+                    },
+                    {
+                      "id": "B1ENtd",
+                      "type": "instance",
+                      "name": "VSync",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "VSync",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m847r0",
+      "type": "frame",
+      "name": "Configurações — Áudio e microfone",
+      "x": 1500,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "kzNeIx",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "m3OdFw",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "8o264i",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "IF5Xxe",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "sncMQd",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "rz8wSs",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "v2Y6J6",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "xdx2Zg",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "qaIaeR",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "S6xasY",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "wEZNZ5",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "LLr3e1",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "Áudio e microfone",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "wMLlZG",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "O som do jogo sai no PC; o microfone vai para o PS5 (chat de voz e comandos).",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "eM8sIT",
+              "type": "instance",
+              "name": "Saída de áudio",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Onde o som do jogo toca.",
+                "Label": "Saída de áudio",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "mCEt7q",
+                      "type": "instance",
+                      "name": "Select",
+                      "width": 300,
+                      "component": "k1apXs",
+                      "props": {
+                        "State": "default",
+                        "Value": "Alto-falantes (Realtek Audio)"
+                      }
+                    }
+                  ]
+                },
+                "mCEt7q/lQ5KdU": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "tuLBtG",
+              "type": "instance",
+              "name": "Microfone",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Usado no chat de voz do PS5.",
+                "Label": "Microfone",
+                "Show description": true
+              },
+              "overrides": {
+                "7sGoql": {
+                  "props": {
+                    "Value": "Microfone do DualSense"
+                  }
+                },
+                "7sGoql/lQ5KdU": {
+                  "visible": false
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "7sGoql",
+                      "type": "instance",
+                      "name": "Select",
+                      "width": 300,
+                      "component": "k1apXs",
+                      "props": {
+                        "State": "default",
+                        "Value": "DualSense (microfone do controle)"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "E3EVor",
+              "type": "instance",
+              "name": "Silenciar microfone",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Também pelo botão de mudo do DualSense, a qualquer momento.",
+                "Label": "Silenciar microfone",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "CJV09K",
+                      "type": "instance",
+                      "name": "Toggle",
+                      "component": "vD5E9Q",
+                      "props": {
+                        "Checked": "off",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "CFbdRo",
+              "type": "instance",
+              "name": "Volume do jogo",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "",
+                "Label": "Volume do jogo",
+                "Show description": false
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "vzTGlX",
+                      "type": "instance",
+                      "name": "Slider",
+                      "width": 240,
+                      "component": "HqI7nU",
+                      "props": {
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "C65TrP",
+                      "type": "text",
+                      "name": "Value",
+                      "width": 76,
+                      "fills": ["$color/text"],
+                      "content": "85 %",
+                      "textStyle": "ACC6X8",
+                      "textAlign": "right",
+                      "textGrowth": "fixed-width"
+                    }
+                  ]
+                },
+                "vzTGlX/ueYeSV": {
+                  "width": 185
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "KmG7Dz",
+      "type": "frame",
+      "name": "Configurações — Controles",
+      "x": 2900,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "iTd599",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "aDqbW7",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "QSxQbL",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "qbiv4W",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "Wcxr8B",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "UCseMH",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "x5XMXI",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "pGoQ8i",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "Fu8J9r",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "Yzca1F",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "nZzL0d",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "o8oYwp",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "Controles",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "W5VORb",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "O DualSense funciona direto. Sem controle, o teclado e o mouse fazem o papel dele.",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "YgDZPR",
+              "type": "frame",
+              "name": "DualSense card",
+              "width": "fill",
+              "layout": "horizontal",
+              "gap": "$space/4",
+              "padding": "$space/4",
+              "align": "center",
+              "fills": ["$color/surface"],
+              "strokes": ["$color/border"],
+              "strokeWeight": 1,
+              "cornerRadius": "$radius/lg",
+              "children": [
+                {
+                  "id": "DLBRLD",
+                  "type": "frame",
+                  "name": "Icon wrap",
+                  "width": 48,
+                  "height": 48,
+                  "layout": "horizontal",
+                  "justify": "center",
+                  "align": "center",
+                  "fills": ["$color/surfaceHigh"],
+                  "cornerRadius": "$radius/lg",
+                  "children": [
+                    {
+                      "id": "QJVL6N",
+                      "type": "icon",
+                      "name": "Icon",
+                      "width": 26,
+                      "height": 26,
+                      "fills": ["$color/text"],
+                      "icon": "lucide:gamepad-2"
+                    }
+                  ]
+                },
+                {
+                  "id": "6toFdR",
+                  "type": "frame",
+                  "name": "Text",
+                  "width": "fill",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "id": "IaOsG1",
+                      "type": "text",
+                      "name": "Title",
+                      "fills": ["$color/text"],
+                      "content": "DualSense conectado por USB",
+                      "textStyle": "886ioz"
+                    },
+                    {
+                      "id": "uAjNOg",
+                      "type": "text",
+                      "name": "Detail",
+                      "width": "fill",
+                      "fills": ["$color/textMuted"],
+                      "content": "Vibração fina e gatilhos adaptáveis completos. Por Bluetooth, a vibração pode ficar mais simples.",
+                      "textStyle": "xt9RYd",
+                      "textGrowth": "fixed-width"
+                    }
+                  ]
+                },
+                {
+                  "id": "rmf4ZA",
+                  "type": "instance",
+                  "name": "Status",
+                  "component": "GPm341",
+                  "props": {
+                    "Label": "Bateria 80 %",
+                    "Status": "ready"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "zBLTZU",
+              "type": "text",
+              "name": "Table title",
+              "margin": [16, 0, 4, 0],
+              "fills": ["$color/text"],
+              "content": "Teclado e mouse",
+              "textStyle": "IdUDFc"
+            },
+            {
+              "id": "HATWzM",
+              "type": "frame",
+              "name": "Mapping table",
+              "width": "fill",
+              "layout": "vertical",
+              "clip": true,
+              "strokes": ["$color/border"],
+              "strokeWeight": 1,
+              "cornerRadius": "$radius/md",
+              "children": [
+                {
+                  "id": "RJeEJ2",
+                  "type": "frame",
+                  "name": "Botão do controle",
+                  "width": "fill",
+                  "height": 36,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": ["$color/surface"],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "gsC37S",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/textSubtle"],
+                      "content": "Botão do controle",
+                      "textStyle": "JwzTpc"
+                    },
+                    {
+                      "id": "doyDMf",
+                      "type": "text",
+                      "name": "K",
+                      "width": "fill",
+                      "fills": ["$color/textSubtle"],
+                      "content": "Tecla ou mouse",
+                      "textStyle": "JwzTpc"
+                    }
+                  ]
+                },
+                {
+                  "id": "2kJ5YD",
+                  "type": "frame",
+                  "name": "Analógico esquerdo",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "kL4pdq",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "Analógico esquerdo",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "OyEVQV",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "nnBGQc",
+                          "type": "frame",
+                          "name": "Key W",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "H8x4pN",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "W",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "4NDhDs",
+                          "type": "frame",
+                          "name": "Key A",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "Pz7oku",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "A",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "K2o1mO",
+                          "type": "frame",
+                          "name": "Key S",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "lgQFl9",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "S",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "22D7gE",
+                          "type": "frame",
+                          "name": "Key D",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "9O19Ti",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "D",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "D2XA0o",
+                  "type": "frame",
+                  "name": "Analógico direito",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "C4aFDR",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "Analógico direito",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "HDYy2K",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "QLIW3J",
+                          "type": "frame",
+                          "name": "Key Mouse",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "IEPNw4",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Mouse",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "E09pGD",
+                  "type": "frame",
+                  "name": "Cruz · Círculo",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "7k4sJ1",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "Cruz · Círculo",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "8rFDeD",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "LAYytn",
+                          "type": "frame",
+                          "name": "Key Espaço",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "CZgpIH",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Espaço",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "tQiAHf",
+                          "type": "frame",
+                          "name": "Key Q",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "jW5SSu",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Q",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "iEvjZ9",
+                  "type": "frame",
+                  "name": "Quadrado · Triângulo",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "jvWy5C",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "Quadrado · Triângulo",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "GSJJKy",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "EccLOx",
+                          "type": "frame",
+                          "name": "Key R",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "4L0oai",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "R",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "3pgjmM",
+                          "type": "frame",
+                          "name": "Key F",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "06BVbi",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "F",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "ynSer2",
+                  "type": "frame",
+                  "name": "L1 · R1",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "1HttJp",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "L1 · R1",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "gKtx47",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "kKEODc",
+                          "type": "frame",
+                          "name": "Key Shift",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "RuhaNl",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Shift",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "CfYAGZ",
+                          "type": "frame",
+                          "name": "Key E",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "ZVz1rx",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "E",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "Oy0g9l",
+                  "type": "frame",
+                  "name": "L2 · R2",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "ZyptTK",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "L2 · R2",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "CWrBKg",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "G3HpJa",
+                          "type": "frame",
+                          "name": "Key Botão direito",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "SykAWP",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Botão direito",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "6GloCd",
+                          "type": "frame",
+                          "name": "Key Botão esquerdo",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "VaVxN9",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Botão esquerdo",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "t3rwdr",
+                  "type": "frame",
+                  "name": "Options · Create",
+                  "width": "fill",
+                  "height": 44,
+                  "layout": "horizontal",
+                  "gap": "$space/4",
+                  "padding": [0, "$space/4"],
+                  "align": "center",
+                  "fills": [],
+                  "strokes": ["$color/border"],
+                  "strokeWeight": [0, 0, 1, 0],
+                  "children": [
+                    {
+                      "id": "RAYAQD",
+                      "type": "text",
+                      "name": "A",
+                      "width": 260,
+                      "fills": ["$color/text"],
+                      "content": "Options · Create",
+                      "textStyle": "xt9RYd"
+                    },
+                    {
+                      "id": "YlqjF6",
+                      "type": "frame",
+                      "name": "Keys",
+                      "width": "fill",
+                      "layout": "horizontal",
+                      "gap": "$space/1",
+                      "children": [
+                        {
+                          "id": "4e8VPP",
+                          "type": "frame",
+                          "name": "Key Enter",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "e6murD",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Enter",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "NtF5ys",
+                          "type": "frame",
+                          "name": "Key Tab",
+                          "layout": "horizontal",
+                          "padding": [3, "$space/2"],
+                          "fills": ["$color/surfaceHigh"],
+                          "strokes": ["$color/borderStrong"],
+                          "strokeWeight": [1, 1, 2, 1],
+                          "cornerRadius": "$radius/sm",
+                          "children": [
+                            {
+                              "id": "O7pR9p",
+                              "type": "text",
+                              "name": "K",
+                              "fills": ["$color/text"],
+                              "content": "Tab",
+                              "textStyle": "ACC6X8"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PIbCev",
+      "type": "frame",
+      "name": "Configurações — RTX",
+      "x": 4300,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "fQ9P7z",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "uQuIOG",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "ck0Soo",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "K2RatC",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "gPKagx",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "LT8Do6",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "pKgOi8",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "J2ABBB",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "mTOXSX",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "ER1x7Z",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "NDXjzP",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "7SmLfM",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "RTX",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "YtHhsF",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "Recursos da sua GPU NVIDIA aplicados ao vídeo do PS5. GPU: GeForce RTX 4060 Laptop.",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "kquHfx",
+              "type": "instance",
+              "name": "RTX Video Super Resolution",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Remove artefatos de compressão e amplia a imagem para a resolução da tela.",
+                "Label": "RTX Video Super Resolution",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "zXAouH",
+                      "type": "instance",
+                      "name": "Toggle",
+                      "component": "vD5E9Q",
+                      "props": {
+                        "Checked": "on",
+                        "State": "focus"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "p5Sxpb",
+              "type": "instance",
+              "name": "RTX Video HDR",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Converte a imagem SDR em HDR. Requer monitor HDR com HDR ativado no Windows.",
+                "Label": "RTX Video HDR",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "4r3H0M",
+                      "type": "instance",
+                      "name": "Toggle",
+                      "component": "vD5E9Q",
+                      "props": {
+                        "Checked": "off",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "nVVyPC",
+              "type": "instance",
+              "name": "DLSS Frame Generation 2x",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Gera um quadro entre cada dois: 30 → 60 ou 60 → 120 fps. Adiciona cerca de 1 quadro de latência; use com Reflex.",
+                "Label": "DLSS Frame Generation 2x",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "cb7Iz6",
+                      "type": "instance",
+                      "name": "Toggle",
+                      "component": "vD5E9Q",
+                      "props": {
+                        "Checked": "off",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "Btvy4y",
+              "type": "instance",
+              "name": "DLSS Super Resolution",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Alternativa ao VSR usando vetores de movimento estimados. Pode ter falhas.",
+                "Label": "DLSS Super Resolution",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "b3u8g9",
+                      "type": "instance",
+                      "name": "Experimental",
+                      "component": "GPm341",
+                      "props": {
+                        "Label": "Experimental",
+                        "Status": "waking"
+                      }
+                    },
+                    {
+                      "id": "hCymqo",
+                      "type": "instance",
+                      "name": "Toggle",
+                      "component": "vD5E9Q",
+                      "props": {
+                        "Checked": "off",
+                        "State": "default"
+                      }
+                    }
+                  ]
+                },
+                "b3u8g9/IPiXA2": {
+                  "icon": "lucide:flask-conical"
+                }
+              }
+            },
+            {
+              "id": "FDfmN9",
+              "type": "instance",
+              "name": "NVIDIA Reflex",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Reduz a fila da GPU para baixar a latência. Boost mantém o clock alto.",
+                "Label": "NVIDIA Reflex",
+                "Show description": true
+              },
+              "overrides": {
+                "G3jcyv/NHlVfm": {
+                  "children": [
+                    {
+                      "id": "qGuRCP",
+                      "type": "instance",
+                      "name": "Desligado",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "Desligado",
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "1GG94e",
+                      "type": "instance",
+                      "name": "Ligado",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "Ligado",
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "o38B6d",
+                      "type": "instance",
+                      "name": "Ligado + Boost",
+                      "component": "I1MHks",
+                      "props": {
+                        "Label": "Ligado + Boost",
+                        "State": "selected"
+                      }
+                    }
+                  ]
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "G3jcyv",
+                      "type": "instance",
+                      "name": "Segmented",
+                      "component": "syDELE"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kB8Jf3",
+      "type": "frame",
+      "name": "Configurações — Rede",
+      "x": 5700,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "na846x",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "0T2BlV",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "sHTwKm",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "vEuW3v",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "fb7UGu",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "zLiF5o",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "iQIFcq",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "RejUnS",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "kpP4uw",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "ua04P4",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "nQmraP",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "4mD5go",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "Rede",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "Nsp1CG",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "Como o Lynx Play chega ao PS5 em casa e fora dela.",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "7fU63U",
+              "type": "instance",
+              "name": "Bitrate na rede local",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Usado quando o PC e o PS5 estão na mesma rede.",
+                "Label": "Bitrate na rede local",
+                "Show description": true
+              },
+              "overrides": {
+                "09be04/ueYeSV": {
+                  "width": 174
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "09be04",
+                      "type": "instance",
+                      "name": "Slider",
+                      "width": 240,
+                      "component": "HqI7nU",
+                      "props": {
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "uYJOWZ",
+                      "type": "text",
+                      "name": "Value",
+                      "width": 76,
+                      "fills": ["$color/text"],
+                      "content": "40 Mbps",
+                      "textStyle": "ACC6X8",
+                      "textAlign": "right",
+                      "textGrowth": "fixed-width"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "9ZBW48",
+              "type": "instance",
+              "name": "Bitrate pela internet",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Usado fora de casa. Baixe se a imagem travar.",
+                "Label": "Bitrate pela internet",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "szCUUx",
+                      "type": "instance",
+                      "name": "Slider",
+                      "width": 240,
+                      "component": "HqI7nU",
+                      "props": {
+                        "State": "default"
+                      }
+                    },
+                    {
+                      "id": "ls3ttT",
+                      "type": "text",
+                      "name": "Value",
+                      "width": 76,
+                      "fills": ["$color/text"],
+                      "content": "15 Mbps",
+                      "textStyle": "ACC6X8",
+                      "textAlign": "right",
+                      "textGrowth": "fixed-width"
+                    }
+                  ]
+                },
+                "szCUUx/ueYeSV": {
+                  "width": 65
+                }
+              }
+            },
+            {
+              "id": "yMXJPL",
+              "type": "instance",
+              "name": "Conta PSN",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Para jogar fora de casa sem configurar o roteador. Também preenche o Account ID sozinho.",
+                "Label": "Conta PSN",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "hhHxk7",
+                      "type": "instance",
+                      "name": "PSN status",
+                      "component": "GPm341",
+                      "props": {
+                        "Label": "Não conectada",
+                        "Status": "offline"
+                      }
+                    },
+                    {
+                      "id": "AOScK8",
+                      "type": "instance",
+                      "name": "PSN login",
+                      "component": "ML3vO0",
+                      "props": {
+                        "Label": "Entrar na PSN",
+                        "Variant": "secondary"
+                      }
+                    }
+                  ]
+                },
+                "hhHxk7/qnkt3p": {
+                  "icon": "lucide:user-x"
+                }
+              }
+            },
+            {
+              "id": "7n10v9",
+              "type": "instance",
+              "name": "Endereço fora de casa",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "IP da VPN (Tailscale, ZeroTier) ou endereço com redirecionamento de portas.",
+                "Label": "Endereço fora de casa",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "m47n3I",
+                      "type": "instance",
+                      "name": "Address",
+                      "width": 300,
+                      "component": "zB9pv5",
+                      "props": {
+                        "Show helper": false,
+                        "State": "default",
+                        "Value": "Ex.: ps5-casa.minha-vpn"
+                      }
+                    }
+                  ]
+                },
+                "m47n3I/l7yP1j": {
+                  "visible": false
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6NDzeo",
+      "type": "frame",
+      "name": "Configurações — Sobre",
+      "x": 7100,
+      "y": 140,
+      "width": 1280,
+      "height": 800,
+      "layout": "horizontal",
+      "clip": true,
+      "fills": ["$color/bg"],
+      "children": [
+        {
+          "id": "DZVuqQ",
+          "type": "instance",
+          "name": "AppRail",
+          "height": "fill",
+          "component": "H58La4",
+          "props": {
+            "Section": "settings"
+          }
+        },
+        {
+          "id": "qOh243",
+          "type": "frame",
+          "name": "Section tabs",
+          "width": 232,
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/1",
+          "padding": ["$space/8", "$space/3"],
+          "strokes": ["$color/border"],
+          "strokeWeight": [0, 1, 0, 0],
+          "children": [
+            {
+              "id": "KUlYAx",
+              "type": "text",
+              "name": "Title",
+              "margin": [0, 8, 16, 8],
+              "fills": ["$color/text"],
+              "content": "Configurações",
+              "textStyle": "V9PsAt"
+            },
+            {
+              "id": "PdoejD",
+              "type": "instance",
+              "name": "Vídeo",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Vídeo",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:monitor"
+                }
+              }
+            },
+            {
+              "id": "8DB4r2",
+              "type": "instance",
+              "name": "Áudio e microfone",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Áudio e microfone",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:volume-2"
+                }
+              }
+            },
+            {
+              "id": "ZZCpZl",
+              "type": "instance",
+              "name": "Controles",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Controles",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:gamepad-2"
+                }
+              }
+            },
+            {
+              "id": "2fC4VA",
+              "type": "instance",
+              "name": "RTX",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "RTX",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:sparkles"
+                }
+              }
+            },
+            {
+              "id": "3hWpZt",
+              "type": "instance",
+              "name": "Rede",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Rede",
+                "State": "default"
+              },
+              "overrides": {
+                "xFC4wG": {
+                  "icon": "lucide:wifi"
+                }
+              }
+            },
+            {
+              "id": "6FNuS6",
+              "type": "instance",
+              "name": "Sobre",
+              "width": "fill",
+              "component": "xsZTaP",
+              "props": {
+                "Label": "Sobre",
+                "State": "selected"
+              },
+              "overrides": {
+                "fV8BXy": {
+                  "icon": "lucide:info"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "m1l1gC",
+          "type": "frame",
+          "name": "Content",
+          "width": "fill",
+          "height": "fill",
+          "layout": "vertical",
+          "gap": "$space/2",
+          "padding": ["$space/8", "$space/10"],
+          "children": [
+            {
+              "id": "rRzTxa",
+              "type": "frame",
+              "name": "Header",
+              "width": "fill",
+              "layout": "vertical",
+              "gap": "$space/1",
+              "padding": [0, 0, "$space/3", 0],
+              "children": [
+                {
+                  "id": "0HuuqZ",
+                  "type": "text",
+                  "name": "Title",
+                  "fills": ["$color/text"],
+                  "content": "Sobre",
+                  "textStyle": "RTzIfn"
+                },
+                {
+                  "id": "YwGv71",
+                  "type": "text",
+                  "name": "Subtitle",
+                  "width": "fill",
+                  "fills": ["$color/textMuted"],
+                  "content": "Versão, licenças e onde ficam os registros do app.",
+                  "textStyle": "xt9RYd",
+                  "textGrowth": "fixed-width"
+                }
+              ]
+            },
+            {
+              "id": "15aRuS",
+              "type": "frame",
+              "name": "App card",
+              "width": "fill",
+              "layout": "horizontal",
+              "gap": "$space/5",
+              "padding": "$space/5",
+              "align": "center",
+              "fills": ["$color/surface"],
+              "strokes": ["$color/border"],
+              "strokeWeight": 1,
+              "cornerRadius": "$radius/lg",
+              "children": [
+                {
+                  "id": "pksXGp",
+                  "type": "frame",
+                  "name": "Mark",
+                  "width": 72,
+                  "height": 72,
+                  "clip": true,
+                  "fills": [
+                    {
+                      "image": "sha256-da1fddc99c0e8f8d9cbaae6e6add3ef00b92d333551fdaf230390d4fbe34ae24.png"
+                    }
+                  ],
+                  "cornerRadius": 18
+                },
+                {
+                  "id": "j7WxOc",
+                  "type": "frame",
+                  "name": "Text",
+                  "width": "fill",
+                  "layout": "vertical",
+                  "gap": "$space/1",
+                  "children": [
+                    {
+                      "id": "NJAYyk",
+                      "type": "text",
+                      "name": "Name",
+                      "fills": ["$color/text"],
+                      "content": [
+                        {
+                          "text": "Lynx",
+                          "fontWeight": 700
+                        },
+                        {
+                          "text": " Play",
+                          "fontWeight": 400,
+                          "fills": ["$color/accent"]
+                        }
+                      ],
+                      "fontFamily": "$font/display",
+                      "fontSize": 24,
+                      "lineHeight": "32px"
+                    },
+                    {
+                      "id": "V6W8m2",
+                      "type": "text",
+                      "name": "Version",
+                      "fills": ["$color/textMuted"],
+                      "content": "Versão 0.1.0 · Windows x64",
+                      "textStyle": "xt9RYd"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ns6Gf0",
+              "type": "instance",
+              "name": "Licença",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "Lynx Play é software livre sob a AGPL-3.0, baseado no chiaki-ng.",
+                "Label": "Licença",
+                "Show description": true
+              },
+              "overrides": {
+                "8mkcha/N3mFle": {
+                  "icon": "lucide:scroll-text"
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "8mkcha",
+                      "type": "instance",
+                      "name": "Licenses link",
+                      "component": "dGdrrq",
+                      "props": {
+                        "Label": "Ver licenças de terceiros"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "dc2TqP",
+              "type": "instance",
+              "name": "Registros (logs)",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "%LOCALAPPDATA%\\Lynx Play\\logs",
+                "Label": "Registros (logs)",
+                "Show description": true
+              },
+              "overrides": {
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "vfpoWt",
+                      "type": "instance",
+                      "name": "Open logs",
+                      "component": "ML3vO0",
+                      "props": {
+                        "Label": "Abrir pasta",
+                        "Show icon": true,
+                        "Variant": "secondary"
+                      }
+                    }
+                  ]
+                },
+                "vfpoWt/XqYoOE": {
+                  "icon": "lucide:folder-open"
+                }
+              }
+            },
+            {
+              "id": "TySJVs",
+              "type": "instance",
+              "name": "Código-fonte",
+              "width": "fill",
+              "component": "XvBD0C",
+              "props": {
+                "Description": "github.com/johnnymouraf/lynx-play",
+                "Label": "Código-fonte",
+                "Show description": true
+              },
+              "overrides": {
+                "49Xf8Z/N3mFle": {
+                  "icon": "lucide:external-link"
+                },
+                "Ruf7kB": {
+                  "children": [
+                    {
+                      "id": "49Xf8Z",
+                      "type": "instance",
+                      "name": "Repo link",
+                      "component": "dGdrrq",
+                      "props": {
+                        "Label": "Abrir no navegador"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

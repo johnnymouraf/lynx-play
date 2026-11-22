@@ -330,10 +330,11 @@ the step is done and green.
   1. CI green on `auto/1.5`, unit tests included.
   2. Unit tests cover the key mapping (defaults, remapping, conflicts) and the
      statistics math (rates and averages over a sliding window).
-  3. In `--play-file` playback the overlay opens and closes with its hotkey
-     (Ctrl+Shift+O, and L3+R3 held on the controller) and shows resolution,
-     codec, received/decoded/presented fps, bitrate, decode time and
-     present-to-present time, updating live (screenshots).
+  3. In `--play-file` playback the overlay opens and closes with the design's
+     shortcuts (F1 menu, F2 statistics; Create + Options held on the
+     controller) and shows resolution, codec, received/decoded/presented fps,
+     bitrate, decode time and present-to-present time, updating live
+     (screenshots).
   4. The Controles screen edits and saves the keyboard/mouse mapping.
   5. The log confirms the latency measures in effect: MMCSS for the decode
      and render threads, power throttling disabled for the process, the GPU
@@ -498,4 +499,55 @@ value in the settings store.
 - B. WASAPI directly for audio: a few milliseconds less, more code.
 
 **Chosen: A**. Changing it: replace the audio output module.
+
+#### D7 – Logo: amber eye between lynx ears (design)
+
+- A. Eye between ears: reads at small sizes.
+- B. Faceted lynx head: more detailed, muddled when small.
+
+**Chosen: A**. It is a raster image; it needs vectorizing before the `.ico`.
+Changing it: regenerate the mark and replace it in the design and the app.
+
+#### D8 – Three font families (design)
+
+- A. Sora for titles and the wordmark, Inter for the interface, JetBrains Mono
+  for numbers (IP, PIN, overlay statistics): more personality, stable digits.
+  All three are OFL and can be bundled.
+- B. Inter only: simpler, smaller package.
+
+**Chosen: A**. Changing it: swap the `font/*` variables and the bundled fonts.
+
+#### D9 – A PS5-like console render on the cards (design)
+
+- A. A generated render resembling a PS5 (no logos): instantly reads as "the
+  console".
+- B. Only the flat console glyph: neutral, no resemblance to Sony's design.
+
+**Chosen: A**. Changing it: point the card's image at the glyph.
+
+#### D10 – Controller focus model and overlay shortcuts (design, 1.5)
+
+- A. The whole card takes focus; Cross runs the main action, Triangle opens
+  options, Circle cancels; overlay on F1 (menu) and F2 (statistics), and
+  Create + Options held on the controller.
+- B. L3 + R3 for the overlay: clashes with games that use the stick clicks
+  together.
+
+**Chosen: A** (1.5's mission now uses these shortcuts). Changing it: the
+bindings in 1.5.
+
+#### D11 – Smaller design choices (design)
+
+Rest mode badge yellow (#E9C46A) close to the amber accent, kept apart by a
+moon icon and text; danger buttons soft (red text on a tinted fill); dark
+toggle thumb on amber; Configurações with its own section column; immersive
+connecting screen without the rail; invalid forms keep their buttons enabled
+and show the error on the field.
+
+- A. As designed.
+- B. Any of them reversed (distinct rest color, solid danger, white thumb,
+  sections in the main rail, rail on the connecting screen, disabled
+  buttons).
+
+**Chosen: A**. Changing it: the design file and the matching QML component.
 
