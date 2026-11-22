@@ -125,16 +125,18 @@ TEST_CASE("The tone map sends the content peak to white and black to black")
     CHECK(toneMapLinear(200.0, 1000.0, 200.0) > 0.0);
 }
 
-TEST_CASE("The tone map is monotonic")
+TEST_CASE("The tone map is monotonic up to the peak and clamps above it")
 {
     double previous = -1.0;
 
-    for (int step = 0; step <= 40; ++step)
+    for (int step = 0; step <= 10; ++step)
     {
         const double mapped = toneMapLinear(static_cast<double>(step) * 100.0, 1000.0, 200.0);
         CHECK(mapped > previous);
         previous = mapped;
     }
+
+    CHECK(toneMapLinear(4000.0, 1000.0, 200.0) == Catch::Approx(1.0));
 }
 
 TEST_CASE("The overlay's white lands at SDR white in PQ and its black stays black")
