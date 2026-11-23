@@ -927,3 +927,58 @@ tests.
 
 **Edge cases:** close while minimized or occluded; close during a feature
 recreation (resize); device removed; repeated open/close.
+
+## Current: 1.9 Controller parity with chiaki-ng
+
+**Goal:** the DualSense behaves like it does in chiaki-ng — every button,
+both triggers, the touchpad (two fingers, click), gyroscope and accelerometer,
+rumble and USB haptics, adaptive triggers, LEDs and hotplug, over USB and
+Bluetooth — with the app's own architecture.
+
+**Guardrails:** the Remote Play protocol and the session path don't change;
+keyboard/mouse keeps working; the USB haptics keep the rule that
+`SDL_RumbleGamepad` must not run while the audio haptics are active; no
+third-party dependency changes.
+
+**Success criteria:**
+
+1. CI green on `auto/1.9`, with unit tests for every conversion the fix
+   touches: the button table against chiaki's, trigger scaling (SDL
+   0–32767 → chiaki 0–255), touchpad coordinates and touch ids, gyro/accel
+   units, and the rumble-vs-haptics selection.
+2. The report contains an audit of every behavior in chiaki-ng's
+   `gui/src/controllermanager.cpp` and `gui/src/streamsession.cpp`
+   (mapping, triggers, touchpad, sensors, rumble/haptics, trigger effects,
+   LED, hotplug) against ours, with chiaki-ng file and line, and says for
+   each "same", "fixed", or "not applicable".
+3. On this machine, with the owner's DualSense connected, a debug view (a
+   log line or the overlay's statistics) shows the pressed buttons with
+   their chiaki names, both trigger values from 0 to 255, two touchpad
+   fingers with coordinates, and gyro/accel changing when the controller
+   moves — checked by driving the controller (the owner may need to wake it).
+4. Owner check: in a real game, the same buttons, triggers, touchpad, gyro,
+   rumble, haptics and adaptive triggers respond as in chiaki-ng, over USB
+   and over Bluetooth.
+5. Keyboard/mouse and the overlay shortcuts still work.
+
+**Deliveries:**
+
+1. The audit: read chiaki-ng's controller code and list every difference;
+   report the table.
+2. The mapping fixes (buttons, trigger scaling, touchpad, sensors) with
+   tests.
+3. The feedback fixes (rumble vs USB haptics, trigger effects, LEDs) with
+   the rule enforced in one place, plus the hotplug/detection parity
+   (including the 0.5 s ghost and the sleeping controller).
+4. The debug instrumentation and the verification.
+
+**Settled in planning:** the owner reports swapped/unresponsive buttons and
+triggers, rumble, touchpad and gyro not working; chiaki-ng is the reference
+for both the mapping and the feedback.
+
+**Changes:** `src/input/` (`GamepadManager`, `Haptics`, the mappings),
+`src/app/InputController`, the overlay's debug section, tests.
+
+**Edge cases:** controller asleep at startup; connect/disconnect mid-session;
+two controllers; USB vs Bluetooth; a game that uses the gyro; the overlay
+open (input goes to it); keyboard/mouse combined with the controller.
