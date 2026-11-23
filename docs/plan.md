@@ -938,6 +938,66 @@ The PS5 was on the network and the saved console opened real sessions.
 reclassify as an owner check.
 
 
+
+#### D82 – The F1 window row cycles instead of opening a submenu (1.10)
+
+The menu has no dropdown and is driven by mouse and D-pad.
+
+- A. A row that cycles fullscreen and the presets, in the existing rows'
+  pattern; leaving fullscreen restores the remembered size (or the first
+  preset when the size is custom, so no preset is unreachable).
+- B. A new submenu with its own state.
+
+**Chosen: A**. Changing it: `MenuResult`/`drawMenu`.
+
+#### D83 – A 500 ms debounce for resizes (1.10)
+
+`SetWindowPos` doesn't send `WM_EXITSIZEMOVE`.
+
+- A. Only `WM_EXITSIZEMOVE`: misses programmatic sizes.
+- B. A 500 ms timer on `WM_SIZE` plus an immediate report at the end of a
+  user drag.
+
+**Chosen: B**. Changing it: `kSizeSettleMilliseconds`.
+
+#### D84 – The cursor through `SetCursor`, not `ShowCursor` (1.10)
+
+`ShowCursor` is a per-thread counter, and the old code hid the cursor in
+every mode.
+
+- A. A balanced `ShowCursor` counter.
+- B. `SetCursor(nullptr)` with `WM_SETCURSOR`, showing the arrow in windowed
+  mode and hiding after two idle seconds in fullscreen, keeping it visible
+  with the F1 menu.
+
+**Chosen: B**. Changing it: `applyCursor()`/`kCursorHideMilliseconds`.
+
+#### D85 – F11 persists the mode (1.10)
+
+- A. Keep it in memory only.
+- B. An `onWindowModeChanged` callback stores it, so a new stream opens the
+  same way.
+
+**Chosen: B**. Changing it: remove the callback wiring.
+
+#### D86 – A two-pixel tolerance for the presets (1.10)
+
+A drag lands one or two pixels off the round sizes.
+
+- A. Exact matching: a 1280×721 window shows "Personalizado".
+- B. Two pixels per dimension, storing the real client size.
+
+**Chosen: B**. Changing it: `kWindowSizePresetTolerance`.
+
+#### D87 – The video test follows the same layout (1.10)
+
+It is the only path that runs a stream window with the settings UI alive,
+used in this step's live checks.
+
+- A. Apply the same layout there too, without touching the video profile.
+- B. Leave it fixed at its own size.
+
+**Chosen: A**. Changing it: `AppController`.
 #### D88 – The game rate counts cadence decisions in the same 2 s window (1.11)
 
 - A. Count the distinct decisions in the metrics' 2 s window.
