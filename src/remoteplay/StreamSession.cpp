@@ -388,7 +388,7 @@ void StreamSession::State::inputLoop(const std::stop_token& stop)
 
         if (keyboardMouse != nullptr)
         {
-            const ChiakiControllerState fromKeyboard =
+            ChiakiControllerState fromKeyboard =
                 input::toChiakiControllerState(keyboardMouse->sample());
             chiaki_controller_state_or(&controllerState, &controllerState, &fromKeyboard);
         }
