@@ -183,7 +183,14 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                              [this](core::WindowMode mode,
                                                                     core::WindowSize size)
                                                          {
-                                                             settings_.setWindowLayout(mode, size);
+                                                             QMetaObject::invokeMethod(
+                                                                 this,
+                                                                 [this, mode, size]
+                                                                 {
+                                                                     settings_.setWindowLayout(mode,
+                                                                                               size);
+                                                                 },
+                                                                 Qt::QueuedConnection);
                                                          },
                                                          .disconnect = [this]
                                                          {
