@@ -36,6 +36,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.7 Minimizing the stream must not crash**: the overlay re-entered
         its own mutex on a click and Frame Generation kept presenting into an
         iconic window; both fixed, with the pipeline idle while hidden.
+  - [x] **1.8 Closing the stream must not kill the app**: releasing the
+        pictures the optical flow read faulted inside the NVIDIA driver; the
+        release now happens on the render thread under a guard.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -881,104 +884,157 @@ and the overlay locked its own non-recursive mutex again.
 
 **Chosen: A**. Changing it: `clientAreaOf`.
 
-## Current: 1.8 Closing the stream must not kill the app
 
-**Goal:** closing the stream window (Esc, its X, or the overlay's
-"Desconectar") ends the session and leaves the app open on the consoles
-screen, with every RTX feature on — including the optical flow.
+#### D73 – The optical-flow teardown runs on the render thread (1.8)
 
-**Guardrails:** the optical flow keeps working during playback; the fix must
-not disable it, nor leak a GPU session per stream; no feature changes.
+The fault is the driver releasing the presenter textures the NvOF read, not
+`nvOFDestroy` itself.
+
+- A. Release the session and the presenter pictures on the render thread
+  after the GPU is idle, each driver call under an SEH guard.
+- B. Guard only the current release on the main thread: survives, but off the
+  thread that used the driver.
+- C. Guard only the NvOF calls: insufficient, the fault comes later.
+
+**Chosen: A**. Changing it: remove `presenter_.releasePictures()` from the
+release path.
+
+#### D74 – One guard per driver call, not one around the block (1.8)
+
+A fault then doesn't skip the remaining releases, and the log names the
+resource; the cost is a `[critical]` line per picture.
+
+- A. One guard per call.
+- B. A single guard around everything: one fault leaks the rest.
+
+**Chosen: A**. Changing it: a single guard.
+
+#### D75 – The release order is frozen in an enum with tests (1.8)
+
+The CI runner has no GPU.
+
+- A. An enum plus a runner test covering the order and the continue-after-fault
+  rule.
+- B. No test: the order depends on reading code.
+
+**Chosen: A**. Changing it: remove the enum and the test.
+
+#### D76 – The owner check ran here (1.8)
+
+The PS5 was on the network and the saved console opened real sessions.
+
+- A. Ten real open/close cycles here, plus the file loops.
+- B. Leave it as an owner check.
+
+**Chosen: A**; the owner still confirms in their own session. Changing it:
+reclassify as an owner check.
+
+## Current: 1.10 The stream window's mode and size
+
+**Goal:** the owner picks how the stream window shows — borderless fullscreen
+or a window at a chosen size — from Configurações › Vídeo and from the F1
+menu, applied live; presets (1920×1080, 1600×900, 1280×720, 960×540,
+Personalizado) plus free mouse resize, and both F11 and a new stream use the
+last chosen mode and size.
+
+**Guardrails:** the stream's video profile doesn't change (the PS5 keeps the
+1080p chosen in Vídeo; this is the presentation size only); fullscreen stays
+borderless on the monitor of the main window; no session restart to apply;
+Frame Generation, VSR and the overlay keep working.
 
 **Success criteria:**
 
-1. CI green on `auto/1.8`, with a unit test for whatever state the fix
-   touches.
-2. Reproduced before the fix: `--play-file` with `rtx.opticalFlow: true`,
-   Esc in the stream window: the whole process dies with `0xC0000005` in
-   `nvwgf2umx.dll` (offsets `0xd2cd86`, `0xd8d217`) and no "Stream window
-   closed" line — the failure is inside the Esc handling, during teardown.
-   With the flow off the same close is clean.
-3. After the fix: with the flow on, closing the stream leaves the app running
-   (the log shows "Stream window closed; ending the session" and the normal
-   shutdown of the session; no new crash event), and ten open/close cycles
-   in a row don't crash; a real session (owner check) returns to the consoles
-   screen.
-4. The GPU is idle before the optical-flow session is released (the log names
-   the order), and the same holds when the window closes while minimized.
+1. CI green on `auto/1.10`, with unit tests: preset matching from a client
+   size (exact, near, custom), clamping to the monitor, and the settings
+   round trip.
+2. `settings.json` gains `video.windowMode` (`fullscreen`/`windowed`) and
+   `video.windowSize` (width, height), additive, with sane defaults
+   (fullscreen, 1280×720).
+3. Configurações › Vídeo has the mode selector and the size selector
+   (disabled in fullscreen); changing either applies to a running stream
+   without restarting it (screenshots/UIA).
+4. The F1 menu has the same control; F11 toggles fullscreen ↔ the last
+   windowed size; a new stream opens with the last mode and size (checked
+   in `--play-file` and a real session).
+5. Dragging the window's border in windowed mode is remembered (debounced)
+   and the selector shows "Personalizado" (checked by resizing with
+   `SetWindowPos` and reading the settings file).
+6. Owner check: a real session at a chosen size and in fullscreen, with F11.
 
 **Deliveries:**
 
-1. Diagnosis: identify which release call faults (NvOF session destroy,
-   resource unregister, or the D3D11 device) and whether the GPU had work in
-   flight; a temporary SEH guard around the release to log and survive would
-   confirm it.
-2. The fix: wait for the GPU fence, unregister the flow resources, destroy the
-   NvOF session before the devices, on the render thread, with the release
-   inside a guard so a driver fault can't take the process down.
-3. The regression test and the verification cycles.
-
-**Settled in planning:** the crash is in the NVIDIA driver's teardown
-(`nvwgf2umx.dll`), not in our code; the same offset appears in the 1.7
-report, where it was recorded as out of scope.
-
-**Changes:** `src/render/OpticalFlow.{h,cpp}`, `FrameRenderer` teardown,
-tests.
-
-**Edge cases:** close while minimized or occluded; close during a feature
-recreation (resize); device removed; repeated open/close.
-
-## Current: 1.9 Controller parity with chiaki-ng
-
-**Goal:** the DualSense behaves like it does in chiaki-ng — every button,
-both triggers, the touchpad (two fingers, click), gyroscope and accelerometer,
-rumble and USB haptics, adaptive triggers, LEDs and hotplug, over USB and
-Bluetooth — with the app's own architecture.
-
-**Guardrails:** the Remote Play protocol and the session path don't change;
-keyboard/mouse keeps working; the USB haptics keep the rule that
-`SDL_RumbleGamepad` must not run while the audio haptics are active; no
-third-party dependency changes.
-
-**Success criteria:**
-
-1. CI green on `auto/1.9`, with unit tests for every conversion the fix
-   touches: the button table against chiaki's, trigger scaling (SDL
-   0–32767 → chiaki 0–255), touchpad coordinates and touch ids, gyro/accel
-   units, and the rumble-vs-haptics selection.
-2. The report contains an audit of every behavior in chiaki-ng's
-   `gui/src/controllermanager.cpp` and `gui/src/streamsession.cpp`
-   (mapping, triggers, touchpad, sensors, rumble/haptics, trigger effects,
-   LED, hotplug) against ours, with chiaki-ng file and line, and says for
-   each "same", "fixed", or "not applicable".
-3. On this machine, with the owner's DualSense connected, a debug view (a
-   log line or the overlay's statistics) shows the pressed buttons with
-   their chiaki names, both trigger values from 0 to 255, two touchpad
-   fingers with coordinates, and gyro/accel changing when the controller
-   moves — checked by driving the controller (the owner may need to wake it).
-4. Owner check: in a real game, the same buttons, triggers, touchpad, gyro,
-   rumble, haptics and adaptive triggers respond as in chiaki-ng, over USB
-   and over Bluetooth.
-5. Keyboard/mouse and the overlay shortcuts still work.
-
-**Deliveries:**
-
-1. The audit: read chiaki-ng's controller code and list every difference;
-   report the table.
-2. The mapping fixes (buttons, trigger scaling, touchpad, sensors) with
+1. The settings model: mode, size, preset matching and clamping, with
    tests.
-3. The feedback fixes (rumble vs USB haptics, trigger effects, LEDs) with
-   the rule enforced in one place, plus the hotplug/detection parity
-   (including the 0.5 s ghost and the sleeping controller).
-4. The debug instrumentation and the verification.
+2. `StreamWindow`: open at the mode/size, apply a change live, F11 toggling
+   while preserving the windowed size, and remembering a drag-resize.
+3. The UI: the Vídeo rows and the F1 menu entry, in Brazilian Portuguese,
+   following the existing components.
+4. The verification (CI plus this machine).
 
-**Settled in planning:** the owner reports swapped/unresponsive buttons and
-triggers, rumble, touchpad and gyro not working; chiaki-ng is the reference
-for both the mapping and the feedback.
+**Settled in planning:** selector of presets plus remembered mouse resize;
+the control lives in both Vídeo and the F1 menu; F11 returns to the last
+window size and new streams use it.
 
-**Changes:** `src/input/` (`GamepadManager`, `Haptics`, the mappings),
-`src/app/InputController`, the overlay's debug section, tests.
+**Changes:** `src/core/Settings.*`, `src/app/SettingsController.*`,
+`src/app/StreamController.cpp`, `src/render/StreamWindow.*`, the overlay's
+menu, the QML settings screen, tests.
 
-**Edge cases:** controller asleep at startup; connect/disconnect mid-session;
-two controllers; USB vs Bluetooth; a game that uses the gyro; the overlay
-open (input goes to it); keyboard/mouse combined with the controller.
+**Data and interfaces:** `settings.json` `video.windowMode` and
+`video.windowSize`, additive, version 1.
+
+**Edge cases:** a size larger than the monitor (clamp); multi-monitor (the
+main window's monitor); F11 while minimized; 4K monitors; odd custom sizes
+(aspect preserved with letterbox); entering fullscreen during the countdown
+before the first frame.
+
+## Current: 1.11 The stats panel must tell the game's rate, the generated frames and the presented frames
+
+**Goal:** the F2 panel separates what the owner needs to judge Frame
+Generation: the **source** rate (what arrives, usually 60), the **game** rate
+(distinct frames, e.g., 30), the **generated** frames per second and the
+**presented** rate — so a 30 fps game with Frame Generation 2x reads
+"jogo 30 · gerados 30 · exibidos 60" instead of a single 60 that hides it.
+
+**Guardrails:** no change to the Frame Generation schedule or to the stream
+protocol; the overlay keeps its shortcuts and stays cheap; the existing
+statistics (GPU stages, cadence, Reflex) stay.
+
+**Success criteria:**
+
+1. CI green on `auto/1.11`, with unit tests for the derived rates (distinct
+   frames over a window, generated per second, presented per second) against
+   fixtures.
+2. The report explains how Veyra-NRVideo derives and shows the source,
+   real and generated rates (its cadence/FG code and UI labels, with sources)
+   and what this step copied or deliberately did not.
+3. `--play-file` of the 30 fps stream carried in a 60 fps container with
+   Frame Generation 2x: the panel shows source 60, game 30, generated ~30/s
+   and presented ~60/s (screenshot + the periodic log line), and the cadence
+   line agrees; with a true 60 fps stream: source 60, game 60, generated
+   ~60/s, presented ~120/s where the display allows.
+4. With Frame Generation off, the panel shows generated 0 and presented equal
+   to the distinct rate, making the difference obvious.
+5. Owner check: in a real 30 fps game (GTA VI-like), the panel shows the
+   game at 30 and the generated frames taking it to 60.
+
+**Deliveries:**
+
+1. The research on Veyra's approach, summarized in the report.
+2. The metrics: distinct/game rate from the cadence window, generated and
+   presented per second from the present counters, source from the decoder,
+   with tests.
+3. The panel and the log line with the four rates and clear Portuguese
+   labels; the cadence line kept.
+4. The verification with both clips and FG on/off.
+
+**Settled in planning:** the container is always 60 from the PS5; the game
+rate comes from the cadence detection (2.4) and the generated frames from
+the Frame Generation counters (2.5); Veyra-NRVideo is the reference for how
+to present them.
+
+**Changes:** `src/core/StreamMetrics.*`, `src/render/Overlay.*` (statistics
+section), the periodic log, tests.
+
+**Edge cases:** a 30 fps game with a 60 fps HUD; a scene change resetting the
+cadence; FG on but the cadence at 60 (no generation needed); the overlay open
+while frames are idle (minimized) showing stale rates; a 120 Hz display.

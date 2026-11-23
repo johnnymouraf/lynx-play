@@ -3,6 +3,7 @@ find_package(Catch2 3 CONFIG REQUIRED)
 add_executable(lynx_tests
     audio/AudioOutputTests.cpp
     audio/HapticsTests.cpp
+    core/GuardedCallTests.cpp
     core/KeyboardMouseTests.cpp
     core/RateCounterTests.cpp
     core/SettingsTests.cpp

@@ -6,6 +6,8 @@ add_library(lynx_core STATIC
     Files.h
     FramePacer.cpp
     FramePacer.h
+    GuardedCall.cpp
+    GuardedCall.h
     KeyboardBindings.cpp
     KeyboardBindings.h
     Latency.cpp

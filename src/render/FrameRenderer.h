@@ -203,6 +203,10 @@ private:
     // chain.
     [[nodiscard]] bool prepareFrameGeneration(UINT bufferIndex);
     void releaseFrameGeneration();
+    // Releases the optical flow's session and the pictures it read, on the
+    // thread that owns them and after the GPU is done; both go before the
+    // presenter's own destruction and the device.
+    void releaseOpticalFlow();
     // The draw target for this frame: the swap chain when Frame Generation
     // is off, the retained real picture when it is on.
     [[nodiscard]] FrameTarget frameTarget(UINT bufferIndex, bool offscreen);

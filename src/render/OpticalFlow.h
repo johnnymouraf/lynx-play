@@ -2,12 +2,15 @@
 
 #include "render/Layout.h"
 
+#include <array>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include <d3d12.h>
 
@@ -70,6 +73,39 @@ struct FlowVector
                                                       SurfaceSize gridExtent, SurfaceSize picture,
                                                       std::uint32_t x, std::uint32_t y,
                                                       std::uint32_t grid = kFlowGridSize);
+
+// The order a session is released in: the engine's last flow passes, its
+// registered pictures go, the pictures are released, then the session. A
+// driver fault in one step must not skip the ones after it.
+enum class SessionReleaseStep
+{
+    WaitForLastFlow,
+    UnregisterCostResources,
+    UnregisterFlowResources,
+    UnregisterInputResources,
+    ReleaseCostPictures,
+    ReleaseFlowPictures,
+    ReleaseInputPictures,
+    DestroySession,
+};
+
+inline constexpr std::array<SessionReleaseStep, 8> kSessionReleaseSteps{
+    SessionReleaseStep::WaitForLastFlow,
+    SessionReleaseStep::UnregisterCostResources,
+    SessionReleaseStep::UnregisterFlowResources,
+    SessionReleaseStep::UnregisterInputResources,
+    SessionReleaseStep::ReleaseCostPictures,
+    SessionReleaseStep::ReleaseFlowPictures,
+    SessionReleaseStep::ReleaseInputPictures,
+    SessionReleaseStep::DestroySession,
+};
+
+[[nodiscard]] std::string_view sessionReleaseStepName(SessionReleaseStep step);
+
+// Runs each release step in order; a fault in one is reported to `faulted` and
+// the steps after it still run.
+void runSessionRelease(const std::function<void(SessionReleaseStep)>& step,
+                       const std::function<void(SessionReleaseStep, std::uint32_t)>& faulted);
 
 // NVIDIA's optical flow engine through the driver's nvofapi64.dll, fed by the
 // presenter's BGRA8 intermediates on the renderer's device. Each execute runs

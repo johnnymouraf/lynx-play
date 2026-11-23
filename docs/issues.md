@@ -87,13 +87,14 @@
   first seconds show ~37–39 fps. The research suggests creating the feature
   off the present thread.
 
-## The process crashes in the NVIDIA driver when closing with optical flow on
+## The NVIDIA driver still faults releasing pictures the optical flow read
 
 - **Where:** closing the stream window (`--play-file` or a real session) with
   `rtx.opticalFlow` on.
 - **Steps:** play with the optical flow enabled and press Esc.
 - **Expected:** the app exits with the normal shutdown lines and code 0.
-- **Actual:** the shutdown lines are logged, then the process exits with
-  `0xC0000005` in `nvwgf2umx.dll` (offset `0xd2cd86`), the driver faulting
-  while the optical-flow session is torn down. Seen on 2026-11-22 and
-  2026-11-23 with the pre-fix builds too; unrelated to minimizing.
+- **Actual:** the driver faults with `0xC0000005` in `nvwgf2umx.dll`
+  (offsets `0xd2cd86`/`0xd8d217`) when the last reference to the pictures the
+  flow read is released. Since step 1.8 the release runs on the render thread
+  behind a guard: the app survives, and each picture logs one `[critical]`
+  line. Seen on 2026-11-22 and 2026-11-23; a driver update may remove it.
