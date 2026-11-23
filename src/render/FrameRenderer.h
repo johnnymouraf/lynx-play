@@ -256,6 +256,8 @@ private:
     SwapChain swapChain_;
     // Keeps the frame path idle while the window can't show a picture.
     PresentGate presentGate_;
+    // The client area the last frame saw, for the log.
+    std::optional<SurfaceSize> lastClientArea_;
     // The last frame found the window hidden; the first one after it starts
     // fresh picture pairs.
     bool hidden_ = false;

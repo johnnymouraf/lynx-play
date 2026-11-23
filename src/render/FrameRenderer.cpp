@@ -615,13 +615,26 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     // A minimized window has an empty client area: presenting into it would
     // run the whole frame for a picture nobody sees, so the pipeline stays
     // idle until it comes back. The newest picture waits for the redraw.
-    presentGate_.setClientSize(clientAreaOf(window_));
+    const SurfaceSize client = clientAreaOf(window_);
+
+    if (!lastClientArea_ || *lastClientArea_ != client)
+    {
+        spdlog::debug("Stream window client area: {}x{}", client.width, client.height);
+        lastClientArea_ = client;
+    }
+
+    presentGate_.setClientSize(client);
 
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
 
     if (!presentGate_.mayPresent())
     {
+        if (!hidden_)
+        {
+            spdlog::debug("The stream window can't show a picture; the frame path is idle");
+        }
+
         hidden_ = true;
 
         if (newest)
@@ -642,6 +655,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         flowReferenceValid_ = false;
         dlssResetPending_ = true;
         frameSchedule_.reset();
+        spdlog::debug("The stream window shows a picture again; the frame path resumes");
     }
 
     if (!newest && !redraw)
