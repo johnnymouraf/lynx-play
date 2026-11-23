@@ -97,6 +97,13 @@ std::string reflexUnavailableReason(ReflexUnavailable reason)
 
 SurfaceSize clientAreaOf(HWND window)
 {
+    // An iconic window has no picture on screen even if its stored client
+    // rectangle still reads the restored size.
+    if (IsIconic(window) != FALSE)
+    {
+        return {};
+    }
+
     RECT client{};
     GetClientRect(window, &client);
 
