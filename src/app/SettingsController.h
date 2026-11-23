@@ -196,6 +196,9 @@ public:
     // The keycap label the Controles screen shows.
     Q_INVOKABLE QString bindingLabel(const QString& binding) const;
 
+    // Records a PSN sign-in; settings.json keeps only its state and expiry.
+    void recordPsnSignIn(std::optional<std::int64_t> tokenExpiry);
+
 signals:
     void videoChanged();
     void audioChanged();

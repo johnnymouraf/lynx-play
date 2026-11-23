@@ -2,7 +2,7 @@
 # must put its libraries there too.
 set(CMAKE_INSTALL_BINDIR .)
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Qml Quick Svg)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Network Qml Quick Svg)
 qt_standard_project_setup(REQUIRES 6.10)
 
 # CI passes the run number, so a downloaded build says which one it is.
@@ -32,6 +32,8 @@ qt_add_executable(lynx-play WIN32
     OverlayInput.h
     PairingController.cpp
     PairingController.h
+    PsnLoginClient.cpp
+    PsnLoginClient.h
     QtLogBridge.cpp
     QtLogBridge.h
     SettingsController.cpp
@@ -167,6 +169,7 @@ target_link_libraries(lynx-play PRIVATE
     Lynx::remoteplay
     Lynx::render
     Qt6::Gui
+    Qt6::Network
     Qt6::Qml
     Qt6::Quick
     Qt6::Svg)

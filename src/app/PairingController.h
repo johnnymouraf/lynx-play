@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/PsnLoginClient.h"
 #include "remoteplay/AccountId.h"
 #include "remoteplay/ConsoleRegistration.h"
 
@@ -29,6 +30,7 @@ class PairingController : public QObject
     Q_PROPERTY(QString failureMessage READ failureMessage NOTIFY stateChanged)
     Q_PROPERTY(QString retryStep READ retryStep NOTIFY stateChanged)
     Q_PROPERTY(QString pairedKey READ pairedKey NOTIFY stateChanged)
+    Q_PROPERTY(PsnLoginClient* psnLogin READ psnLogin CONSTANT)
 
 public:
     enum class State
@@ -40,7 +42,8 @@ public:
     };
     Q_ENUM(State)
 
-    explicit PairingController(ConsolesController& consoles, QObject* parent = nullptr);
+    explicit PairingController(ConsolesController& consoles, PsnLoginClient& psnLogin,
+                               QObject* parent = nullptr);
     ~PairingController() override;
 
     [[nodiscard]] State state() const;
@@ -52,6 +55,7 @@ public:
     // The card key of the console just paired, which may differ from the key
     // pairing started with.
     [[nodiscard]] QString pairedKey() const;
+    [[nodiscard]] PsnLoginClient* psnLogin();
 
     // The message to show under the field, or empty when the text is valid.
     Q_INVOKABLE QString accountIdError(const QString& text) const;
@@ -73,6 +77,7 @@ private:
     void setState(State state);
 
     ConsolesController& consoles_;
+    PsnLoginClient& psnLogin_;
     std::unique_ptr<remoteplay::ConsoleRegistration> registration_;
     QTimer watchdog_;
     QString key_;

@@ -918,6 +918,22 @@ void SettingsController::setInvertMouseY(bool invert)
     applyKeyboardMouse(keyboardMouse);
 }
 
+void SettingsController::recordPsnSignIn(std::optional<std::int64_t> tokenExpiry)
+{
+    core::PsnSettings psn;
+    psn.signedIn = true;
+    psn.tokenExpiry = tokenExpiry;
+
+    if (psn == settings_.psn)
+    {
+        return;
+    }
+
+    settings_.psn = psn;
+    spdlog::info("PSN sign-in saved with its token expiry");
+    save();
+}
+
 void SettingsController::setKeyboardBinding(const QString& control, const QString& binding)
 {
     std::size_t index = core::kKeyboardControlCount;

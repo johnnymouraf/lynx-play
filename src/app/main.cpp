@@ -4,6 +4,7 @@
 #include "app/Fonts.h"
 #include "app/IconProvider.h"
 #include "app/InputController.h"
+#include "app/PsnLoginClient.h"
 #include "app/QtLogBridge.h"
 #include "app/SettingsController.h"
 #include "app/StreamController.h"
@@ -16,6 +17,7 @@
 #include "core/Settings.h"
 #include "remoteplay/ChiakiRuntime.h"
 #include "remoteplay/ConsoleStore.h"
+#include "remoteplay/PsnTokenStore.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
 
@@ -110,6 +112,20 @@ std::optional<lynx::core::SettingsStore> openSettingsStore()
     }
 
     return lynx::core::SettingsStore(*dataDir / "settings.json");
+}
+
+std::optional<lynx::remoteplay::PsnTokenStore> openPsnTokenStore()
+{
+    const auto dataDir = lynx::core::roamingDataDir();
+
+    if (!dataDir)
+    {
+        spdlog::error("The PSN tokens are unavailable: {}", dataDir.error());
+        return std::nullopt;
+    }
+
+    return lynx::remoteplay::PsnTokenStore(*dataDir / "psn.json",
+                                           lynx::remoteplay::dpapiProtector());
 }
 
 QString findStreamGpu()
@@ -234,8 +250,9 @@ int main(int argc, char* argv[])
 
     lynx::app::InputController input(settings, std::move(gamepads), sdl.has_value());
     lynx::app::StreamController stream(settings, input);
+    lynx::app::PsnLoginClient psnLogin(settings, openPsnTokenStore());
     lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore(),
-                                           stream);
+                                           stream, psnLogin);
 
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);

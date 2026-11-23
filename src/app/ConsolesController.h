@@ -55,7 +55,8 @@ public:
 
     // Without a store, nothing is remembered after the app closes.
     ConsolesController(bool remotePlayReady, std::optional<remoteplay::ConsoleStore> store,
-                       StreamController& stream, QObject* parent = nullptr);
+                       StreamController& stream, PsnLoginClient& psnLogin,
+                       QObject* parent = nullptr);
     ~ConsolesController() override;
 
     [[nodiscard]] ConsoleListModel* model();

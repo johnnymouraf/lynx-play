@@ -85,10 +85,11 @@ std::expected<void, std::string> sendWakeupTo(const SavedConsole& console,
 
 ConsolesController::ConsolesController(bool remotePlayReady,
                                        std::optional<remoteplay::ConsoleStore> store,
-                                       StreamController& stream, QObject* parent)
+                                       StreamController& stream, PsnLoginClient& psnLogin,
+                                       QObject* parent)
     : QObject(parent),
       model_(this),
-      pairing_(*this, this),
+      pairing_(*this, psnLogin, this),
       stream_(stream),
       store_(std::move(store)),
       remotePlayReady_(remotePlayReady)

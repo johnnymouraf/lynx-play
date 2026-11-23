@@ -80,8 +80,9 @@ std::string_view failureName(PairingFailure failure)
 
 } // namespace
 
-PairingController::PairingController(ConsolesController& consoles, QObject* parent)
-    : QObject(parent), consoles_(consoles)
+PairingController::PairingController(ConsolesController& consoles, PsnLoginClient& psnLogin,
+                                     QObject* parent)
+    : QObject(parent), consoles_(consoles), psnLogin_(psnLogin)
 {
     watchdog_.setSingleShot(true);
     watchdog_.setInterval(kPairingTimeout);
@@ -121,6 +122,11 @@ QString PairingController::retryStep() const
 QString PairingController::pairedKey() const
 {
     return pairedKey_;
+}
+
+PsnLoginClient* PairingController::psnLogin()
+{
+    return &psnLogin_;
 }
 
 QString PairingController::accountIdError(const QString& text) const
