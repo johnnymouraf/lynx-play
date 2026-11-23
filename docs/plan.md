@@ -30,6 +30,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         gyro); microphone with mute.
   - [x] **1.5 Keyboard/mouse, overlay and stats** [auto]: key mapping,
         in-stream menu, statistics and latency tuning.
+  - [ ] **1.6 PSN login for the Account ID**: the pairing dialog logs in
+        through the browser (OAuth redirect) and fills the Account ID;
+        manual entry stays.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -809,3 +812,79 @@ With the overlay open, frames redraw continuously.
   badge.
 
 **Chosen: B**, matching `rtx.upscaling`. Changing it: separate rows.
+
+## Current: 1.6 PSN login for the Account ID
+
+**Goal:** the pairing dialog offers "Entrar com a PSN": it opens the default
+browser on Sony's authorize page, takes the redirect URL the browser lands on,
+exchanges its code for tokens and fills the Account ID automatically, keeping
+manual entry as the fallback.
+
+**Guardrails:**
+
+- The pairing protocol doesn't change; the Account ID stays the Base64 of the
+  user id's 8 little-endian bytes, as chiaki expects.
+- No embedded browser: the system browser plus a pasted redirect URL.
+- No credentials, tokens or Account IDs in the repository or the logs (log only
+  that a token was acquired, and its expiry).
+- Tokens are stored encrypted with DPAPI, like the console keys.
+- Manual Account ID entry stays.
+
+**Success criteria:**
+
+1. CI green on `auto/1.6`, unit tests covering: the authorize URL (client id,
+   redirect URI, scope, `prompt=always`), the redirect parser (a `code`, an
+   `error=access_denied`, a malformed URL), the token response (access,
+   refresh, `expires_in`, missing fields), the refresh-token body, and the
+   `user_id` → Account ID conversion against a fixed fixture.
+2. The pairing dialog's Account ID step has "Entrar com a PSN" and a paste
+   field; the click opens the default browser on the authorize URL (the URL in
+   the log and a browser process started) and the dialog shows the waiting
+   state — screenshots.
+3. Pasting a redirect URL with an invalid code reaches Sony and shows the
+   mapped error (a real network call, no credentials needed).
+4. A successful login stores the tokens encrypted and shows when the token
+   expires (owner check).
+5. Owner check: the real login yields the right Account ID, and the console
+   pairs with it.
+
+**Deliveries:**
+
+1. `PsnLogin` (pure, in `src/remoteplay/`): the authorize URL builder, the
+   redirect parser, the token request/response and the account-id conversion,
+   with tests.
+2. The Qt Network client in the app layer (`src/app/`): open the browser
+   (`QDesktopServices`), the form POST with basic auth, the GET of
+   `.../oauth/token/<access_token>` for `user_id`, and the error mapping
+   (denied, expired code, network, malformed response); DPAPI storage for the
+   tokens.
+3. The pairing dialog: "Entrar com a PSN" on the Account ID step, the paste
+   field and the states (idle, waiting for the browser, exchanging, error,
+   success with "Usar este ID"), keeping the manual entry.
+4. Verification on this machine: browser URL, invalid-code error, UI
+   screenshots, CI.
+
+**Settled in planning:** reproduce chiaki-ng's flow exactly
+(`third_party/chiaki-ng/gui/src/psnaccountid.cpp`,
+`include/psnaccountid.h`): authorize
+`https://auth.api.sonyentertainmentnetwork.com/2.0/oauth/authorize` with
+client id `ba495a24-818c-472b-b12d-ff231c1b5745` and secret
+`mvaiZkRsAsI1IBkY`, redirect `https://remoteplay.dl.playstation.net/remoteplay/redirect`,
+scope `psn:clientapp referenceDataService:countryConfig.read
+pushNotification:webSocket.desktop.connect
+sessionManager:remotePlaySession.system.update`; exchange the code at
+`.../2.0/oauth/token`; read `user_id` and convert it. The tokens are also
+what step 3.2 will use, so store the refresh token too.
+
+**Changes:** `src/remoteplay/PsnLogin.{h,cpp}` (pure), `src/app/PsnLoginClient.{h,cpp}`
+(Qt Network and DPAPI), `src/core/` (secure storage reuse, settings field for
+the token expiry), `src/app/qml/` (the pairing dialog), tests.
+
+**Data and interfaces:** the tokens (access, refresh, expiry) go encrypted
+into the app data; `settings.json` keeps only expiry and "signed in" state;
+the Account ID reaches the pairing dialog through the existing field.
+
+**Edge cases:** the user cancels the browser and pastes nothing; a redirect
+with `error=access_denied`; an expired code (400 from Sony); no network;
+a proxy refusing the call; a malformed `user_id`; the refresh token present
+but the access token expired (refresh it).
