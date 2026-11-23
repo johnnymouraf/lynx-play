@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdlib>
 #include <utility>
 
 #include <SDL3/SDL.h>
@@ -20,36 +19,6 @@ constexpr std::uint16_t kDualSenseProduct = 0x0CE6;
 constexpr std::uint16_t kDualSenseEdgeProduct = 0x0DF2;
 constexpr std::uint32_t kRumbleDurationMs = 5000;
 constexpr auto kDeviceRefreshInterval = std::chrono::milliseconds(500);
-
-struct ButtonEntry
-{
-    SDL_GamepadButton sdl;
-    std::uint32_t mask;
-};
-
-constexpr std::array<ButtonEntry, 15> kButtons{{
-    {SDL_GAMEPAD_BUTTON_SOUTH, buttons::kCross},
-    {SDL_GAMEPAD_BUTTON_EAST, buttons::kCircle},
-    {SDL_GAMEPAD_BUTTON_WEST, buttons::kSquare},
-    {SDL_GAMEPAD_BUTTON_NORTH, buttons::kTriangle},
-    {SDL_GAMEPAD_BUTTON_DPAD_LEFT, buttons::kDpadLeft},
-    {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, buttons::kDpadRight},
-    {SDL_GAMEPAD_BUTTON_DPAD_UP, buttons::kDpadUp},
-    {SDL_GAMEPAD_BUTTON_DPAD_DOWN, buttons::kDpadDown},
-    {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, buttons::kL1},
-    {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, buttons::kR1},
-    {SDL_GAMEPAD_BUTTON_LEFT_STICK, buttons::kL3},
-    {SDL_GAMEPAD_BUTTON_RIGHT_STICK, buttons::kR3},
-    {SDL_GAMEPAD_BUTTON_START, buttons::kOptions},
-    {SDL_GAMEPAD_BUTTON_BACK, buttons::kCreate},
-    {SDL_GAMEPAD_BUTTON_TOUCHPAD, buttons::kTouchpad},
-}};
-
-std::uint32_t buttonMask(SDL_GamepadButton button)
-{
-    const auto found = std::ranges::find(kButtons, button, &ButtonEntry::sdl);
-    return found != kButtons.end() ? found->mask : 0;
-}
 
 GamepadConnection connectionOf(SDL_JoystickConnectionState state)
 {
@@ -101,9 +70,11 @@ void clearDualSenseEffects(SDL_Gamepad* gamepad)
     DualSenseTriggerEffect clear;
     clear.type = 0x05;
     effects.apply({.leftTrigger = clear, .rightTrigger = clear});
-    const auto packet = effects.serialize();
-    SDL_SendGamepadEffect(gamepad, packet.data(), static_cast<int>(packet.size()));
-    SDL_RumbleGamepad(gamepad, 0, 0, 0);
+    const auto triggers = effects.serialize();
+    SDL_SendGamepadEffect(gamepad, triggers.data(), static_cast<int>(triggers.size()));
+
+    const auto rumble = dualSenseRumblePacket({}, DualSenseRumbleEncoding::Current, 0);
+    SDL_SendGamepadEffect(gamepad, rumble.data(), static_cast<int>(rumble.size()));
 }
 
 } // namespace
@@ -114,6 +85,8 @@ struct GamepadManager::Device
     SDL_Gamepad* handle = nullptr;
     std::string name;
     bool dualSense = false;
+    bool dualSenseEdge = false;
+    std::uint16_t firmwareVersion = 0;
     bool hasLed = false;
     bool hasPlayerLed = false;
     GamepadConnection connection = GamepadConnection::Unknown;
@@ -206,6 +179,18 @@ void GamepadManager::openDevice(SDL_JoystickID id)
         return;
     }
 
+    // Windows enumerates a Sony pad's motion node, and sometimes a sleeping
+    // paired pad, as a device with no buttons; it can't drive the console.
+    SDL_Joystick* joystick = SDL_GetGamepadJoystick(handle);
+    const int buttonCount = joystick != nullptr ? SDL_GetNumJoystickButtons(joystick) : 0;
+
+    if (buttonCount == 0)
+    {
+        spdlog::info("Skipping gamepad {}: it has no buttons", id);
+        SDL_CloseGamepad(handle);
+        return;
+    }
+
     auto device = std::make_unique<Device>();
     device->id = id;
     device->handle = handle;
@@ -218,6 +203,18 @@ void GamepadManager::openDevice(SDL_JoystickID id)
     const bool sony = vendor == kSonyVendor &&
                       (product == kDualSenseProduct || product == kDualSenseEdgeProduct);
     device->dualSense = SDL_GetGamepadType(handle) == SDL_GAMEPAD_TYPE_PS5 || sony;
+    device->dualSenseEdge = product == kDualSenseEdgeProduct;
+    device->firmwareVersion = SDL_GetGamepadFirmwareVersion(handle);
+
+    char guidText[33]{};
+    std::uint16_t guidVersion = 0;
+    const SDL_GUID guid = SDL_GetJoystickGUID(joystick);
+    SDL_GUIDToString(guid, guidText, sizeof(guidText));
+    SDL_GetJoystickGUIDInfo(guid, nullptr, nullptr, &guidVersion, nullptr);
+    char* mapping = SDL_GetGamepadMapping(handle);
+    spdlog::info("Gamepad '{}' GUID {} version 0x{:04x}, mapping '{}'", device->name, guidText,
+                 guidVersion, mapping != nullptr ? mapping : "");
+    SDL_free(mapping);
 
     const SDL_PropertiesID properties = SDL_GetGamepadProperties(handle);
     device->hasLed =
@@ -359,15 +356,33 @@ void GamepadManager::publish()
         });
     }
 
+    // Every connected controller drives the console, as chiaki-ng combines
+    // them; the active one supplies feedback and the status line.
+    const Device* active = activeDevice();
     std::optional<GamepadSample> sample;
+
+    if (active != nullptr)
+    {
+        sample = active->sample;
+    }
+
+    for (const std::unique_ptr<Device>& device : devices_)
+    {
+        if (device.get() == active)
+        {
+            continue;
+        }
+
+        sample = sample ? mergeSamples(*sample, device->sample) : device->sample;
+    }
+
     std::optional<GamepadConnection> connection;
     std::optional<std::string> name;
 
-    if (const Device* device = activeDevice(); device != nullptr)
+    if (active != nullptr)
     {
-        sample = device->sample;
-        connection = device->connection;
-        name = device->name;
+        connection = active->connection;
+        name = active->name;
     }
 
     const std::scoped_lock lock(mutex_);
@@ -472,8 +487,14 @@ void GamepadManager::handleEvent(const SDL_Event& event)
             return;
         }
 
-        device->sample.buttons = down ? device->sample.buttons | buttonMask(button)
-                                      : device->sample.buttons & ~buttonMask(button);
+        const std::uint32_t mask = gamepadButtonMask(button);
+
+        if (mask != 0)
+        {
+            device->sample.buttons = down ? device->sample.buttons | mask
+                                          : device->sample.buttons & ~mask;
+        }
+
         return;
     }
 
@@ -527,17 +548,19 @@ void GamepadManager::handleEvent(const SDL_Event& event)
             return;
         }
 
-        const int finger = event.gtouchpad.finger;
+        TouchPhase phase = TouchPhase::Motion;
 
-        if (finger < 0 || finger >= static_cast<int>(device->sample.touches.size()))
+        if (event.type == SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN)
         {
-            return;
+            phase = TouchPhase::Down;
+        }
+        else if (event.type == SDL_EVENT_GAMEPAD_TOUCHPAD_UP)
+        {
+            phase = TouchPhase::Up;
         }
 
-        GamepadTouch& touch = device->sample.touches[static_cast<std::size_t>(finger)];
-        touch.x = event.gtouchpad.x;
-        touch.y = event.gtouchpad.y;
-        touch.down = event.type != SDL_EVENT_GAMEPAD_TOUCHPAD_UP;
+        applyTouch(device->sample, event.gtouchpad.finger, phase, event.gtouchpad.x,
+                   event.gtouchpad.y);
         return;
     }
 
@@ -550,52 +573,22 @@ void GamepadManager::handleEvent(const SDL_Event& event)
             return;
         }
 
-        const auto timestamp = static_cast<std::uint32_t>(event.gsensor.sensor_timestamp / 1000);
+        const bool accelerometer = event.gsensor.sensor == SDL_SENSOR_ACCEL;
+        const bool gyroscope = event.gsensor.sensor == SDL_SENSOR_GYRO;
 
-        if (event.gsensor.sensor == SDL_SENSOR_ACCEL)
-        {
-            device->sample.accel = {
-                event.gsensor.data[0] / SDL_STANDARD_GRAVITY,
-                event.gsensor.data[1] / SDL_STANDARD_GRAVITY,
-                event.gsensor.data[2] / SDL_STANDARD_GRAVITY,
-            };
-            chiaki_accel_new_zero_set_active(&device->realAccel, device->sample.accel[0],
-                                             device->sample.accel[1], device->sample.accel[2],
-                                             true);
-            chiaki_orientation_tracker_update(
-                &device->tracker, device->sample.gyro[0], device->sample.gyro[1],
-                device->sample.gyro[2], device->sample.accel[0], device->sample.accel[1],
-                device->sample.accel[2], &device->accelZero, false, timestamp);
-        }
-        else if (event.gsensor.sensor == SDL_SENSOR_GYRO)
-        {
-            device->sample.gyro = {
-                event.gsensor.data[0],
-                event.gsensor.data[1],
-                event.gsensor.data[2],
-            };
-            chiaki_orientation_tracker_update(
-                &device->tracker, device->sample.gyro[0], device->sample.gyro[1],
-                device->sample.gyro[2], device->sample.accel[0], device->sample.accel[1],
-                device->sample.accel[2], &device->accelZero, false, timestamp);
-        }
-        else
+        if (!accelerometer && !gyroscope)
         {
             return;
         }
 
-        device->lastMotionMicroseconds = timestamp;
-        device->sample.hasMotion = true;
-
-        ChiakiControllerState state;
-        chiaki_controller_state_set_idle(&state);
-        chiaki_orientation_tracker_apply_to_controller_state(&device->tracker, &state);
-        device->sample.orientation = {
-            state.orient_x,
-            state.orient_y,
-            state.orient_z,
-            state.orient_w,
+        const std::array<float, 3> data{
+            event.gsensor.data[0],
+            event.gsensor.data[1],
+            event.gsensor.data[2],
         };
+        const auto timestamp =
+            static_cast<std::uint32_t>(event.gsensor.sensor_timestamp / 1000);
+        updateMotion(*device, accelerometer, data, timestamp);
         return;
     }
 
@@ -616,7 +609,7 @@ void GamepadManager::tick()
         resetMotionRequested_ = false;
     }
 
-    if (Device* device = activeDevice(); device != nullptr)
+    for (const std::unique_ptr<Device>& device : devices_)
     {
         if (resetMotion)
         {
@@ -642,29 +635,42 @@ void GamepadManager::tick()
 
 void GamepadManager::applyCommand(Device& device, const DualSenseCommand& command)
 {
+    if (command.classicRumble)
+    {
+        audioHapticsActive_ = !*command.classicRumble;
+    }
+
+    if (command.intensity)
+    {
+        intensity_ = *command.intensity;
+    }
+
     if (command.rumble)
     {
-        if (!SDL_RumbleGamepad(device.handle, command.rumble->first, command.rumble->second,
-                                kRumbleDurationMs) &&
-            !rumbleErrorLogged_)
+        switch (rumblePath(device.dualSense, audioHapticsActive_))
         {
-            spdlog::warn("Cannot rumble '{}': {}", device.name, SDL_GetError());
-            rumbleErrorLogged_ = true;
+        case RumblePath::DualSenseEffect:
+            sendRumble(device, *command.rumble);
+            break;
+
+        case RumblePath::SdlRumble:
+            if (!SDL_RumbleGamepad(device.handle, command.rumble->first,
+                                    command.rumble->second, kRumbleDurationMs) &&
+                !rumbleErrorLogged_)
+            {
+                spdlog::warn("Cannot rumble '{}': {}", device.name, SDL_GetError());
+                rumbleErrorLogged_ = true;
+            }
+            break;
+
+        case RumblePath::None:
+            break;
         }
     }
 
-    if (command.led && device.hasLed)
-    {
-        SDL_SetGamepadLED(device.handle, (*command.led)[0], (*command.led)[1], (*command.led)[2]);
-    }
-
-    if (command.playerIndex && device.hasPlayerLed)
-    {
-        SDL_SetGamepadPlayerIndex(device.handle, *command.playerIndex);
-    }
-
-    const bool packet = command.leftTrigger || command.rightTrigger || command.microphoneMuted ||
-                        command.intensity || command.classicRumble;
+    const bool packet = device.dualSense &&
+                        (command.leftTrigger || command.rightTrigger ||
+                         command.microphoneMuted || command.intensity || command.classicRumble);
 
     if (!packet)
     {
@@ -672,11 +678,7 @@ void GamepadManager::applyCommand(Device& device, const DualSenseCommand& comman
     }
 
     effects_.apply(command);
-
-    if (device.dualSense)
-    {
-        sendEffects(device);
-    }
+    sendEffects(device);
 }
 
 void GamepadManager::sendEffects(Device& device)
@@ -687,6 +689,24 @@ void GamepadManager::sendEffects(Device& device)
         !packetErrorLogged_)
     {
         spdlog::warn("Cannot send DualSense effects: {}", SDL_GetError());
+        packetErrorLogged_ = true;
+    }
+}
+
+void GamepadManager::sendRumble(Device& device,
+                               const std::pair<std::uint16_t, std::uint16_t>& levels)
+{
+    const DualSenseRumble rumble{
+        .left = rumbleLevel(levels.first),
+        .right = rumbleLevel(levels.second),
+    };
+    const auto encoding = rumbleEncoding(device.dualSenseEdge, device.firmwareVersion);
+    const auto packet = dualSenseRumblePacket(rumble, encoding, intensity_);
+
+    if (!SDL_SendGamepadEffect(device.handle, packet.data(), static_cast<int>(packet.size())) &&
+        !packetErrorLogged_)
+    {
+        spdlog::warn("Cannot send DualSense rumble: {}", SDL_GetError());
         packetErrorLogged_ = true;
     }
 }
@@ -704,6 +724,8 @@ void GamepadManager::resetDeviceMotion(Device& device)
     ChiakiControllerState state;
     chiaki_controller_state_set_idle(&state);
     chiaki_orientation_tracker_apply_to_controller_state(&device.tracker, &state);
+    device.sample.gyro = {state.gyro_x, state.gyro_y, state.gyro_z};
+    device.sample.accel = {state.accel_x, state.accel_y, state.accel_z};
     device.sample.orientation = {
         state.orient_x,
         state.orient_y,
@@ -712,15 +734,52 @@ void GamepadManager::resetDeviceMotion(Device& device)
     };
 }
 
+void GamepadManager::updateMotion(Device& device, bool accelerometer,
+                                  const std::array<float, 3>& data, std::uint32_t timestamp)
+{
+    if (accelerometer)
+    {
+        const std::array<float, 3> accel = accelerationInG(data);
+        chiaki_accel_new_zero_set_active(&device.realAccel, accel[0], accel[1], accel[2], true);
+        chiaki_orientation_tracker_update(
+            &device.tracker, device.sample.gyro[0], device.sample.gyro[1],
+            device.sample.gyro[2], accel[0], accel[1], accel[2], &device.accelZero, false,
+            timestamp);
+    }
+    else
+    {
+        chiaki_orientation_tracker_update(
+            &device.tracker, data[0], data[1], data[2], device.sample.accel[0],
+            device.sample.accel[1], device.sample.accel[2], &device.accelZero, true, timestamp);
+    }
+
+    device.lastMotionMicroseconds = timestamp;
+
+    ChiakiControllerState state;
+    chiaki_controller_state_set_idle(&state);
+    chiaki_orientation_tracker_apply_to_controller_state(&device.tracker, &state);
+    device.sample.gyro = {state.gyro_x, state.gyro_y, state.gyro_z};
+    device.sample.accel = {state.accel_x, state.accel_y, state.accel_z};
+    device.sample.orientation = {
+        state.orient_x,
+        state.orient_y,
+        state.orient_z,
+        state.orient_w,
+    };
+    device.sample.hasMotion = true;
+}
+
 void GamepadManager::readCurrentState(Device& device)
 {
     device.sample = GamepadSample{};
 
-    for (const ButtonEntry& entry : kButtons)
+    for (int button = 0; button < static_cast<int>(SDL_GAMEPAD_BUTTON_COUNT); ++button)
     {
-        if (SDL_GetGamepadButton(device.handle, entry.sdl))
+        const auto gamepadButton = static_cast<SDL_GamepadButton>(button);
+
+        if (SDL_GetGamepadButton(device.handle, gamepadButton))
         {
-            device.sample.buttons |= entry.mask;
+            device.sample.buttons |= gamepadButtonMask(gamepadButton);
         }
     }
 
@@ -736,8 +795,8 @@ void GamepadManager::readCurrentState(Device& device)
 
     const int fingers = SDL_GetNumGamepadTouchpadFingers(device.handle, 0);
 
-    for (int finger = 0; finger < fingers && finger < static_cast<int>(device.sample.touches.size());
-         ++finger)
+    for (int finger = 0;
+         finger < fingers && finger < static_cast<int>(device.sample.touches.size()); ++finger)
     {
         bool down = false;
         float x = 0.0f;
@@ -749,10 +808,7 @@ void GamepadManager::readCurrentState(Device& device)
             continue;
         }
 
-        GamepadTouch& touch = device.sample.touches[static_cast<std::size_t>(finger)];
-        touch.down = down;
-        touch.x = x;
-        touch.y = y;
+        applyTouch(device.sample, finger, down ? TouchPhase::Down : TouchPhase::Up, x, y);
     }
 
     std::array<float, 3> data{};
@@ -765,11 +821,7 @@ void GamepadManager::readCurrentState(Device& device)
 
     if (SDL_GetGamepadSensorData(device.handle, SDL_SENSOR_ACCEL, data.data(), 3))
     {
-        device.sample.accel = {
-            data[0] / SDL_STANDARD_GRAVITY,
-            data[1] / SDL_STANDARD_GRAVITY,
-            data[2] / SDL_STANDARD_GRAVITY,
-        };
+        device.sample.accel = accelerationInG(data);
         chiaki_accel_new_zero_set_active(&device.realAccel, device.sample.accel[0],
                                          device.sample.accel[1], device.sample.accel[2], true);
         device.sample.hasMotion = true;

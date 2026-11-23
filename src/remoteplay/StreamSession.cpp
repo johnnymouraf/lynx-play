@@ -169,10 +169,10 @@ struct StreamSession::State
     bool microphoneConnected = false;
     std::atomic<bool> controlConnected{false};
     std::atomic<bool> microphoneActive{false};
-    // Haptics are audible until the console says otherwise; the trigger
-    // strength starts off, as chiaki-ng does.
+    // Haptics are audible until the console says otherwise; both strengths
+    // start at chiaki-ng's strong default.
     std::atomic<int> hapticIntensity{::Strong};
-    std::atomic<int> triggerIntensity{::Off};
+    std::atomic<int> triggerIntensity{::Strong};
     std::jthread inputThread;
 
     State() = default;
@@ -556,7 +556,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         return;
 
     case CHIAKI_EVENT_RUMBLE:
-        if (gamepads != nullptr && haptics->route() != audio::HapticsRoute::Audio)
+        if (gamepads != nullptr && hapticIntensity.load() != ::Off)
         {
             gamepads->submit(input::dualSenseCommand(event.rumble));
         }
@@ -564,7 +564,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         return;
 
     case CHIAKI_EVENT_TRIGGER_EFFECTS:
-        if (gamepads != nullptr)
+        if (gamepads != nullptr && triggerIntensity.load() != ::Off)
         {
             gamepads->submit(input::dualSenseCommand(event.trigger_effects));
         }
