@@ -233,12 +233,16 @@ FrameRenderer::~FrameRenderer()
     }
 
     waitForGpu();
+    spdlog::info("The frame renderer's GPU work is complete (fence {}); releasing the features",
+                 lastSignaledFence_);
+
     releaseFrameGeneration();
     // The features must be gone before the host shuts NGX down.
     dlssSuperResolution_.reset();
     ngxHost_.reset();
 
     reflex_.shutdown();
+    spdlog::info("The frame features are released; the session's own objects go next");
 }
 
 void FrameRenderer::resize(SurfaceSize size)

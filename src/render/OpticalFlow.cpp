@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -255,6 +256,26 @@ D3D12_RESOURCE_DESC outputDescription(SurfaceSize extent, DXGI_FORMAT format)
     return description;
 }
 
+// The driver's release path can fault on some driver versions; the guard turns
+// the access violation into a logged failure so a close can't take the process
+// down. The function holds no objects that need unwinding, which SEH requires.
+__declspec(noinline) bool callGuarded(const std::function<void()>& call, DWORD& fault)
+{
+    bool completed = false;
+
+    __try
+    {
+        call();
+        completed = true;
+    }
+    __except (fault = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER)
+    {
+        completed = false;
+    }
+
+    return completed;
+}
+
 } // namespace
 
 struct OpticalFlow::Impl
@@ -266,56 +287,108 @@ struct OpticalFlow::Impl
 
     void releaseSession()
     {
+        if (!configured && handle == nullptr && costs.empty() && flows.empty() && inputs.empty())
+        {
+            return;
+        }
+
+        spdlog::info("Optical flow: releasing the session on thread {} (created on thread {})",
+                     GetCurrentThreadId(), createdThread);
+
+        const auto step = [](std::string_view name, const std::function<void()>& call)
+        {
+            DWORD fault = 0;
+
+            if (callGuarded(call, fault))
+            {
+                spdlog::info("Optical flow: {}", name);
+                return;
+            }
+
+            spdlog::critical("Optical flow: {} faulted with 0x{:08X}", name, fault);
+        };
+
         // A failed frame can leave the engine working; never release a
         // registered picture under it.
         if (lastOutputValue != 0 && fence != nullptr)
         {
-            if (fence->GetCompletedValue() < lastOutputValue && fenceEvent)
+            const std::uint64_t completed = fence->GetCompletedValue();
+
+            if (completed < lastOutputValue && fenceEvent)
             {
-                if (SUCCEEDED(fence->SetEventOnCompletion(lastOutputValue, fenceEvent.get())))
-                {
-                    WaitForSingleObject(fenceEvent.get(), kRegistrationTimeoutMilliseconds);
-                }
+                step(std::format("waiting for the last flow (fence {} of {})", completed,
+                                 lastOutputValue),
+                     [this]
+                     {
+                         if (SUCCEEDED(fence->SetEventOnCompletion(lastOutputValue,
+                                                                   fenceEvent.get())))
+                         {
+                             WaitForSingleObject(fenceEvent.get(),
+                                                 kRegistrationTimeoutMilliseconds);
+                         }
+                     });
+            }
+            else
+            {
+                spdlog::info("Optical flow: the last flow is complete (fence {} of {})", completed,
+                             lastOutputValue);
             }
 
             lastOutputValue = 0;
         }
 
-        const auto unregister = [this](std::vector<NvOFGPUBufferHandle>& handles)
+        const auto unregister = [this, &step](std::string_view name,
+                                              std::vector<NvOFGPUBufferHandle>& handles)
         {
-            for (auto it = handles.rbegin(); it != handles.rend(); ++it)
+            for (NvOFGPUBufferHandle& buffer : handles)
             {
-                if (*it == nullptr)
+                if (buffer == nullptr)
                 {
                     continue;
                 }
 
                 NV_OF_UNREGISTER_RESOURCE_PARAMS_D3D12 parameters{};
-                parameters.hOFGpuBuffer = *it;
-                functions.nvOFUnregisterResourceD3D12(&parameters);
+                parameters.hOFGpuBuffer = std::exchange(buffer, nullptr);
+                step(std::format("unregistered a {} picture", name),
+                     [this, &parameters] { functions.nvOFUnregisterResourceD3D12(&parameters); });
             }
 
             handles.clear();
         };
 
-        unregister(costHandles);
-        unregister(flowHandles);
-        unregister(inputHandles);
-        costs.clear();
-        flows.clear();
-        inputs.clear();
+        const auto release = [&step](std::string_view name,
+                                     std::vector<ComPtr<ID3D12Resource>>& resources)
+        {
+            for (std::size_t index = 0; index < resources.size(); ++index)
+            {
+                step(std::format("released {} picture {}", name, index),
+                     [&resources, index] { resources[index].Reset(); });
+            }
+
+            resources.clear();
+        };
+
+        unregister("cost", costHandles);
+        unregister("flow", flowHandles);
+        unregister("input", inputHandles);
+        release("cost", costs);
+        release("flow", flows);
+        release("input", inputs);
 
         if (handle != nullptr)
         {
-            functions.nvOFDestroy(handle);
-            handle = nullptr;
+            const NvOFHandle session = std::exchange(handle, nullptr);
+            step("destroyed the NvOF session",
+                 [this, session] { functions.nvOFDestroy(session); });
         }
 
         configured = false;
+        spdlog::info("Optical flow: the session is released");
     }
 
     ComPtr<ID3D12Device> device;
     NV_OF_D3D12_API_FUNCTION_LIST functions{};
+    DWORD createdThread = 0;
     NvOFHandle handle = nullptr;
     ComPtr<ID3D12Fence> fence;
     core::UniqueHandle fenceEvent;
@@ -512,6 +585,7 @@ std::expected<OpticalFlow, std::string> OpticalFlow::create(ID3D12Device& device
     auto impl = std::make_unique<Impl>();
     impl->device = &device;
     impl->functions = loaded.functions;
+    impl->createdThread = GetCurrentThreadId();
     impl->slotCount = slotCount;
 
     if (const NV_OF_STATUS status =
