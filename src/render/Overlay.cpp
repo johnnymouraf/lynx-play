@@ -68,10 +68,13 @@ constexpr ImGuiWindowFlags kMenuFlags =
     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
 
 // Dear ImGui has process-wide state; the contexts of two stream windows on
-// different threads must not interleave.
-std::mutex& imGuiMutex()
+// different threads must not interleave. Windows also dispatches messages
+// synchronously from inside a handler: Dear ImGui's ReleaseCapture on a mouse
+// button up sends WM_CAPTURECHANGED to the same window, which re-enters
+// Overlay::handleMessage on this thread. A recursive mutex keeps that legal.
+std::recursive_mutex& imGuiMutex()
 {
-    static std::mutex mutex;
+    static std::recursive_mutex mutex;
     return mutex;
 }
 
