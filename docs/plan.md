@@ -39,6 +39,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.8 Closing the stream must not kill the app**: releasing the
         pictures the optical flow read faulted inside the NVIDIA driver; the
         release now happens on the render thread under a guard.
+  - [x] **1.9 Controller parity with chiaki-ng**: the audit against chiaki-ng
+        fixed the trigger scale, the touchpad, the sensors, the merge of
+        keyboard and gamepad, and the rumble/trigger packets.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -1038,3 +1041,55 @@ section), the periodic log, tests.
 **Edge cases:** a 30 fps game with a 60 fps HUD; a scene change resetting the
 cadence; FG on but the cadence at 60 (no generation needed); the overlay open
 while frames are idle (minimized) showing stale rates; a 120 Hz display.
+
+#### D77 – Keyboard and gamepad merge through chiaki's own OR (1.9)
+
+Our sample merge handled touches and the motion block differently from
+chiaki's.
+
+- A. Convert each source to `ChiakiControllerState` and call
+  `chiaki_controller_state_or`, exactly as `streamsession.cpp` does.
+- B. Fix the sample-level merge by hand.
+- C. Disable the keyboard by default.
+
+**Chosen: A**, with the keyboard as its own toggle (D81). Changing it:
+`StreamSession`/`GamepadManager::publish`/`OverlayInput`.
+
+#### D78 – DualSense rumble goes in the effect packet (1.9)
+
+`SDL_RumbleGamepad` disables the USB audio haptics, and chiaki-ng never uses
+it on a DualSense.
+
+- A. SDL rumble always.
+- B. The effect packet only with the haptics active.
+- C. The packet on a DualSense, SDL on other pads and only without audio
+  haptics.
+
+**Chosen: C**. Changing it: `applyCommand`/`sendRumble`/`rumblePath`.
+
+#### D79 – Touch ids are allocated on the contact (1.9)
+
+- A. Fixed ids per finger.
+- B. Sequential masked ids at down, as chiaki's protocol expects.
+
+**Chosen: B**. Changing it: `applyTouch`/`toChiakiControllerState`.
+
+#### D80 – The controller debug lives at the top and in the log (1.9)
+
+The bottom of the 720p panel was cut off, and precise reports need text.
+
+- A. The controller section at the top plus a 1 Hz log line while the
+  statistics are open.
+- B. Keep it at the bottom (cut).
+- C. A separate panel.
+
+**Chosen: A**. Changing it: `drawStatistics`/`render`.
+
+#### D81 – "Keyboard as controller" is a toggle, on by default (1.9)
+
+chiaki-ng's `settings/keyboard_enabled` defaults to true.
+
+- A. A toggle with the same default, off means an empty keyboard sample.
+- B. Always on: no way to isolate a gamepad problem.
+
+**Chosen: A**. Changing it: `Settings`/`KeyboardMouse`/`SettingsController`/QML.
