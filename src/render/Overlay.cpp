@@ -541,12 +541,14 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const Overlay
     ImGui::PopFont();
     rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
 
+    // The controller section goes first: the panel is taller than a 720p
+    // window, and this is the part a controller report has to see.
+    drawControllerSection(fonts, gamepad);
     drawVideoSection(fonts, stats);
     drawLatencySection(fonts, stats);
     drawGpuSection(fonts, stats);
     drawFrameTime(fonts, stats);
     drawReflexSection(fonts, stats.reflex);
-    drawControllerSection(fonts, gamepad);
 
     ImGui::PopStyleVar();
     ImGui::End();
