@@ -1012,9 +1012,13 @@ statistics (GPU stages, cadence, Reflex) stay.
    and what this step copied or deliberately did not.
 3. `--play-file` of the 30 fps stream carried in a 60 fps container with
    Frame Generation 2x: the panel shows source 60, game 30, generated ~30/s
-   and presented ~60/s (screenshot + the periodic log line), and the cadence
-   line agrees; with a true 60 fps stream: source 60, game 60, generated
-   ~60/s, presented ~120/s where the display allows.
+   and presented ~60/s (screenshot + the periodic log line), the cadence line
+   agrees, and the pipeline proves 30 distinct + 30 generated presented per
+   second — no repeated source frame presented as real. With a true 60 fps
+   stream: source 60, game 60, generated ~60/s, presented ~120/s where the
+   display allows. If the cadence reads 60 on 30-in-60 content (a 60 fps HUD
+   would make frames differ), the repeated-frame metric must be fixed (its
+   region or threshold) and the fixture must carry motion and a HUD.
 4. With Frame Generation off, the panel shows generated 0 and presented equal
    to the distinct rate, making the difference obvious.
 5. Owner check: in a real 30 fps game (GTA VI-like), the panel shows the
