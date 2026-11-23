@@ -33,6 +33,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.6 PSN login for the Account ID**: the pairing dialog logs in
         through the browser (OAuth redirect) and fills the Account ID;
         manual entry stays.
+  - [x] **1.7 Minimizing the stream must not crash**: the overlay re-entered
+        its own mutex on a click and Frame Generation kept presenting into an
+        iconic window; both fixed, with the pipeline idle while hidden.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -847,59 +850,33 @@ UI untouched.
 **Chosen: A**, closing the edge case now. Changing it: drop the call in
 `PsnLoginClient`'s constructor.
 
-## Current: 1.7 Minimizing the stream must not crash
 
-**Goal:** minimizing (or restoring) the stream window while streaming leaves
-the app running, with or without Frame Generation and VSR on; the same holds
-for alt-tab, occlusion and minimizing the main window.
+#### D70 – The overlay's mutex became recursive (1.7)
 
-**Guardrails:** no feature changes; the frame path stays the same when the
-window is visible; the fix must not disable Frame Generation or VSR to hide
-the problem; no new third-party dependency.
+`ReleaseCapture` makes Windows re-enter the window procedure synchronously,
+and the overlay locked its own non-recursive mutex again.
 
-**Success criteria:**
+- A. A `std::recursive_mutex`: keeps cross-thread exclusion and delivers
+  every message.
+- B. Ignore nested messages: drops input.
+- C. Marshal messages to the render thread: more machinery.
 
-1. CI green on `auto/1.7`, with a unit test for whatever pure state the fix
-   touches (for example the source ring or the frame schedule).
-2. Reproduced before the fix with `--play-file` and the owner's settings
-   (`rtx.frameGeneration: 2x`, `rtx.videoSuperResolution: true`,
-   `rtx.opticalFlow: true`, Reflex boost): minimizing the stream window
-   closes the whole app with no log line; the Windows Application log shows
-   `0xc0000409` in `ucrtbase.dll` (event at 2026-11-23 09:36:56, offset
-   `0xa527e`). The reproduction and the diagnosis are recorded.
-3. After the fix, the same test minimizes and restores the window ten times,
-   leaves it minimized for a minute, alt-tabs away and back, and the stream
-   keeps presenting (the log shows no gap in the present lines and no error),
-   and the app exits normally with Esc.
-4. The log names the cause (an error line, not a silent death) if anything
-   still fails.
-5. Owner check: a real PS5 session survives minimizing, alt-tab and
-   minimizing the main window, as before.
+**Chosen: A**. Changing it: the type in `Overlay.cpp`.
 
-**Deliveries:**
+#### D71 – The pipeline goes idle while the window can't show it (1.7)
 
-1. Diagnosis: a `std::set_terminate` handler that logs the exception type,
-   `what()` and the thread, plus a `try`/`catch` around the render thread's
-   body, to turn the next silent death into a log line; enable WER local
-   dumps under `HKCU` for `lynx-play.exe` while investigating.
-2. The fix itself, once the exception is identified (the suspects: an `.at()`
-   out of range in the render loop, a DLSS-G/NGX evaluate on an occluded swap
-   chain, or a zero-sized present after `WM_SIZE` with `SIZE_MINIMIZED`),
-   with the regression test.
-3. A guard on minimize: if `Present` reports the window occluded
-   (`DXGI_STATUS_OCCLUDED`) or the client area is zero, skip the present and
-   keep the pipeline idle instead of presenting into an occluded chain.
+- A. Skip drawing and presenting while the window is iconic or has a zero
+  client area, resuming on restore and restarting the DLSS-G/cadence pairs;
+  an occluded chain retries periodically.
+- B. Keep presenting: GPU work for an unseen picture.
+- C. Skip only the present: the pipeline still runs.
 
-**Settled in planning:** the crash is native, in `ucrtbase.dll`
-(`0xc0000409`), right after the minimize, in the build `0.1.0-build.141`; the
-owner's stream had Frame Generation 2x, VSR, RTX HDR off, optical flow and
-Reflex boost on, at 1080p60.
+**Chosen: A**. Changing it: the `PresentGate` use in `renderFrame`.
 
-**Changes:** `src/render/` (render thread, present path, swap chain),
-`src/core/` (terminate logging), tests.
+#### D72 – `IsIconic` in addition to the client rect (1.7)
 
-**Data and interfaces:** none.
+- A. Treat a window as hidden when `IsIconic` says so or the client area is
+  zero.
+- B. Only the client rect: a minimized window was seen presenting once.
 
-**Edge cases:** minimize with every RTX feature off; minimize the main window
-while the stream plays; fullscreen occluded by another app; restore after a
-long occlusion; device removed.
+**Chosen: A**. Changing it: `clientAreaOf`.
