@@ -95,6 +95,8 @@ struct MenuResult
     bool reflexChanged = false;
     core::ReflexMode reflex = core::ReflexMode::Off;
     bool microphoneToggled = false;
+    bool windowLayoutChanged = false;
+    core::WindowLayout windowLayout;
     bool disconnect = false;
 };
 
@@ -136,6 +138,21 @@ const char* reflexModeLabel(core::ReflexMode mode)
     }
 
     return "Desligado";
+}
+
+std::string windowLayoutText(const core::WindowLayout& layout)
+{
+    if (layout.mode == core::WindowMode::Fullscreen)
+    {
+        return "Tela cheia";
+    }
+
+    if (core::windowSizePresetIndex(layout.size))
+    {
+        return std::format("{} × {}", layout.size.width, layout.size.height);
+    }
+
+    return std::format("Personalizado ({} × {})", layout.size.width, layout.size.height);
 }
 
 // Portuguese writes decimals with a comma, as the design does.
@@ -539,6 +556,50 @@ bool toggleRow(const char* id, const Fonts& fonts, const char* label, const char
     return clicked;
 }
 
+// A row whose value cycles through choices when clicked; the detail line
+// says what a click does.
+bool cycleRow(const char* id, const Fonts& fonts, const char* label, const char* detail,
+              const char* value, float height)
+{
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+
+    ImGui::PushID(id);
+    ImGui::InvisibleButton("row", ImVec2(width, height));
+    const bool clicked = ImGui::IsItemClicked();
+    const bool hovered = ImGui::IsItemHovered();
+    const bool focused = ImGui::IsItemFocused();
+    ImGui::PopID();
+
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+
+    if (hovered)
+    {
+        drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height), kOverlayHover,
+                                 6.0F);
+    }
+
+    if (focused)
+    {
+        drawList->AddRect(start, ImVec2(start.x + width, start.y + height), kFocus, 6.0F, 0, 2.0F);
+    }
+
+    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + 12.0F, start.y + 8.0F), kText,
+             label);
+
+    if (detail != nullptr && detail[0] != '\0')
+    {
+        drawText(drawList, fonts.caption, kCaptionSize, ImVec2(start.x + 12.0F, start.y + 30.0F),
+                 kTextMuted, detail);
+    }
+
+    const float valueWidth = textWidth(fonts.label, kBodySize, value);
+    drawText(drawList, fonts.label, kBodySize,
+             ImVec2(start.x + width - 12.0F - valueWidth, start.y + 8.0F), kAccent, value);
+
+    return clicked;
+}
+
 bool actionButton(const char* id, const Fonts& fonts, const char* label, bool danger)
 {
     const ImVec2 start = ImGui::GetCursorScreenPos();
@@ -655,7 +716,8 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
 }
 
 MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const OverlayOptions& options,
-                    core::ReflexMode currentReflex, bool microphoneMuted, bool statsVisible)
+                    core::ReflexMode currentReflex, bool microphoneMuted, bool statsVisible,
+                    core::WindowLayout windowLayout)
 {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float height = std::min(kMenuHeight, std::max(320.0F, display.y - 2.0F * kPanelMargin));
@@ -718,6 +780,13 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
                      static_cast<int>(stats.reflex.state));
     }
 
+    if (cycleRow("window-row", menuFonts, "Janela", "Clique para alternar tela cheia e tamanhos",
+                 windowLayoutText(windowLayout).c_str(), 54.0F))
+    {
+        result.windowLayoutChanged = true;
+        result.windowLayout = core::nextWindowLayout(windowLayout);
+    }
+
     if (toggleRow("stats-row", menuFonts, "Mostrar estatísticas", "", statsVisible, 44.0F))
     {
         result.statisticsToggled = true;
@@ -768,6 +837,8 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
     overlay->actions_ = std::move(actions);
     overlay->reflex_ = overlay->options_.reflex;
     overlay->microphoneMuted_ = overlay->options_.microphoneMuted;
+    overlay->windowMode_.store(overlay->options_.windowMode);
+    overlay->windowSize_.store(overlay->options_.windowSize);
     overlay->statisticsVisible_.store(overlay->options_.statisticsVisible);
     overlay->reportedStatisticsVisible_ = overlay->options_.statisticsVisible;
 
@@ -986,8 +1057,12 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
 
     if (menuOpen)
     {
+        const core::WindowLayout windowLayout{
+            .mode = windowMode_.load(),
+            .size = windowSize_.load(),
+        };
         const MenuResult menu = drawMenu(fonts, stats, options_, reflex_, microphoneMuted_,
-                                         statisticsVisible);
+                                         statisticsVisible, windowLayout);
 
         if (menu.statisticsToggled)
         {
@@ -1007,6 +1082,24 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             else
             {
                 spdlog::warn("overlay: no reflex action");
+            }
+        }
+
+        if (menu.windowLayoutChanged)
+        {
+            windowMode_.store(menu.windowLayout.mode);
+            windowSize_.store(menu.windowLayout.size);
+            spdlog::info("overlay: window layout mode {} at {}x{}",
+                         core::windowModeName(menu.windowLayout.mode),
+                         menu.windowLayout.size.width, menu.windowLayout.size.height);
+
+            if (actions_.windowLayoutChanged)
+            {
+                actions_.windowLayoutChanged(menu.windowLayout.mode, menu.windowLayout.size);
+            }
+            else
+            {
+                spdlog::warn("overlay: no window layout action");
             }
         }
 
@@ -1111,6 +1204,12 @@ void Overlay::toggleMenu()
 void Overlay::toggleStatistics()
 {
     statisticsVisible_.store(!statisticsVisible_.load());
+}
+
+void Overlay::setWindowLayout(core::WindowMode mode, core::WindowSize size)
+{
+    windowMode_.store(mode);
+    windowSize_.store(size);
 }
 
 bool Overlay::menuOpen() const

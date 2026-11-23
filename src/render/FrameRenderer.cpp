@@ -196,6 +196,12 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
     requestedFrameGeneration_.store(options_.frameGeneration);
     requestedHdr_.store(options_.hdr);
     requestedHdrApplied_ = options_.hdr;
+    requestedWindowMode_.store(options_.overlay.windowMode);
+    requestedWindowSize_.store(options_.overlay.windowSize);
+    windowLayoutApplied_ = {
+        .mode = options_.overlay.windowMode,
+        .size = options_.overlay.windowSize,
+    };
 
     spdlog::info("Display for the stream: '{}', HDR supported {}, HDR active {}, SDR white "
                  "{:.0f} nits (DisplayConfig)",
@@ -287,6 +293,14 @@ void FrameRenderer::setFrameGeneration(core::FrameGenerationMode mode)
 void FrameRenderer::setHdrMode(core::HdrMode mode)
 {
     requestedHdr_.store(mode);
+    SetEvent(wakeEvent_.get());
+}
+
+void FrameRenderer::setWindowLayout(core::WindowMode mode, core::WindowSize size)
+{
+    requestedWindowMode_.store(mode);
+    requestedWindowSize_.store(size);
+    redrawRequested_.store(true);
     SetEvent(wakeEvent_.get());
 }
 
@@ -542,6 +556,7 @@ try
         applyRequestedOpticalFlow();
         applyRequestedFrameGeneration();
         applyRequestedHdr();
+        applyRequestedWindowLayout();
         applyOverlayToggles();
         pollGamepad();
 
@@ -1119,6 +1134,26 @@ void FrameRenderer::applyRequestedHdr()
     requestedHdrApplied_ = requested;
     rtxVideoHdrFailed_ = false;
     spdlog::info("HDR: {}", core::hdrModeName(requested));
+}
+
+void FrameRenderer::applyRequestedWindowLayout()
+{
+    const core::WindowLayout requested{
+        .mode = requestedWindowMode_.load(),
+        .size = requestedWindowSize_.load(),
+    };
+
+    if (requested == windowLayoutApplied_)
+    {
+        return;
+    }
+
+    windowLayoutApplied_ = requested;
+
+    if (overlay_ != nullptr)
+    {
+        overlay_->setWindowLayout(requested.mode, requested.size);
+    }
 }
 
 FrameRenderer::Presentation FrameRenderer::presentationFor(const VideoFrame* frame) const

@@ -17,8 +17,6 @@ namespace
 {
 
 constexpr auto kWindowClassName = L"LynxPlayStreamWindow";
-constexpr LONG kInitialClientWidth = 1280;
-constexpr LONG kInitialClientHeight = 720;
 constexpr DWORD kWindowedStyle = WS_OVERLAPPEDWINDOW;
 constexpr DWORD kFullscreenStyle = WS_POPUP;
 
@@ -26,6 +24,11 @@ constexpr DWORD kFullscreenStyle = WS_POPUP;
 constexpr UINT kRenderFailedMessage = WM_APP + 1;
 // Posted when the overlay's menu opens or closes, from the renderer's thread.
 constexpr UINT kOverlayMenuMessage = WM_APP + 2;
+
+// A border drag reports its size once it settles; a programmatic resize
+// (SetWindowPos) has no drag-end message, so the timer catches both.
+constexpr UINT_PTR kSizeSettleTimer = 1;
+constexpr UINT kSizeSettleMilliseconds = 500;
 
 // Bit 29 of a key message's lParam: the Alt key was down.
 constexpr LPARAM kAltDownFlag = LPARAM{1} << 29;
@@ -90,6 +93,16 @@ SurfaceSize clientSize(HWND window)
     };
 }
 
+core::WindowSize windowSizeOf(HWND window)
+{
+    const SurfaceSize size = clientSize(window);
+
+    return {
+        .width = static_cast<int>(size.width),
+        .height = static_cast<int>(size.height),
+    };
+}
+
 RECT workAreaOf(HWND anchor)
 {
     const HMONITOR monitor = anchor != nullptr
@@ -102,18 +115,47 @@ RECT workAreaOf(HWND anchor)
     return info.rcWork;
 }
 
-// The window's frame for the initial client size, centered in the work area.
-RECT initialFrame(const RECT& workArea)
+core::WindowSize workAreaSizeOf(HWND anchor)
 {
-    RECT frame{.left = 0, .top = 0, .right = kInitialClientWidth, .bottom = kInitialClientHeight};
+    const RECT area = workAreaOf(anchor);
+
+    return {
+        .width = static_cast<int>(area.right - area.left),
+        .height = static_cast<int>(area.bottom - area.top),
+    };
+}
+
+// The frame a windowed window needs around a client size.
+SIZE frameSizeOf(core::WindowSize client)
+{
+    RECT frame{.left = 0, .top = 0, .right = client.width, .bottom = client.height};
     AdjustWindowRectEx(&frame, kWindowedStyle, FALSE, 0);
 
-    const LONG width = frame.right - frame.left;
-    const LONG height = frame.bottom - frame.top;
-    const LONG left = workArea.left + std::max(0L, (workArea.right - workArea.left - width) / 2);
-    const LONG top = workArea.top + std::max(0L, (workArea.bottom - workArea.top - height) / 2);
+    return {.cx = frame.right - frame.left, .cy = frame.bottom - frame.top};
+}
 
-    return {.left = left, .top = top, .right = left + width, .bottom = top + height};
+// The requested client size, clamped so that its frame fits the work area.
+core::WindowSize fittingClientSize(core::WindowSize wanted, core::WindowSize workArea)
+{
+    const core::WindowSize clamped = core::clampWindowSize(wanted, workArea);
+    const SIZE frame = frameSizeOf(clamped);
+    const LONG availableWidth = std::max(1L, workArea.width - (frame.cx - clamped.width));
+    const LONG availableHeight = std::max(1L, workArea.height - (frame.cy - clamped.height));
+
+    return {
+        .width = static_cast<int>(std::min<LONG>(clamped.width, availableWidth)),
+        .height = static_cast<int>(std::min<LONG>(clamped.height, availableHeight)),
+    };
+}
+
+// The window's frame for a client size, centered in the work area.
+RECT initialFrame(const RECT& workArea, core::WindowSize client)
+{
+    const SIZE frame = frameSizeOf(client);
+    const LONG left = workArea.left + std::max(0L, (workArea.right - workArea.left - frame.cx) / 2);
+    const LONG top = workArea.top + std::max(0L, (workArea.bottom - workArea.top - frame.cy) / 2);
+
+    return {.left = left, .top = top, .right = left + frame.cx, .bottom = top + frame.cy};
 }
 
 } // namespace
@@ -124,9 +166,17 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     registerWindowClassOnce(&StreamWindow::windowProc);
 
     // The constructor is private, out of make_unique's reach.
-    std::unique_ptr<StreamWindow> stream(new StreamWindow(std::move(options.onClosed)));
+    std::unique_ptr<StreamWindow> stream(
+        new StreamWindow(std::move(options.onClosed), std::move(options.onWindowModeChanged),
+                         std::move(options.onWindowedSizeChanged)));
 
-    const RECT frame = initialFrame(workAreaOf(options.monitorOf));
+    const core::WindowSize client =
+        fittingClientSize(options.windowedSize, workAreaSizeOf(options.monitorOf));
+    const RECT frame = initialFrame(workAreaOf(options.monitorOf), client);
+
+    stream->windowedSize_ = client;
+    stream->reportedWindowedSize_ = client;
+
     const HWND window = CreateWindowExW(0, kWindowClassName, options.title.c_str(), kWindowedStyle,
                                        frame.left, frame.top, frame.right - frame.left,
                                        frame.bottom - frame.top, nullptr, nullptr,
@@ -141,7 +191,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     registerMouse(window);
     stream->keyboardMouse_ = std::move(options.keyboardMouse);
 
-    if (options.mode == WindowMode::Fullscreen)
+    if (options.mode == core::WindowMode::Fullscreen)
     {
         stream->enterFullscreen();
     }
@@ -187,6 +237,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     }
 
     stream->renderer_ = std::move(*renderer);
+    stream->updateOverlayLayout();
     ShowWindow(window, SW_SHOW);
     SetForegroundWindow(window);
     stream->setCursorVisible(false);
@@ -194,8 +245,12 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     return stream;
 }
 
-StreamWindow::StreamWindow(std::function<void(CloseReason)> onClosed)
-    : onClosed_(std::move(onClosed))
+StreamWindow::StreamWindow(std::function<void(CloseReason)> onClosed,
+                           std::function<void(core::WindowMode)> onWindowModeChanged,
+                           std::function<void(core::WindowSize)> onWindowedSizeChanged)
+    : onClosed_(std::move(onClosed)),
+      onWindowModeChanged_(std::move(onWindowModeChanged)),
+      onWindowedSizeChanged_(std::move(onWindowedSizeChanged))
 {
 }
 
@@ -304,11 +359,27 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_SIZE:
-        if (renderer_ != nullptr && wParam != SIZE_MINIMIZED)
-        {
-            renderer_->resize(clientSize(window_));
-        }
+        handleWindowSize(wParam);
         return 0;
+
+    case WM_TIMER:
+        if (wParam == kSizeSettleTimer)
+        {
+            KillTimer(window_, kSizeSettleTimer);
+            reportWindowedSize();
+            return 0;
+        }
+        break;
+
+    case WM_EXITSIZEMOVE:
+        if (mode_ == core::WindowMode::Windowed && !applyingLayout_)
+        {
+            KillTimer(window_, kSizeSettleTimer);
+            windowedSize_ = windowSizeOf(window_);
+            updateOverlayLayout();
+            reportWindowedSize();
+        }
+        break;
 
     case WM_KEYDOWN:
         if (keyboardMouse_ != nullptr && wParam != VK_F1 && wParam != VK_F2 &&
@@ -498,19 +569,110 @@ void StreamWindow::handleRawInput(LPARAM lParam)
     rawButton(mouse, RI_MOUSE_BUTTON_3_DOWN, RI_MOUSE_BUTTON_3_UP, 2, *keyboardMouse_);
 }
 
-void StreamWindow::toggleFullscreen()
+void StreamWindow::handleWindowSize(WPARAM sizeCommand)
 {
-    if (fullscreen_)
+    if (window_ == nullptr || sizeCommand == SIZE_MINIMIZED)
     {
-        leaveFullscreen();
         return;
     }
 
-    enterFullscreen();
+    if (renderer_ != nullptr)
+    {
+        renderer_->resize(clientSize(window_));
+    }
+
+    if (mode_ != core::WindowMode::Windowed || applyingLayout_)
+    {
+        return;
+    }
+
+    const core::WindowSize size = windowSizeOf(window_);
+
+    if (size.width <= 0 || size.height <= 0)
+    {
+        return;
+    }
+
+    windowedSize_ = size;
+    SetTimer(window_, kSizeSettleTimer, kSizeSettleMilliseconds, nullptr);
+    updateOverlayLayout();
+}
+
+void StreamWindow::toggleFullscreen()
+{
+    if (mode_ == core::WindowMode::Fullscreen)
+    {
+        leaveFullscreen();
+    }
+    else
+    {
+        enterFullscreen();
+    }
+
+    if (onWindowModeChanged_)
+    {
+        onWindowModeChanged_(mode_);
+    }
+
+    updateOverlayLayout();
+}
+
+void StreamWindow::applyWindowLayout(core::WindowMode mode, core::WindowSize size)
+{
+    if (window_ == nullptr)
+    {
+        return;
+    }
+
+    const core::WindowSize fitted = fittingClientSize(size, workAreaSizeOf(window_));
+    const bool sizeChanged = fitted != windowedSize_;
+    const bool modeChanged = mode != mode_;
+
+    if (!sizeChanged && !modeChanged)
+    {
+        return;
+    }
+
+    if (sizeChanged)
+    {
+        windowedSize_ = fitted;
+    }
+
+    if (modeChanged)
+    {
+        if (mode == core::WindowMode::Fullscreen)
+        {
+            enterFullscreen();
+        }
+        else
+        {
+            leaveFullscreen();
+        }
+    }
+    else if (sizeChanged && mode_ == core::WindowMode::Windowed)
+    {
+        applyingLayout_ = true;
+        resizeWindowed(fitted);
+        applyingLayout_ = false;
+    }
+
+    updateOverlayLayout();
 }
 
 void StreamWindow::enterFullscreen()
 {
+    if (window_ == nullptr || mode_ == core::WindowMode::Fullscreen)
+    {
+        return;
+    }
+
+    // A minimized window would otherwise remember a minimized placement and
+    // come back minimized when fullscreen ends.
+    if (IsIconic(window_) != FALSE)
+    {
+        ShowWindow(window_, SW_RESTORE);
+    }
+
     MONITORINFO monitor{.cbSize = sizeof(MONITORINFO)};
 
     if (!GetWindowPlacement(window_, &windowedPlacement_) ||
@@ -528,21 +690,95 @@ void StreamWindow::enterFullscreen()
         windowedPlacement_.showCmd = SW_SHOWNORMAL;
     }
 
+    KillTimer(window_, kSizeSettleTimer);
+
     const RECT& area = monitor.rcMonitor;
+    applyingLayout_ = true;
     SetWindowLongPtrW(window_, GWL_STYLE, kFullscreenStyle | visible);
     SetWindowPos(window_, HWND_TOP, area.left, area.top, area.right - area.left,
                  area.bottom - area.top, SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
-    fullscreen_ = true;
+    applyingLayout_ = false;
+    mode_ = core::WindowMode::Fullscreen;
 }
 
 void StreamWindow::leaveFullscreen()
 {
+    if (window_ == nullptr || mode_ != core::WindowMode::Fullscreen)
+    {
+        return;
+    }
+
     const LONG_PTR visible = GetWindowLongPtrW(window_, GWL_STYLE) & WS_VISIBLE;
+    applyingLayout_ = true;
     SetWindowLongPtrW(window_, GWL_STYLE, kWindowedStyle | visible);
     SetWindowPlacement(window_, &windowedPlacement_);
     SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                  SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
-    fullscreen_ = false;
+    mode_ = core::WindowMode::Windowed;
+    // The remembered size may have changed while fullscreen (from the Vídeo
+    // screen or the menu); the placement's own size can be stale.
+    resizeWindowed(windowedSize_);
+    applyingLayout_ = false;
+}
+
+// Resizes the windowed window to a client size, keeping it inside the work
+// area of the monitor it is on.
+void StreamWindow::resizeWindowed(core::WindowSize size)
+{
+    if (window_ == nullptr || mode_ != core::WindowMode::Windowed)
+    {
+        return;
+    }
+
+    const RECT workArea = workAreaOf(window_);
+    const core::WindowSize monitor{.width = static_cast<int>(workArea.right - workArea.left),
+                                    .height = static_cast<int>(workArea.bottom - workArea.top)};
+    const core::WindowSize fitted = fittingClientSize(size, monitor);
+    const SIZE frame = frameSizeOf(fitted);
+
+    RECT current{};
+    GetWindowRect(window_, &current);
+
+    const LONG left = std::clamp(current.left, workArea.left,
+                                 std::max(workArea.left, workArea.right - frame.cx));
+    const LONG top = std::clamp(current.top, workArea.top,
+                                std::max(workArea.top, workArea.bottom - frame.cy));
+    const bool wasApplying = applyingLayout_;
+
+    applyingLayout_ = true;
+    SetWindowPos(window_, nullptr, left, top, frame.cx, frame.cy,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    applyingLayout_ = wasApplying;
+
+    // A minimized window reports a 0×0 client; keep the size it will restore
+    // to instead.
+    const core::WindowSize actual = windowSizeOf(window_);
+    windowedSize_ = actual.width > 0 && actual.height > 0 ? actual : fitted;
+    reportedWindowedSize_ = windowedSize_;
+}
+
+void StreamWindow::reportWindowedSize()
+{
+    if (mode_ != core::WindowMode::Windowed || windowedSize_ == reportedWindowedSize_)
+    {
+        return;
+    }
+
+    reportedWindowedSize_ = windowedSize_;
+    spdlog::info("Windowed size: {}x{}", windowedSize_.width, windowedSize_.height);
+
+    if (onWindowedSizeChanged_)
+    {
+        onWindowedSizeChanged_(windowedSize_);
+    }
+}
+
+void StreamWindow::updateOverlayLayout()
+{
+    if (renderer_ != nullptr)
+    {
+        renderer_->setWindowLayout(mode_, windowedSize_);
+    }
 }
 
 // The renderer goes first: its thread must stop presenting before the window

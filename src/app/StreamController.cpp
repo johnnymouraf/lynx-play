@@ -133,6 +133,8 @@ StreamController::StreamController(SettingsController& settings, InputController
                 if (window_ != nullptr)
                 {
                     window_->setHdrMode(settings_.hdrMode());
+                    window_->applyWindowLayout(settings_.video().windowMode,
+                                               settings_.video().windowSize);
                 }
             });
 
@@ -379,6 +381,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
                     }
                 });
         },
+        .windowLayoutChanged = [this](core::WindowMode mode, core::WindowSize size)
+        { post([this, mode, size] { settings_.setWindowLayout(mode, size); }); },
         .disconnect = [this]
         {
             post(
@@ -405,7 +409,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                  .hdr = settings_.hdrMode(),
                                                  .rtxVideoHdrAvailable =
                                                      settings_.rtxVideoHdrAvailable(),
-                                                 .mode = render::WindowMode::Fullscreen,
+                                                 .mode = settings_.video().windowMode,
+                                                 .windowedSize = settings_.video().windowSize,
                                                  .monitorOf = mainWindow_,
                                                  .overlayFonts = overlayFonts(),
                                                  .overlay =
@@ -421,6 +426,10 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                                  : "Sem controle",
                                                          .sessionName =
                                                              target_->name.toStdString(),
+                                                         .windowMode =
+                                                             settings_.video().windowMode,
+                                                         .windowSize =
+                                                             settings_.video().windowSize,
                                                      },
                                                  .overlayActions = overlayActions,
                                                  .metrics = metrics_,
@@ -442,6 +451,20 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                                    : render::OverlayGamepad{};
                                                  },
                                                  .onClosed = closed,
+                                                 .onWindowModeChanged =
+                                                     [this](core::WindowMode mode)
+                                                 {
+                                                     const QString name = QString::fromLatin1(
+                                                         core::windowModeName(mode).data());
+                                                     post([this, name]
+                                                          { settings_.setWindowMode(name); });
+                                                 },
+                                                 .onWindowedSizeChanged =
+                                                     [this](core::WindowSize size)
+                                                 {
+                                                     post([this, size]
+                                                          { settings_.setWindowedSize(size); });
+                                                 },
                                              });
 
     if (!window)

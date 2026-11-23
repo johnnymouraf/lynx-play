@@ -436,6 +436,76 @@ bool SettingsController::hdrRtxAvailable() const
     return hdrDisplay_.hdrActive && rtxHdrAvailability_.available;
 }
 
+QString SettingsController::windowMode() const
+{
+    return QString::fromLatin1(core::windowModeName(settings_.video.windowMode).data());
+}
+
+void SettingsController::setWindowMode(const QString& name)
+{
+    core::VideoSettings video = settings_.video;
+
+    if (name == u"fullscreen"_s)
+    {
+        video.windowMode = core::WindowMode::Fullscreen;
+    }
+    else if (name == u"windowed"_s)
+    {
+        video.windowMode = core::WindowMode::Windowed;
+    }
+    else
+    {
+        return;
+    }
+
+    apply(video);
+}
+
+QString SettingsController::windowSizePreset() const
+{
+    const auto preset = core::windowSizePresetIndex(settings_.video.windowSize);
+
+    if (!preset)
+    {
+        return u"custom"_s;
+    }
+
+    return QString::fromLatin1(core::kWindowSizePresetNames.at(*preset).data());
+}
+
+void SettingsController::setWindowSizePreset(const QString& name)
+{
+    for (std::size_t index = 0; index < core::kWindowSizePresetNames.size(); ++index)
+    {
+        if (name == QString::fromLatin1(core::kWindowSizePresetNames.at(index).data()))
+        {
+            setWindowedSize(core::kWindowSizePresets.at(index));
+            return;
+        }
+    }
+}
+
+QString SettingsController::windowSizeText() const
+{
+    return u"%1 × %2"_s.arg(settings_.video.windowSize.width)
+        .arg(settings_.video.windowSize.height);
+}
+
+void SettingsController::setWindowedSize(core::WindowSize size)
+{
+    core::VideoSettings video = settings_.video;
+    video.windowSize = core::clampWindowSize(size, core::kMaxWindowSize);
+    apply(video);
+}
+
+void SettingsController::setWindowLayout(core::WindowMode mode, core::WindowSize size)
+{
+    core::VideoSettings video = settings_.video;
+    video.windowMode = mode;
+    video.windowSize = core::clampWindowSize(size, core::kMaxWindowSize);
+    apply(video);
+}
+
 int SettingsController::minBitrateMbps() const
 {
     return static_cast<int>(core::kMinBitrateKbps) / kKbpsPerMbps;
@@ -1112,9 +1182,11 @@ void SettingsController::apply(const core::VideoSettings& video)
     }
 
     settings_.video = video;
-    spdlog::info("Video settings: {}p, {} fps, {}, {} Mbps, {}, HDR {}", resolution(),
-                 video.framesPerSecond, core::codecName(video.codec), bitrateMbps(),
-                 presentModeName(video.presentMode), core::hdrModeName(video.hdr));
+    spdlog::info(
+        "Video settings: {}p, {} fps, {}, {} Mbps, {}, HDR {}, window {} {}x{}", resolution(),
+        video.framesPerSecond, core::codecName(video.codec), bitrateMbps(),
+        presentModeName(video.presentMode), core::hdrModeName(video.hdr),
+        core::windowModeName(video.windowMode), video.windowSize.width, video.windowSize.height);
     emit videoChanged();
     save();
 }

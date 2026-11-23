@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ReflexMode.h"
+#include "core/Settings.h"
 #include "core/StreamMetrics.h"
 #include "render/GpuTimer.h"
 
@@ -111,6 +112,10 @@ struct OverlayOptions
     std::string microphoneDetail;
     // The console (or file) being played; the quick menu's session line.
     std::string sessionName;
+    // The stream window's mode and remembered windowed size, for the quick
+    // menu's window row.
+    core::WindowMode windowMode = core::WindowMode::Fullscreen;
+    core::WindowSize windowSize = core::kDefaultWindowSize;
     // The back buffer is HDR10: Dear ImGui's sRGB colors are converted to PQ
     // at this SDR white level.
     bool hdrOutput = false;
@@ -125,6 +130,8 @@ struct OverlayActions
     std::function<void(bool)> microphoneMutedChanged;
     std::function<void(bool)> statisticsVisibleChanged;
     std::function<void(bool)> menuOpenChanged;
+    // The quick menu's window row: the layout the player cycled to.
+    std::function<void(core::WindowMode, core::WindowSize)> windowLayoutChanged;
     std::function<void()> disconnect;
 };
 
@@ -181,6 +188,9 @@ public:
     // Safe from the interface's thread; applied by the next frame.
     void toggleMenu();
     void toggleStatistics();
+    // Safe from the window's thread; the quick menu's window row shows this
+    // before the next frame.
+    void setWindowLayout(core::WindowMode mode, core::WindowSize size);
     [[nodiscard]] bool menuOpen() const;
     [[nodiscard]] bool statisticsVisible() const;
     // Whether anything is on screen, so the renderer keeps drawing.
@@ -223,6 +233,8 @@ private:
     float sdrWhiteNits_ = 200.0F;
     std::atomic<bool> menuOpen_{false};
     std::atomic<bool> statisticsVisible_{false};
+    std::atomic<core::WindowMode> windowMode_{core::WindowMode::Fullscreen};
+    std::atomic<core::WindowSize> windowSize_{core::kDefaultWindowSize};
     bool reportedMenuOpen_ = false;
     bool reportedStatisticsVisible_ = false;
     core::ReflexMode reflex_ = core::ReflexMode::Off;
