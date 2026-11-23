@@ -140,6 +140,12 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                 [&settings, visible] { settings.setOverlayStatisticsVisible(visible); },
                 Qt::QueuedConnection);
         },
+        .windowLayoutChanged = [&settings](core::WindowMode mode, core::WindowSize size)
+        {
+            QMetaObject::invokeMethod(
+                &settings, [&settings, mode, size] { settings.setWindowLayout(mode, size); },
+                Qt::QueuedConnection);
+        },
         .disconnect = []
         { QMetaObject::invokeMethod(qApp, [] { QCoreApplication::quit(); }, Qt::QueuedConnection); },
     };
@@ -155,6 +161,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
             .frameGeneration = settings.frameGenerationMode(),
             .hdr = settings.hdrMode(),
             .rtxVideoHdrAvailable = settings.rtxVideoHdrAvailable(),
+            .mode = settings.video().windowMode,
+            .windowedSize = settings.video().windowSize,
             .overlayFonts = overlayFonts(),
             .overlay =
                 {
@@ -165,6 +173,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                                              ? "DualSense"
                                              : "Sem controle",
                     .sessionName = "Arquivo de teste",
+                    .windowMode = settings.video().windowMode,
+                    .windowSize = settings.video().windowSize,
                 },
             .overlayActions = overlayActions,
             .metrics = metrics,
@@ -175,11 +185,25 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                     return render::OverlayGamepad{};
                 }
 
-                const std::optional<input::GamepadSample> sample = gamepads->sample();
+                const std::optional<ChiakiControllerState> state = gamepads->gamepadState();
 
-                return sample ? overlayGamepad(*sample) : render::OverlayGamepad{};
+                return state ? overlayGamepad(*state) : render::OverlayGamepad{};
             },
             .onClosed = quit,
+            .onWindowModeChanged = [&settings](core::WindowMode mode)
+            {
+                const QString name =
+                    QString::fromLatin1(core::windowModeName(mode).data());
+                QMetaObject::invokeMethod(
+                    &settings, [&settings, name] { settings.setWindowMode(name); },
+                    Qt::QueuedConnection);
+            },
+            .onWindowedSizeChanged = [&settings](core::WindowSize size)
+            {
+                QMetaObject::invokeMethod(
+                    &settings, [&settings, size] { settings.setWindowedSize(size); },
+                    Qt::QueuedConnection);
+            },
         });
 
     if (!window)
@@ -187,6 +211,17 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
         spdlog::error("Can't play the file: {}", window.error());
         return EXIT_FAILURE;
     }
+
+    // The Vídeo screen and the menu change the same settings; apply them to
+    // the running window through their signal.
+    render::StreamWindow* const streamWindow = window->get();
+    QObject layoutContext;
+    QObject::connect(&settings, &SettingsController::videoChanged, &layoutContext,
+                     [&settings, streamWindow]
+                     {
+                         streamWindow->applyWindowLayout(settings.video().windowMode,
+                                                         settings.video().windowSize);
+                     });
 
     return QCoreApplication::exec();
 }

@@ -131,7 +131,7 @@ GamepadSample KeyboardMouseInput::sample()
 
     GamepadSample result;
 
-    if (overlayOpen_.load())
+    if (!settings_.enabled || overlayOpen_.load())
     {
         deltaX_ = 0.0;
         deltaY_ = 0.0;

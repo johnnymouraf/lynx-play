@@ -37,6 +37,10 @@ class SettingsController : public QObject
     Q_PROPERTY(QString hdr READ hdr WRITE setHdr NOTIFY videoChanged)
     Q_PROPERTY(QString hdrDescription READ hdrDescription NOTIFY videoChanged)
     Q_PROPERTY(bool hdrRtxAvailable READ hdrRtxAvailable NOTIFY videoChanged)
+    Q_PROPERTY(QString windowMode READ windowMode WRITE setWindowMode NOTIFY videoChanged)
+    Q_PROPERTY(QString windowSizePreset READ windowSizePreset WRITE setWindowSizePreset NOTIFY
+                   videoChanged)
+    Q_PROPERTY(QString windowSizeText READ windowSizeText NOTIFY videoChanged)
     Q_PROPERTY(int minBitrateMbps READ minBitrateMbps CONSTANT)
     Q_PROPERTY(int maxBitrateMbps READ maxBitrateMbps CONSTANT)
     Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY audioDevicesChanged)
@@ -70,6 +74,8 @@ class SettingsController : public QObject
     Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
                    setOverlayStatisticsVisible NOTIFY overlayChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
+    Q_PROPERTY(bool keyboardMouseEnabled READ keyboardMouseEnabled WRITE setKeyboardMouseEnabled
+                   NOTIFY keyboardMouseChanged)
     Q_PROPERTY(int mouseSensitivityPercent READ mouseSensitivityPercent WRITE
                    setMouseSensitivityPercent NOTIFY keyboardMouseChanged)
     Q_PROPERTY(bool invertMouseY READ invertMouseY WRITE setInvertMouseY NOTIFY
@@ -113,6 +119,19 @@ public:
     // What this display can show and why RTX Video HDR may be unavailable.
     [[nodiscard]] QString hdrDescription() const;
     [[nodiscard]] bool hdrRtxAvailable() const;
+
+    // "fullscreen" or "windowed".
+    [[nodiscard]] QString windowMode() const;
+    void setWindowMode(const QString& name);
+    // "1920x1080", "1600x900", "1280x720", "960x540" or "custom".
+    [[nodiscard]] QString windowSizePreset() const;
+    void setWindowSizePreset(const QString& name);
+    // The remembered windowed size, like "1280 × 720".
+    [[nodiscard]] QString windowSizeText() const;
+    // A size the player dragged the stream window to.
+    void setWindowedSize(core::WindowSize size);
+    // A mode and size chosen together, saved once.
+    void setWindowLayout(core::WindowMode mode, core::WindowSize size);
 
     [[nodiscard]] int minBitrateMbps() const;
     [[nodiscard]] int maxBitrateMbps() const;
@@ -185,6 +204,8 @@ public:
     void setOverlayStatisticsVisible(bool visible);
 
     [[nodiscard]] QVariantMap keyboardBindings() const;
+    [[nodiscard]] bool keyboardMouseEnabled() const;
+    void setKeyboardMouseEnabled(bool enabled);
     [[nodiscard]] int mouseSensitivityPercent() const;
     void setMouseSensitivityPercent(int percent);
     [[nodiscard]] bool invertMouseY() const;

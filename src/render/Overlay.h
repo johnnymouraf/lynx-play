@@ -1,11 +1,13 @@
 #pragma once
 
 #include "core/ReflexMode.h"
+#include "core/Settings.h"
 #include "core/StreamMetrics.h"
 #include "render/GpuTimer.h"
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -111,6 +113,10 @@ struct OverlayOptions
     std::string microphoneDetail;
     // The console (or file) being played; the quick menu's session line.
     std::string sessionName;
+    // The stream window's mode and remembered windowed size, for the quick
+    // menu's window row.
+    core::WindowMode windowMode = core::WindowMode::Fullscreen;
+    core::WindowSize windowSize = core::kDefaultWindowSize;
     // The back buffer is HDR10: Dear ImGui's sRGB colors are converted to PQ
     // at this SDR white level.
     bool hdrOutput = false;
@@ -125,12 +131,22 @@ struct OverlayActions
     std::function<void(bool)> microphoneMutedChanged;
     std::function<void(bool)> statisticsVisibleChanged;
     std::function<void(bool)> menuOpenChanged;
+    // The quick menu's window row: the layout the player cycled to.
+    std::function<void(core::WindowMode, core::WindowSize)> windowLayoutChanged;
     std::function<void()> disconnect;
 };
 
-// The controller state the overlay navigates with while its menu is open.
+// The controller state the overlay navigates with while its menu is open, and
+// the debug view's snapshot of what the console receives.
 struct OverlayGamepad
 {
+    struct Touch
+    {
+        bool down = false;
+        std::uint16_t x = 0;
+        std::uint16_t y = 0;
+    };
+
     bool connected = false;
     bool cross = false;
     bool circle = false;
@@ -152,6 +168,15 @@ struct OverlayGamepad
     float leftY = 0.0F;
     float rightX = 0.0F;
     float rightY = 0.0F;
+
+    // The debug view: the buttons by chiaki's names, both trigger levels,
+    // both touchpad fingers in the console's coordinates, and the sensors.
+    std::string buttons;
+    std::uint8_t leftTrigger = 0;
+    std::uint8_t rightTrigger = 0;
+    std::array<Touch, 2> touches{};
+    std::array<float, 3> gyro{};
+    std::array<float, 3> accel{};
 };
 
 // The in-stream overlay, drawn with Dear ImGui into the stream's back buffer:
@@ -181,6 +206,9 @@ public:
     // Safe from the interface's thread; applied by the next frame.
     void toggleMenu();
     void toggleStatistics();
+    // Safe from the window's thread; the quick menu's window row shows this
+    // before the next frame.
+    void setWindowLayout(core::WindowMode mode, core::WindowSize size);
     [[nodiscard]] bool menuOpen() const;
     [[nodiscard]] bool statisticsVisible() const;
     // Whether anything is on screen, so the renderer keeps drawing.
@@ -223,10 +251,14 @@ private:
     float sdrWhiteNits_ = 200.0F;
     std::atomic<bool> menuOpen_{false};
     std::atomic<bool> statisticsVisible_{false};
+    std::atomic<core::WindowMode> windowMode_{core::WindowMode::Fullscreen};
+    std::atomic<core::WindowSize> windowSize_{core::kDefaultWindowSize};
     bool reportedMenuOpen_ = false;
     bool reportedStatisticsVisible_ = false;
     core::ReflexMode reflex_ = core::ReflexMode::Off;
     bool microphoneMuted_ = false;
+    // Paces the controller debug line written while the statistics are open.
+    std::chrono::steady_clock::time_point nextControllerLog_{};
 };
 
 } // namespace lynx::render

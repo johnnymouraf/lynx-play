@@ -109,6 +109,10 @@ public:
     // recreating the swap chain when the display can show HDR.
     void setHdrMode(core::HdrMode mode);
 
+    // Safe from any thread; the quick menu's window row shows this before
+    // the next frame.
+    void setWindowLayout(core::WindowMode mode, core::WindowSize size);
+
     // Safe from any thread; the overlay opens or closes on the next frame.
     void toggleOverlayMenu();
     void toggleOverlayStatistics();
@@ -183,6 +187,7 @@ private:
     void applyRequestedOpticalFlow();
     void applyRequestedFrameGeneration();
     void applyRequestedHdr();
+    void applyRequestedWindowLayout();
     // Configures the video processor for the picture on screen and the
     // window it fits, pointing this slot's scaling view at its output; false
     // means the shader's path draws this frame.
@@ -351,6 +356,10 @@ private:
     std::uint64_t droppedFrames_ = 0;
     std::atomic<core::HdrMode> requestedHdr_;
     core::HdrMode requestedHdrApplied_ = core::HdrMode::Auto;
+    // The layout the overlay's window row shows.
+    std::atomic<core::WindowMode> requestedWindowMode_;
+    std::atomic<core::WindowSize> requestedWindowSize_;
+    core::WindowLayout windowLayoutApplied_;
     // Set when the driver accepted the extension but failed to run it; the
     // pipeline then presents the SDR shader path.
     bool rtxVideoHdrFailed_ = false;

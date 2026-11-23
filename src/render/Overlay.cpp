@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -95,6 +96,8 @@ struct MenuResult
     bool reflexChanged = false;
     core::ReflexMode reflex = core::ReflexMode::Off;
     bool microphoneToggled = false;
+    bool windowLayoutChanged = false;
+    core::WindowLayout windowLayout;
     bool disconnect = false;
 };
 
@@ -136,6 +139,21 @@ const char* reflexModeLabel(core::ReflexMode mode)
     }
 
     return "Desligado";
+}
+
+std::string windowLayoutText(const core::WindowLayout& layout)
+{
+    if (layout.mode == core::WindowMode::Fullscreen)
+    {
+        return "Tela cheia";
+    }
+
+    if (core::windowSizePresetIndex(layout.size))
+    {
+        return std::format("{} × {}", layout.size.width, layout.size.height);
+    }
+
+    return std::format("Personalizado ({} × {})", layout.size.width, layout.size.height);
 }
 
 // Portuguese writes decimals with a comma, as the design does.
@@ -458,7 +476,78 @@ void drawReflexSection(const Fonts& fonts, const ReflexOverlayStats& reflex)
     }
 }
 
-void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
+std::string touchText(const OverlayGamepad::Touch& touch)
+{
+    if (!touch.down)
+    {
+        return "—";
+    }
+
+    return std::format("({}, {})", touch.x, touch.y);
+}
+
+// The line the statistics write to the log once a second, so a controller
+// problem can be reported with the exact values the console receives.
+std::string controllerSummary(const OverlayGamepad& gamepad)
+{
+    if (!gamepad.connected)
+    {
+        return "controller: none";
+    }
+
+    return std::format(
+        "controller: buttons={} L2={} R2={} touch1={} touch2={} "
+        "gyro=({:.2f}, {:.2f}, {:.2f}) accel=({:.2f}, {:.2f}, {:.2f})",
+        gamepad.buttons.empty() ? "none" : gamepad.buttons, gamepad.leftTrigger,
+        gamepad.rightTrigger, touchText(gamepad.touches[0]), touchText(gamepad.touches[1]),
+        gamepad.gyro[0], gamepad.gyro[1], gamepad.gyro[2], gamepad.accel[0], gamepad.accel[1],
+        gamepad.accel[2]);
+}
+
+void wrappedValue(const Fonts& fonts, const std::string& value)
+{
+    ImGui::PushFont(fonts.mono, kMonoSize);
+    ImGui::TextWrapped("%s", value.c_str());
+    ImGui::PopFont();
+}
+
+void valueLine(const Fonts& fonts, const char* label, const std::string& value)
+{
+    ImGui::PushFont(fonts.label, kBodySize);
+    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
+    ImGui::TextUnformatted(label);
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+
+    wrappedValue(fonts, value);
+}
+
+void drawControllerSection(const Fonts& fonts, const OverlayGamepad& gamepad)
+{
+    sectionLabel(fonts, "CONTROLE");
+
+    if (!gamepad.connected)
+    {
+        valueRow(fonts, "Estado", "sem controle");
+        return;
+    }
+
+    valueLine(fonts, "Botões", gamepad.buttons.empty() ? "—" : gamepad.buttons);
+    valueRow(fonts, "Gatilhos",
+             std::format("L2 {} · R2 {}", gamepad.leftTrigger, gamepad.rightTrigger).c_str());
+    valueRow(fonts, "Toque 1", touchText(gamepad.touches[0]).c_str());
+    valueRow(fonts, "Toque 2", touchText(gamepad.touches[1]).c_str());
+    valueRow(fonts, "Giroscópio",
+             std::format("{:.2f} {:.2f} {:.2f} rad/s", gamepad.gyro[0], gamepad.gyro[1],
+                         gamepad.gyro[2])
+                 .c_str());
+    valueRow(fonts, "Acelerômetro",
+             std::format("{:.2f} {:.2f} {:.2f} g", gamepad.accel[0], gamepad.accel[1],
+                         gamepad.accel[2])
+                 .c_str());
+}
+
+void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const OverlayGamepad& gamepad)
 {
     ImGui::SetNextWindowPos(ImVec2(kPanelMargin, kPanelMargin), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(kStatsWidth, 0.0F), ImGuiCond_Always);
@@ -475,6 +564,9 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
     ImGui::PopFont();
     rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
 
+    // The controller section goes first: the panel is taller than a 720p
+    // window, and this is the part a controller report has to see.
+    drawControllerSection(fonts, gamepad);
     drawRateSection(fonts, stats);
     drawVideoSection(fonts, stats);
     drawLatencySection(fonts, stats);
@@ -542,6 +634,50 @@ bool toggleRow(const char* id, const Fonts& fonts, const char* label, const char
 
     drawSwitch(drawList, ImVec2(start.x + width - 12.0F - 48.0F, start.y + (height - 28.0F) / 2.0F),
                on);
+
+    return clicked;
+}
+
+// A row whose value cycles through choices when clicked; the detail line
+// says what a click does.
+bool cycleRow(const char* id, const Fonts& fonts, const char* label, const char* detail,
+              const char* value, float height)
+{
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+
+    ImGui::PushID(id);
+    ImGui::InvisibleButton("row", ImVec2(width, height));
+    const bool clicked = ImGui::IsItemClicked();
+    const bool hovered = ImGui::IsItemHovered();
+    const bool focused = ImGui::IsItemFocused();
+    ImGui::PopID();
+
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+
+    if (hovered)
+    {
+        drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height), kOverlayHover,
+                                 6.0F);
+    }
+
+    if (focused)
+    {
+        drawList->AddRect(start, ImVec2(start.x + width, start.y + height), kFocus, 6.0F, 0, 2.0F);
+    }
+
+    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + 12.0F, start.y + 8.0F), kText,
+             label);
+
+    if (detail != nullptr && detail[0] != '\0')
+    {
+        drawText(drawList, fonts.caption, kCaptionSize, ImVec2(start.x + 12.0F, start.y + 30.0F),
+                 kTextMuted, detail);
+    }
+
+    const float valueWidth = textWidth(fonts.label, kBodySize, value);
+    drawText(drawList, fonts.label, kBodySize,
+             ImVec2(start.x + width - 12.0F - valueWidth, start.y + 8.0F), kAccent, value);
 
     return clicked;
 }
@@ -662,7 +798,8 @@ bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlay
 }
 
 MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const OverlayOptions& options,
-                    core::ReflexMode currentReflex, bool microphoneMuted, bool statsVisible)
+                    core::ReflexMode currentReflex, bool microphoneMuted, bool statsVisible,
+                    core::WindowLayout windowLayout)
 {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float height = std::min(kMenuHeight, std::max(320.0F, display.y - 2.0F * kPanelMargin));
@@ -725,6 +862,13 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
                      static_cast<int>(stats.reflex.state));
     }
 
+    if (cycleRow("window-row", menuFonts, "Janela", "Clique para alternar tela cheia e tamanhos",
+                 windowLayoutText(windowLayout).c_str(), 54.0F))
+    {
+        result.windowLayoutChanged = true;
+        result.windowLayout = core::nextWindowLayout(windowLayout);
+    }
+
     if (toggleRow("stats-row", menuFonts, "Mostrar estatísticas", "", statsVisible, 44.0F))
     {
         result.statisticsToggled = true;
@@ -775,6 +919,8 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
     overlay->actions_ = std::move(actions);
     overlay->reflex_ = overlay->options_.reflex;
     overlay->microphoneMuted_ = overlay->options_.microphoneMuted;
+    overlay->windowMode_.store(overlay->options_.windowMode);
+    overlay->windowSize_.store(overlay->options_.windowSize);
     overlay->statisticsVisible_.store(overlay->options_.statisticsVisible);
     overlay->reportedStatisticsVisible_ = overlay->options_.statisticsVisible;
 
@@ -988,13 +1134,25 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
 
     if (statisticsVisible)
     {
-        drawStatistics(fonts, stats);
+        drawStatistics(fonts, stats, gamepad);
+
+        const auto now = std::chrono::steady_clock::now();
+
+        if (now >= nextControllerLog_)
+        {
+            spdlog::info("{}", controllerSummary(gamepad));
+            nextControllerLog_ = now + std::chrono::seconds(1);
+        }
     }
 
     if (menuOpen)
     {
+        const core::WindowLayout windowLayout{
+            .mode = windowMode_.load(),
+            .size = windowSize_.load(),
+        };
         const MenuResult menu = drawMenu(fonts, stats, options_, reflex_, microphoneMuted_,
-                                         statisticsVisible);
+                                         statisticsVisible, windowLayout);
 
         if (menu.statisticsToggled)
         {
@@ -1014,6 +1172,24 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             else
             {
                 spdlog::warn("overlay: no reflex action");
+            }
+        }
+
+        if (menu.windowLayoutChanged)
+        {
+            windowMode_.store(menu.windowLayout.mode);
+            windowSize_.store(menu.windowLayout.size);
+            spdlog::info("overlay: window layout mode {} at {}x{}",
+                         core::windowModeName(menu.windowLayout.mode),
+                         menu.windowLayout.size.width, menu.windowLayout.size.height);
+
+            if (actions_.windowLayoutChanged)
+            {
+                actions_.windowLayoutChanged(menu.windowLayout.mode, menu.windowLayout.size);
+            }
+            else
+            {
+                spdlog::warn("overlay: no window layout action");
             }
         }
 
@@ -1118,6 +1294,12 @@ void Overlay::toggleMenu()
 void Overlay::toggleStatistics()
 {
     statisticsVisible_.store(!statisticsVisible_.load());
+}
+
+void Overlay::setWindowLayout(core::WindowMode mode, core::WindowSize size)
+{
+    windowMode_.store(mode);
+    windowSize_.store(size);
 }
 
 bool Overlay::menuOpen() const

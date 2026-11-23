@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <format>
 #include <fstream>
 #include <istream>
@@ -45,6 +46,11 @@ constexpr Names<VideoCodec, 2> kCodecNames{{
 constexpr Names<PresentMode, 2> kPresentModeNames{{
     {"vsync", PresentMode::VSync},
     {"lowestLatency", PresentMode::LowestLatency},
+}};
+
+constexpr Names<WindowMode, 2> kWindowModeNames{{
+    {"fullscreen", WindowMode::Fullscreen},
+    {"windowed", WindowMode::Windowed},
 }};
 
 constexpr Names<HdrMode, 3> kHdrNames{{
@@ -145,6 +151,34 @@ std::optional<double> numberAt(const Json& object, const std::string& key)
     return entry->get<double>();
 }
 
+std::optional<WindowSize> windowSizeAt(const Json& video)
+{
+    const auto entry = video.find("windowSize");
+
+    if (entry == video.end() || !entry->is_object())
+    {
+        return std::nullopt;
+    }
+
+    const auto width = integerAt(*entry, "width");
+    const auto height = integerAt(*entry, "height");
+
+    if (!width || !height)
+    {
+        return std::nullopt;
+    }
+
+    const bool inRange = *width >= 1 && *width <= kMaxWindowSize.width && *height >= 1 &&
+                         *height <= kMaxWindowSize.height;
+
+    if (!inRange)
+    {
+        return std::nullopt;
+    }
+
+    return WindowSize{.width = static_cast<int>(*width), .height = static_cast<int>(*height)};
+}
+
 VideoSettings readVideo(const Json& video)
 {
     VideoSettings settings;
@@ -159,6 +193,8 @@ VideoSettings readVideo(const Json& video)
     settings.presentMode =
         namedValue(kPresentModeNames, video, "presentMode", settings.presentMode);
     settings.hdr = namedValue(kHdrNames, video, "hdr", settings.hdr);
+    settings.windowMode = namedValue(kWindowModeNames, video, "windowMode", settings.windowMode);
+    settings.windowSize = windowSizeAt(video).value_or(settings.windowSize);
 
     const auto framesPerSecond = integerAt(video, "fps");
 
@@ -299,6 +335,7 @@ KeyboardMouseSettings readKeyboardMouse(const Json& keyboardMouse)
     }
 
     settings.invertY = booleanAt(keyboardMouse, "invertY", settings.invertY);
+    settings.enabled = booleanAt(keyboardMouse, "enabled", settings.enabled);
 
     return settings;
 }
@@ -370,6 +407,56 @@ KeyboardMouseSettings assignKeyboardBinding(KeyboardMouseSettings settings, Keyb
 
     settings.bindings.at(index) = replacement;
     return settings;
+}
+
+std::optional<std::size_t> windowSizePresetIndex(WindowSize size)
+{
+    for (std::size_t index = 0; index < kWindowSizePresets.size(); ++index)
+    {
+        const WindowSize preset = kWindowSizePresets.at(index);
+        const int widthGap = size.width - preset.width;
+        const int heightGap = size.height - preset.height;
+
+        if (std::abs(widthGap) <= kWindowSizePresetTolerance &&
+            std::abs(heightGap) <= kWindowSizePresetTolerance)
+        {
+            return index;
+        }
+    }
+
+    return std::nullopt;
+}
+
+WindowSize clampWindowSize(WindowSize size, WindowSize maximum)
+{
+    return {
+        .width = std::clamp(size.width, 1, std::max(1, maximum.width)),
+        .height = std::clamp(size.height, 1, std::max(1, maximum.height)),
+    };
+}
+
+WindowLayout nextWindowLayout(WindowLayout current)
+{
+    if (current.mode == WindowMode::Fullscreen)
+    {
+        // Back to the remembered size when it is one of the choices, so a
+        // custom size doesn't hide the presets from the menu.
+        const bool rememberedIsPreset = windowSizePresetIndex(current.size).has_value();
+
+        return {
+            .mode = WindowMode::Windowed,
+            .size = rememberedIsPreset ? current.size : kWindowSizePresets.front(),
+        };
+    }
+
+    const auto preset = windowSizePresetIndex(current.size);
+
+    if (!preset || *preset + 1 >= kWindowSizePresets.size())
+    {
+        return {.mode = WindowMode::Fullscreen, .size = current.size};
+    }
+
+    return {.mode = WindowMode::Windowed, .size = kWindowSizePresets.at(*preset + 1)};
 }
 
 std::expected<Settings, std::string> readSettings(std::istream& input)
@@ -466,6 +553,12 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"bitrateKbps", video.bitrateKbps},
              {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
              {"hdr", nameOf(kHdrNames, video.hdr)},
+             {"windowMode", nameOf(kWindowModeNames, video.windowMode)},
+             {"windowSize",
+              {
+                  {"width", video.windowSize.width},
+                  {"height", video.windowSize.height},
+              }},
          }},
         {"audio",
          {
@@ -491,6 +584,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
          }},
         {"keyboardMouse",
          {
+             {"enabled", keyboardMouse.enabled},
              {"bindings", bindings},
              {"mouseSensitivity", keyboardMouse.mouseSensitivity},
              {"invertY", keyboardMouse.invertY},

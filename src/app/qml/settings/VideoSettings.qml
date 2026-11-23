@@ -19,6 +19,51 @@ ColumnLayout {
 
     SettingRow {
         Layout.fillWidth: true
+        label: "Modo da janela"
+        description: "Tela cheia sem bordas no monitor do Lynx Play, ou uma janela ajustável. F11 alterna durante a transmissão."
+
+        SegmentedControl {
+            name: "Modo da janela"
+            options: [
+                { label: "Tela cheia", value: "fullscreen" },
+                { label: "Janela", value: "windowed" }
+            ]
+            currentValue: section.settings.windowMode
+            onActivated: value => section.settings.windowMode = value
+        }
+    }
+
+    SettingRow {
+        Layout.fillWidth: true
+        label: "Tamanho da janela"
+        description: section.settings.windowMode === "fullscreen"
+            ? `Tela cheia. O último tamanho de janela foi ${section.settings.windowSizeText}.`
+            : `Tamanho atual: ${section.settings.windowSizeText}. Arraste a borda da janela para ajustar.`
+
+        Select {
+            width: 220
+            enabled: section.settings.windowMode === "windowed"
+            opacity: enabled ? 1 : 0.5
+            name: "Tamanho da janela"
+            options: {
+                const sizes = [
+                    { label: "1920 × 1080", value: "1920x1080" },
+                    { label: "1600 × 900", value: "1600x900" },
+                    { label: "1280 × 720", value: "1280x720" },
+                    { label: "960 × 540", value: "960x540" }
+                ];
+                if (section.settings.windowSizePreset === "custom") {
+                    sizes.push({ label: "Personalizado", value: "custom" });
+                }
+                return sizes;
+            }
+            currentValue: section.settings.windowSizePreset
+            onActivated: value => section.settings.windowSizePreset = value
+        }
+    }
+
+    SettingRow {
+        Layout.fillWidth: true
         label: "Resolução"
         description: "Resolução pedida ao PS5. A imagem é ampliada para a sua tela."
 

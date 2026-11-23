@@ -25,13 +25,6 @@ class KeyboardMouseInput;
 namespace lynx::render
 {
 
-enum class WindowMode
-{
-    Windowed,
-    // Borderless, covering the whole monitor.
-    Fullscreen,
-};
-
 enum class CloseReason
 {
     // Esc or the window's close button.
@@ -49,7 +42,10 @@ struct StreamWindowOptions
     core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
     core::HdrMode hdr = core::HdrMode::Auto;
     bool rtxVideoHdrAvailable = false;
-    WindowMode mode = WindowMode::Windowed;
+    core::WindowMode mode = core::WindowMode::Fullscreen;
+    // The client size the window opens at and returns to when leaving
+    // fullscreen.
+    core::WindowSize windowedSize = core::kDefaultWindowSize;
     // The window opens on the monitor this other window is on (the app's main
     // window); null opens it on the primary monitor.
     HWND monitorOf = nullptr;
@@ -67,6 +63,13 @@ struct StreamWindowOptions
     // destroys it. It runs inside the window's message handling, so it must
     // not destroy the StreamWindow; defer that to the event loop.
     std::function<void(CloseReason)> onClosed;
+    // Called when F11 or Alt+Enter toggles the mode, so the app remembers it;
+    // runs inside the window's message handling, so defer work on the app's
+    // objects.
+    std::function<void(core::WindowMode)> onWindowModeChanged;
+    // Called once the windowed size settles after the player drags the
+    // border, so the app can store it.
+    std::function<void(core::WindowSize)> onWindowedSizeChanged;
 };
 
 // The top-level window the stream plays in, outside Qt so presentation keeps
@@ -92,28 +95,57 @@ public:
     void setOpticalFlow(bool enabled);
     void setFrameGeneration(core::FrameGenerationMode mode);
     void setHdrMode(core::HdrMode mode);
+    // Applies a mode and windowed size to the running window, without
+    // restarting the stream; a no-op when both already match. Lives on the
+    // thread that runs the message loop.
+    void applyWindowLayout(core::WindowMode mode, core::WindowSize size);
     // Ends the stream as the player would with Esc.
     void close();
 
 private:
-    explicit StreamWindow(std::function<void(CloseReason)> onClosed);
+    StreamWindow(std::function<void(CloseReason)> onClosed,
+                 std::function<void(core::WindowMode)> onWindowModeChanged,
+                 std::function<void(core::WindowSize)> onWindowedSizeChanged);
 
     static LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT handleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void handleKey(WPARAM key);
     void handleRawInput(LPARAM lParam);
+    void handleWindowSize(WPARAM sizeCommand);
     void toggleFullscreen();
     void enterFullscreen();
     void leaveFullscreen();
-    void setCursorVisible(bool visible);
+    void resizeWindowed(core::WindowSize size);
+    void reportWindowedSize();
+    void updateOverlayLayout();
+    // Keeps the cursor visible in windowed mode and hides it in fullscreen
+    // after two seconds without movement; windowed keeps the system's resize
+    // arrow over the borders through DefWindowProc.
+    void applyCursor();
+    void noteMouseActivity();
     void close(CloseReason reason);
 
     HWND window_ = nullptr;
     std::unique_ptr<FrameRenderer> renderer_;
     std::function<void(CloseReason)> onClosed_;
+    std::function<void(core::WindowMode)> onWindowModeChanged_;
+    std::function<void(core::WindowSize)> onWindowedSizeChanged_;
     std::shared_ptr<input::KeyboardMouseInput> keyboardMouse_;
-    bool fullscreen_ = false;
-    bool cursorVisible_ = true;
+    core::WindowMode mode_ = core::WindowMode::Windowed;
+    // The client size windowed mode uses; a drag updates it as it moves, and
+    // the app hears about it once it settles.
+    core::WindowSize windowedSize_;
+    // The size the app already knows, so a settle only reports a change.
+    core::WindowSize reportedWindowedSize_;
+    // Set while the window resizes itself, so its own changes don't look
+    // like the player's drags.
+    bool applyingLayout_ = false;
+    // SetCursor(nullptr) hides the cursor over this window only, unlike
+    // ShowCursor's thread-wide counter.
+    bool cursorHidden_ = false;
+    // Fullscreen shows the cursor until a moment after the last movement.
+    bool cursorAwake_ = true;
+    bool overlayMenuOpen_ = false;
     bool haveAbsoluteMouse_ = false;
     LONG lastAbsoluteX_ = 0;
     LONG lastAbsoluteY_ = 0;

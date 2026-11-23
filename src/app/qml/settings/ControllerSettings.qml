@@ -193,6 +193,22 @@ ColumnLayout {
         textStyle: "titleSmall"
     }
 
+    SettingRow {
+        Layout.fillWidth: true
+        label: "Teclado como controle"
+        description: "As teclas e o mouse jogam pelo controle virtual."
+
+        Toggle {
+            checked: section.settings.keyboardMouseEnabled
+            Accessible.name: "Teclado como controle"
+            onCheckedChanged: {
+                if (checked !== section.settings.keyboardMouseEnabled) {
+                    section.settings.keyboardMouseEnabled = checked;
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: table
 
@@ -203,6 +219,8 @@ ColumnLayout {
         border.width: 1
         border.color: Theme.border
         clip: true
+        enabled: section.settings.keyboardMouseEnabled
+        opacity: enabled ? 1 : 0.5
 
         readonly property int labelColumnWidth: Math.min(260, table.width * 0.4)
 
@@ -313,6 +331,8 @@ ColumnLayout {
         Layout.fillWidth: true
         label: "Sensibilidade do mouse"
         description: "Quanto o mouse move o analógico direito."
+        enabled: section.settings.keyboardMouseEnabled
+        opacity: enabled ? 1 : 0.5
 
         Row {
             spacing: Theme.space3
@@ -342,6 +362,8 @@ ColumnLayout {
         Layout.fillWidth: true
         label: "Inverter eixo Y"
         description: "Para quem prefere o mouse com a vertical invertida."
+        enabled: section.settings.keyboardMouseEnabled
+        opacity: enabled ? 1 : 0.5
 
         Toggle {
             checked: section.settings.invertMouseY
