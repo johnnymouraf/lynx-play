@@ -986,3 +986,55 @@ menu, the QML settings screen, tests.
 main window's monitor); F11 while minimized; 4K monitors; odd custom sizes
 (aspect preserved with letterbox); entering fullscreen during the countdown
 before the first frame.
+
+## Current: 1.11 The stats panel must tell the game's rate, the generated frames and the presented frames
+
+**Goal:** the F2 panel separates what the owner needs to judge Frame
+Generation: the **source** rate (what arrives, usually 60), the **game** rate
+(distinct frames, e.g., 30), the **generated** frames per second and the
+**presented** rate — so a 30 fps game with Frame Generation 2x reads
+"jogo 30 · gerados 30 · exibidos 60" instead of a single 60 that hides it.
+
+**Guardrails:** no change to the Frame Generation schedule or to the stream
+protocol; the overlay keeps its shortcuts and stays cheap; the existing
+statistics (GPU stages, cadence, Reflex) stay.
+
+**Success criteria:**
+
+1. CI green on `auto/1.11`, with unit tests for the derived rates (distinct
+   frames over a window, generated per second, presented per second) against
+   fixtures.
+2. The report explains how Veyra-NRVideo derives and shows the source,
+   real and generated rates (its cadence/FG code and UI labels, with sources)
+   and what this step copied or deliberately did not.
+3. `--play-file` of the 30 fps stream carried in a 60 fps container with
+   Frame Generation 2x: the panel shows source 60, game 30, generated ~30/s
+   and presented ~60/s (screenshot + the periodic log line), and the cadence
+   line agrees; with a true 60 fps stream: source 60, game 60, generated
+   ~60/s, presented ~120/s where the display allows.
+4. With Frame Generation off, the panel shows generated 0 and presented equal
+   to the distinct rate, making the difference obvious.
+5. Owner check: in a real 30 fps game (GTA VI-like), the panel shows the
+   game at 30 and the generated frames taking it to 60.
+
+**Deliveries:**
+
+1. The research on Veyra's approach, summarized in the report.
+2. The metrics: distinct/game rate from the cadence window, generated and
+   presented per second from the present counters, source from the decoder,
+   with tests.
+3. The panel and the log line with the four rates and clear Portuguese
+   labels; the cadence line kept.
+4. The verification with both clips and FG on/off.
+
+**Settled in planning:** the container is always 60 from the PS5; the game
+rate comes from the cadence detection (2.4) and the generated frames from
+the Frame Generation counters (2.5); Veyra-NRVideo is the reference for how
+to present them.
+
+**Changes:** `src/core/StreamMetrics.*`, `src/render/Overlay.*` (statistics
+section), the periodic log, tests.
+
+**Edge cases:** a 30 fps game with a 60 fps HUD; a scene change resetting the
+cadence; FG on but the cadence at 60 (no generation needed); the overlay open
+while frames are idle (minimized) showing stale rates; a 120 Hz display.
