@@ -15,6 +15,7 @@
 #include "core/Latency.h"
 #include "core/Paths.h"
 #include "core/Settings.h"
+#include "core/TerminateLogging.h"
 #include "remoteplay/ChiakiRuntime.h"
 #include "remoteplay/ConsoleStore.h"
 #include "remoteplay/PsnTokenStore.h"
@@ -194,6 +195,7 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
 int main(int argc, char* argv[])
 {
     startLogging();
+    lynx::core::installTerminateLogging();
     lynx::app::installQtLogBridge();
     spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
     lynx::core::disableProcessPowerThrottling();

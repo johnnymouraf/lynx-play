@@ -22,6 +22,8 @@ add_library(lynx_core STATIC
     SlidingWindow.h
     StreamMetrics.cpp
     StreamMetrics.h
+    TerminateLogging.cpp
+    TerminateLogging.h
     Text.cpp
     Text.h
     VideoCodec.h

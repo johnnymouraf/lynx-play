@@ -1,6 +1,7 @@
 #include "render/FrameRenderer.h"
 
 #include "core/Latency.h"
+#include "core/TerminateLogging.h"
 
 #include <algorithm>
 #include <format>
@@ -408,6 +409,7 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 }
 
 void FrameRenderer::run(const std::stop_token& stop)
+try
 {
     SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
     const core::MmcssRegistration mmcss = core::MmcssRegistration::enable(L"Games");
@@ -539,6 +541,11 @@ void FrameRenderer::run(const std::stop_token& stop)
     // The overlay's buffers and the frames in flight are released below, so
     // the GPU must be done with them first.
     waitForGpu();
+}
+catch (...)
+{
+    core::logUnhandledException("The render thread stopped on an unhandled exception");
+    throw;
 }
 
 void FrameRenderer::applyOverlayToggles()
