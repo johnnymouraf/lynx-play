@@ -50,6 +50,12 @@ public:
     // Recreates the intermediate pictures. The GPU must be idle.
     [[nodiscard]] std::expected<void, std::string> resizePicture(SurfaceSize picture);
 
+    // Releases the per-buffer pictures one by one, so a fault in the driver on
+    // one still lets the others go. The GPU must be idle, and the optical flow
+    // engine's session must no longer use them: the driver faults on the last
+    // reference to a picture the engine registered.
+    void releasePictures();
+
     // The converted picture of a back buffer.
     [[nodiscard]] ID3D12Resource* intermediate(UINT bufferIndex) const;
     [[nodiscard]] DXGI_FORMAT intermediateFormat() const;

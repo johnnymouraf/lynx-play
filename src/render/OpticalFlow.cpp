@@ -1,5 +1,6 @@
 #include "render/OpticalFlow.h"
 
+#include "core/GuardedCall.h"
 #include "core/Windows.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
@@ -256,27 +257,47 @@ D3D12_RESOURCE_DESC outputDescription(SurfaceSize extent, DXGI_FORMAT format)
     return description;
 }
 
-// The driver's release path can fault on some driver versions; the guard turns
-// the access violation into a logged failure so a close can't take the process
-// down. The function holds no objects that need unwinding, which SEH requires.
-__declspec(noinline) bool callGuarded(const std::function<void()>& call, DWORD& fault)
+} // namespace
+
+std::string_view sessionReleaseStepName(SessionReleaseStep step)
 {
-    bool completed = false;
-
-    __try
+    switch (step)
     {
-        call();
-        completed = true;
-    }
-    __except (fault = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER)
-    {
-        completed = false;
+    case SessionReleaseStep::WaitForLastFlow:
+        return "waiting for the last flow";
+    case SessionReleaseStep::UnregisterCostResources:
+        return "unregistering the cost pictures";
+    case SessionReleaseStep::UnregisterFlowResources:
+        return "unregistering the flow pictures";
+    case SessionReleaseStep::UnregisterInputResources:
+        return "unregistering the input pictures";
+    case SessionReleaseStep::ReleaseCostPictures:
+        return "releasing the cost pictures";
+    case SessionReleaseStep::ReleaseFlowPictures:
+        return "releasing the flow pictures";
+    case SessionReleaseStep::ReleaseInputPictures:
+        return "releasing the input pictures";
+    case SessionReleaseStep::DestroySession:
+        return "destroying the session";
     }
 
-    return completed;
+    return "unknown step";
 }
 
-} // namespace
+void runSessionRelease(const std::function<void(SessionReleaseStep)>& step,
+                       const std::function<void(SessionReleaseStep, std::uint32_t)>& faulted)
+{
+    for (const SessionReleaseStep releaseStep : kSessionReleaseSteps)
+    {
+        std::uint32_t fault = 0;
+        const auto call = [&step, releaseStep] { step(releaseStep); };
+
+        if (!core::callGuarded(call, fault))
+        {
+            faulted(releaseStep, fault);
+        }
+    }
+}
 
 struct OpticalFlow::Impl
 {
@@ -295,95 +316,126 @@ struct OpticalFlow::Impl
         spdlog::info("Optical flow: releasing the session on thread {} (created on thread {})",
                      GetCurrentThreadId(), createdThread);
 
-        const auto step = [](std::string_view name, const std::function<void()>& call)
-        {
-            DWORD fault = 0;
-
-            if (callGuarded(call, fault))
+        runSessionRelease(
+            [this](SessionReleaseStep step)
             {
-                spdlog::info("Optical flow: {}", name);
-                return;
-            }
-
-            spdlog::critical("Optical flow: {} faulted with 0x{:08X}", name, fault);
-        };
-
-        // A failed frame can leave the engine working; never release a
-        // registered picture under it.
-        if (lastOutputValue != 0 && fence != nullptr)
-        {
-            const std::uint64_t completed = fence->GetCompletedValue();
-
-            if (completed < lastOutputValue && fenceEvent)
+                spdlog::info("Optical flow: {}", sessionReleaseStepName(step));
+                releaseStep(step);
+            },
+            [](SessionReleaseStep step, std::uint32_t fault)
             {
-                step(std::format("waiting for the last flow (fence {} of {})", completed,
-                                 lastOutputValue),
-                     [this]
-                     {
-                         if (SUCCEEDED(fence->SetEventOnCompletion(lastOutputValue,
-                                                                   fenceEvent.get())))
-                         {
-                             WaitForSingleObject(fenceEvent.get(),
-                                                 kRegistrationTimeoutMilliseconds);
-                         }
-                     });
-            }
-            else
-            {
-                spdlog::info("Optical flow: the last flow is complete (fence {} of {})", completed,
-                             lastOutputValue);
-            }
-
-            lastOutputValue = 0;
-        }
-
-        const auto unregister = [this, &step](std::string_view name,
-                                              std::vector<NvOFGPUBufferHandle>& handles)
-        {
-            for (NvOFGPUBufferHandle& buffer : handles)
-            {
-                if (buffer == nullptr)
-                {
-                    continue;
-                }
-
-                NV_OF_UNREGISTER_RESOURCE_PARAMS_D3D12 parameters{};
-                parameters.hOFGpuBuffer = std::exchange(buffer, nullptr);
-                step(std::format("unregistered a {} picture", name),
-                     [this, &parameters] { functions.nvOFUnregisterResourceD3D12(&parameters); });
-            }
-
-            handles.clear();
-        };
-
-        const auto release = [&step](std::string_view name,
-                                     std::vector<ComPtr<ID3D12Resource>>& resources)
-        {
-            for (std::size_t index = 0; index < resources.size(); ++index)
-            {
-                step(std::format("released {} picture {}", name, index),
-                     [&resources, index] { resources[index].Reset(); });
-            }
-
-            resources.clear();
-        };
-
-        unregister("cost", costHandles);
-        unregister("flow", flowHandles);
-        unregister("input", inputHandles);
-        release("cost", costs);
-        release("flow", flows);
-        release("input", inputs);
-
-        if (handle != nullptr)
-        {
-            const NvOFHandle session = std::exchange(handle, nullptr);
-            step("destroyed the NvOF session",
-                 [this, session] { functions.nvOFDestroy(session); });
-        }
+                spdlog::critical("Optical flow: {} faulted with 0x{:08X}",
+                                 sessionReleaseStepName(step), fault);
+            });
 
         configured = false;
         spdlog::info("Optical flow: the session is released");
+    }
+
+    void releaseStep(SessionReleaseStep step)
+    {
+        switch (step)
+        {
+        case SessionReleaseStep::WaitForLastFlow:
+            waitForLastFlow();
+            break;
+        case SessionReleaseStep::UnregisterCostResources:
+            unregisterAll("cost", costHandles);
+            break;
+        case SessionReleaseStep::UnregisterFlowResources:
+            unregisterAll("flow", flowHandles);
+            break;
+        case SessionReleaseStep::UnregisterInputResources:
+            unregisterAll("input", inputHandles);
+            break;
+        case SessionReleaseStep::ReleaseCostPictures:
+            releaseAll("cost", costs);
+            break;
+        case SessionReleaseStep::ReleaseFlowPictures:
+            releaseAll("flow", flows);
+            break;
+        case SessionReleaseStep::ReleaseInputPictures:
+            releaseAll("input", inputs);
+            break;
+        case SessionReleaseStep::DestroySession:
+            if (handle != nullptr)
+            {
+                const NvOFHandle session = std::exchange(handle, nullptr);
+                functions.nvOFDestroy(session);
+            }
+            break;
+        }
+    }
+
+    void waitForLastFlow()
+    {
+        // A failed frame can leave the engine working; never release a
+        // registered picture under it.
+        if (lastOutputValue == 0 || fence == nullptr)
+        {
+            return;
+        }
+
+        const std::uint64_t completed = fence->GetCompletedValue();
+
+        if (completed < lastOutputValue && fenceEvent)
+        {
+            if (SUCCEEDED(fence->SetEventOnCompletion(lastOutputValue, fenceEvent.get())))
+            {
+                WaitForSingleObject(fenceEvent.get(), kRegistrationTimeoutMilliseconds);
+            }
+        }
+
+        spdlog::info("Optical flow: the last flow is complete (fence {} of {})",
+                     fence->GetCompletedValue(), lastOutputValue);
+        lastOutputValue = 0;
+    }
+
+    void unregisterAll(std::string_view name, std::vector<NvOFGPUBufferHandle>& handles)
+    {
+        for (NvOFGPUBufferHandle& buffer : handles)
+        {
+            if (buffer == nullptr)
+            {
+                continue;
+            }
+
+            NV_OF_UNREGISTER_RESOURCE_PARAMS_D3D12 parameters{};
+            parameters.hOFGpuBuffer = std::exchange(buffer, nullptr);
+
+            const auto unregister = [this, &parameters]
+            {
+                functions.nvOFUnregisterResourceD3D12(&parameters);
+            };
+
+            std::uint32_t fault = 0;
+
+            if (!core::callGuarded(unregister, fault))
+            {
+                spdlog::critical("Optical flow: unregistering a {} picture faulted with 0x{:08X}",
+                                 name, fault);
+            }
+        }
+
+        handles.clear();
+    }
+
+    void releaseAll(std::string_view name, std::vector<ComPtr<ID3D12Resource>>& pictures)
+    {
+        for (std::size_t index = 0; index < pictures.size(); ++index)
+        {
+            const auto release = [&pictures, index] { pictures[index].Reset(); };
+
+            std::uint32_t fault = 0;
+
+            if (!core::callGuarded(release, fault))
+            {
+                spdlog::critical("Optical flow: releasing {} picture {} faulted with 0x{:08X}",
+                                 name, index, fault);
+            }
+        }
+
+        pictures.clear();
     }
 
     ComPtr<ID3D12Device> device;

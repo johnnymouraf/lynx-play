@@ -1,13 +1,27 @@
 #include "render/OpticalFlow.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace lynx::render;
+
+namespace
+{
+
+constexpr std::uint32_t kAccessViolation = 0xC0000005UL;
+
+void writeToNull()
+{
+    *static_cast<volatile int*>(nullptr) = 1;
+}
+
+} // namespace
 
 TEST_CASE("S10.5 flow vectors become pixels")
 {
@@ -74,4 +88,58 @@ TEST_CASE("Densify picks the grid cell covering the pixel")
     CHECK_FALSE(flowVectorAt(vectors, grid, picture, 8, 0).has_value());
     CHECK_FALSE(flowVectorAt(vectors, grid, picture, 0, 6).has_value());
     CHECK_FALSE(flowVectorAt(std::array<std::int16_t, 2>{0, 0}, grid, picture, 7, 5).has_value());
+}
+
+TEST_CASE("A faulting release step is reported and the steps after it still run")
+{
+    std::vector<SessionReleaseStep> visited;
+    std::vector<SessionReleaseStep> faulted;
+
+    runSessionRelease(
+        [&visited](SessionReleaseStep step)
+        {
+            visited.push_back(step);
+
+            if (step == SessionReleaseStep::ReleaseFlowPictures)
+            {
+                writeToNull();
+            }
+        },
+        [&faulted](SessionReleaseStep step, std::uint32_t fault)
+        {
+            CHECK(fault == kAccessViolation);
+            faulted.push_back(step);
+        });
+
+    const std::vector<SessionReleaseStep> expected(kSessionReleaseSteps.begin(),
+                                                   kSessionReleaseSteps.end());
+    CHECK(visited == expected);
+    REQUIRE(faulted.size() == 1);
+    CHECK(faulted.front() == SessionReleaseStep::ReleaseFlowPictures);
+}
+
+TEST_CASE("The session waits for the GPU before it unregisters and destroys")
+{
+    CHECK(kSessionReleaseSteps.front() == SessionReleaseStep::WaitForLastFlow);
+    CHECK(kSessionReleaseSteps.back() == SessionReleaseStep::DestroySession);
+
+    const auto position = [](SessionReleaseStep step)
+    {
+        const auto found = std::ranges::find(kSessionReleaseSteps, step);
+        return static_cast<std::size_t>(found - kSessionReleaseSteps.begin());
+    };
+
+    CHECK(position(SessionReleaseStep::UnregisterCostResources) <
+          position(SessionReleaseStep::ReleaseCostPictures));
+    CHECK(position(SessionReleaseStep::UnregisterFlowResources) <
+          position(SessionReleaseStep::ReleaseFlowPictures));
+    CHECK(position(SessionReleaseStep::UnregisterInputResources) <
+          position(SessionReleaseStep::ReleaseInputPictures));
+    CHECK(position(SessionReleaseStep::ReleaseInputPictures) <
+          position(SessionReleaseStep::DestroySession));
+
+    for (const SessionReleaseStep step : kSessionReleaseSteps)
+    {
+        CHECK_FALSE(sessionReleaseStepName(step).empty());
+    }
 }

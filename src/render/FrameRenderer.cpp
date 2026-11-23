@@ -236,6 +236,9 @@ FrameRenderer::~FrameRenderer()
     spdlog::info("The frame renderer's GPU work is complete (fence {}); releasing the features",
                  lastSignaledFence_);
 
+    // The render thread normally releases the flow before it stops; this
+    // covers a renderer whose thread stopped early.
+    releaseOpticalFlow();
     releaseFrameGeneration();
     // The features must be gone before the host shuts NGX down.
     dlssSuperResolution_.reset();
@@ -568,6 +571,9 @@ try
     // The overlay's buffers and the frames in flight are released below, so
     // the GPU must be done with them first.
     waitForGpu();
+    // The flow's session and pictures belong to this thread; release them
+    // here, while the presenter and the device that own them are still alive.
+    releaseOpticalFlow();
 }
 catch (...)
 {
@@ -758,6 +764,9 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         if (presenter_.needsPicture(picture))
         {
             waitForGpu();
+            // The old pictures go before the presenter replaces them; the
+            // engine's registration goes first.
+            releaseOpticalFlow();
 
             if (auto resized = presenter_.resizePicture(picture); !resized)
             {
@@ -1164,6 +1173,10 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
             return std::unexpected(created.error());
         }
 
+        // The engine registered the old pictures: end its session first, then
+        // release the pictures it read, each under a guard.
+        opticalFlow_.reset();
+        presenter_.releasePictures();
         presenter_ = std::move(*created);
 
         if (videoSuperResolution_)
@@ -1186,8 +1199,6 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
             }
         }
 
-        // The engine registered the old intermediate textures.
-        opticalFlow_.reset();
         flowReferenceValid_ = false;
         flowSlotValid_.fill(false);
         dlssResetPending_ = true;
@@ -1404,6 +1415,25 @@ void FrameRenderer::applyRequestedFrameGeneration()
         spdlog::info("Frame Generation: it needs the optical flow; it starts when the flow is "
                      "ready");
     }
+}
+
+void FrameRenderer::releaseOpticalFlow()
+{
+    if (!opticalFlow_)
+    {
+        return;
+    }
+
+    waitForGpu();
+    spdlog::info("Optical flow: the GPU is idle at fence {}; releasing the session",
+                 lastSignaledFence_);
+    opticalFlow_.reset();
+
+    // The engine's registration goes with the session, but the driver can
+    // fault on the last reference to the pictures it read; release them here,
+    // one by one, so the fault is logged and the rest go.
+    spdlog::info("Optical flow: releasing the pictures the engine read");
+    presenter_.releasePictures();
 }
 
 void FrameRenderer::releaseFrameGeneration()

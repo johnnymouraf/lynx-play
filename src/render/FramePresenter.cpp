@@ -1,5 +1,6 @@
 #include "render/FramePresenter.h"
 
+#include "core/GuardedCall.h"
 #include "core/Windows.h"
 #include "render/ColorConversion.h"
 #include "render/shaders/ScalePixelShader.h"
@@ -11,6 +12,9 @@
 #include <climits>
 #include <cstdint>
 #include <span>
+#include <string_view>
+
+#include <spdlog/spdlog.h>
 
 namespace lynx::render
 {
@@ -272,6 +276,25 @@ D3D12_RESOURCE_DESC intermediateDescription(SurfaceSize picture, DXGI_FORMAT for
     };
 }
 
+void releaseAll(std::string_view name, std::vector<ComPtr<ID3D12Resource>>& pictures)
+{
+    for (std::size_t index = 0; index < pictures.size(); ++index)
+    {
+        const auto release = [&pictures, index] { pictures[index].Reset(); };
+
+        std::uint32_t fault = 0;
+
+        if (!core::callGuarded(release, fault))
+        {
+            spdlog::critical("The presenter's {} picture {} faulted while the driver released it: "
+                             "0x{:08X}",
+                             name, index, fault);
+        }
+    }
+
+    pictures.clear();
+}
+
 } // namespace
 
 std::expected<FramePresenter, std::string> FramePresenter::create(ID3D12Device& device,
@@ -408,7 +431,7 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
         intermediateDescription(picture, intermediateFormat_);
     const D3D12_HEAP_PROPERTIES defaultHeap{.Type = D3D12_HEAP_TYPE_DEFAULT};
 
-    intermediates_.clear();
+    releasePictures();
     intermediates_.resize(bufferCount_);
 
     for (UINT index = 0; index < bufferCount_; ++index)
@@ -427,8 +450,6 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
         device_->CreateShaderResourceView(texture.Get(), nullptr,
                                           cpuView(index * kViewsPerBuffer + kIntermediateView));
     }
-
-    flowPictures_.clear();
 
     if (needsFlowCopy())
     {
@@ -456,6 +477,12 @@ std::expected<void, std::string> FramePresenter::resizePicture(SurfaceSize pictu
 
     pictureSize_ = picture;
     return {};
+}
+
+void FramePresenter::releasePictures()
+{
+    releaseAll("intermediate", intermediates_);
+    releaseAll("flow", flowPictures_);
 }
 
 ID3D12Resource* FramePresenter::intermediate(UINT bufferIndex) const
