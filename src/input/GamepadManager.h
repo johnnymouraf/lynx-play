@@ -110,6 +110,11 @@ private:
     // While the DualSense's USB audio endpoint drives the actuators, SDL's
     // rumble must stay off; the effect packet carries rumble instead.
     bool audioHapticsActive_ = false;
+    bool effectsApplied_ = false;
+    // The last lightbar and player LED the console asked for, so a controller
+    // that appears later gets them too.
+    std::optional<std::array<std::uint8_t, 3>> led_;
+    std::optional<int> playerIndex_;
     bool packetErrorLogged_ = false;
     bool rumbleErrorLogged_ = false;
     std::chrono::steady_clock::time_point nextRefresh_{};

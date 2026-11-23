@@ -241,6 +241,23 @@ void GamepadManager::openDevice(SDL_JoystickID id)
 
     readCurrentState(*device);
 
+    // A controller that appears after the console's feedback events still
+    // gets the effects and lights it asked for.
+    if (device->dualSense && effectsApplied_)
+    {
+        sendEffects(*device);
+    }
+
+    if (device->hasLed && led_)
+    {
+        SDL_SetGamepadLED(handle, (*led_)[0], (*led_)[1], (*led_)[2]);
+    }
+
+    if (device->hasPlayerLed && playerIndex_)
+    {
+        SDL_SetGamepadPlayerIndex(handle, *playerIndex_);
+    }
+
     if (device->batteryPercent >= 0)
     {
         spdlog::info("Gamepad detected: '{}' ({}{}, battery {}%)", device->name,
@@ -312,6 +329,7 @@ void GamepadManager::refreshActive()
     {
         activeId_ = next;
         effects_ = DualSenseEffects{};
+        effectsApplied_ = false;
 
         if (chosen != nullptr)
         {
@@ -668,6 +686,27 @@ void GamepadManager::applyCommand(Device& device, const DualSenseCommand& comman
         }
     }
 
+    if (command.led)
+    {
+        led_ = command.led;
+
+        if (device.hasLed)
+        {
+            SDL_SetGamepadLED(device.handle, (*command.led)[0], (*command.led)[1],
+                              (*command.led)[2]);
+        }
+    }
+
+    if (command.playerIndex)
+    {
+        playerIndex_ = command.playerIndex;
+
+        if (device.hasPlayerLed)
+        {
+            SDL_SetGamepadPlayerIndex(device.handle, *command.playerIndex);
+        }
+    }
+
     const bool packet = device.dualSense &&
                         (command.leftTrigger || command.rightTrigger ||
                          command.microphoneMuted || command.intensity || command.classicRumble);
@@ -678,6 +717,7 @@ void GamepadManager::applyCommand(Device& device, const DualSenseCommand& comman
     }
 
     effects_.apply(command);
+    effectsApplied_ = true;
     sendEffects(device);
 }
 

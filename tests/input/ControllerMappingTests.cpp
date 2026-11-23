@@ -166,7 +166,7 @@ TEST_CASE("Touchpad points outside the pad are clamped")
     CHECK(state.touches[0].y == 0);
 }
 
-TEST_CASE("The accelerometer's m/s² become g")
+TEST_CASE("The accelerometer's meters per second squared become g")
 {
     const std::array<float, 3> rest = accelerationInG({0.0F, 9.80665F, 0.0F});
     const std::array<float, 3> tilted = accelerationInG({-9.80665F, 0.0F, 4.903325F});
