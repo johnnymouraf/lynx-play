@@ -209,7 +209,7 @@ void GamepadManager::openDevice(SDL_JoystickID id)
     char guidText[33]{};
     std::uint16_t guidVersion = 0;
     const SDL_GUID guid = SDL_GetJoystickGUID(joystick);
-    SDL_GUIDToString(guid, guidText, sizeof(guidText));
+    SDL_GUIDToString(guid, guidText, static_cast<int>(sizeof(guidText)));
     SDL_GetJoystickGUIDInfo(guid, nullptr, nullptr, &guidVersion, nullptr);
     char* mapping = SDL_GetGamepadMapping(handle);
     spdlog::info("Gamepad '{}' GUID {} version 0x{:04x}, mapping '{}'", device->name, guidText,

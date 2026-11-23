@@ -50,13 +50,13 @@ std::array<std::uint8_t, kDualSensePacketSize> dualSenseRumblePacket(
     DualSenseRumble rumble, DualSenseRumbleEncoding encoding, std::uint8_t intensity)
 {
     std::array<std::uint8_t, kDualSensePacketSize> bytes{};
-    bytes[DualSenseEffects::kEnableBits2] = kEffectsEnabled;
-    bytes[DualSenseEffects::kEnableBits1] = kClassicRumble;
+    bytes[kEnableBits2] = kEffectsEnabled;
+    bytes[kEnableBits1] = kClassicRumble;
     bytes[DualSenseEffects::kIntensityOffset] = intensity;
 
     if (encoding == DualSenseRumbleEncoding::Legacy)
     {
-        bytes[DualSenseEffects::kEnableBits1] |= kLegacyRumble;
+        bytes[kEnableBits1] |= kLegacyRumble;
         bytes[DualSenseEffects::kRumbleRightOffset] = static_cast<std::uint8_t>(rumble.right >> 1);
         bytes[DualSenseEffects::kRumbleLeftOffset] = static_cast<std::uint8_t>(rumble.left >> 1);
         return bytes;
