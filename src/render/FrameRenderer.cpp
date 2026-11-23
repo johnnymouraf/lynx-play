@@ -1043,7 +1043,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     if (metrics_ != nullptr && realPresented)
     {
-        metrics_->addPresented(now, interval, readyToPresent);
+        metrics_->addPresented(now, interval, readyToPresent, showsNewFrame);
     }
 
     if (showsNewFrame && realPresented)
@@ -2925,8 +2925,9 @@ void FrameRenderer::reportStatistics()
             metrics_->snapshot(core::StreamMetrics::Clock::now());
 
         spdlog::info("Rates: source {:.1f} fps, game {:.1f} fps, generated {:.1f} fps, displayed "
-                     "{:.1f} fps",
-                     video.sourceFps, video.gameFps, video.generatedFps, video.displayedFps);
+                     "{:.1f} fps; real presents {:.1f} fps, repeated {:.1f} fps",
+                     video.sourceFps, video.gameFps, video.generatedFps, video.displayedFps,
+                     video.realPresentedFps, video.repeatedPresentedFps);
     }
 
     if (lastGpuTimes_)

@@ -23,6 +23,7 @@ StreamMetrics::StreamMetrics(Clock::time_point start)
     : received_(kMetricsWindow, start),
       distinct_(kMetricsWindow, start),
       generated_(kMetricsWindow, start),
+      presented_(kMetricsWindow, start),
       decodeTime_(kMetricsWindow, start),
       presentInterval_(kMetricsWindow, start),
       readyToPresent_(kMetricsWindow, start),
@@ -90,9 +91,14 @@ void StreamMetrics::addPacketStats(Clock::time_point at, std::uint64_t received,
 }
 
 void StreamMetrics::addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
-                                 std::optional<Clock::duration> readyToPresent)
+                                 std::optional<Clock::duration> readyToPresent, bool newFrame)
 {
     const std::scoped_lock lock(mutex_);
+
+    if (newFrame)
+    {
+        presented_.add(at);
+    }
 
     if (interval)
     {
@@ -116,6 +122,7 @@ StreamMetricsSnapshot StreamMetrics::snapshot(Clock::time_point now)
     const SlidingWindow::Summary received = received_.summarize(now);
     const SlidingWindow::Summary distinct = distinct_.summarize(now);
     const SlidingWindow::Summary generated = generated_.summarize(now);
+    const SlidingWindow::Summary presented = presented_.summarize(now);
     const SlidingWindow::Summary decode = decodeTime_.summarize(now);
     const SlidingWindow::Summary interval = presentInterval_.summarize(now);
     const SlidingWindow::Summary ready = readyToPresent_.summarize(now);
@@ -132,6 +139,9 @@ StreamMetricsSnapshot StreamMetrics::snapshot(Clock::time_point now)
     snapshot.gameFps = distinct.perSecond;
     snapshot.generatedFps = generated.perSecond;
     snapshot.displayedFps = snapshot.gameFps + snapshot.generatedFps;
+    snapshot.realPresentedFps = presented.perSecond;
+    snapshot.repeatedPresentedFps =
+        std::max(0.0, snapshot.realPresentedFps - snapshot.gameFps);
 
     if (bytes.elapsedSeconds > 0.0)
     {

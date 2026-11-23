@@ -34,6 +34,11 @@ struct StreamMetricsSnapshot
     // New pictures shown per second, the distinct source ones plus the
     // generated ones. With Frame Generation off it equals the game rate.
     double displayedFps = 0.0;
+    // Real pictures shown per second and, of those, the ones that repeated
+    // a picture already on screen. Frame Generation holds the real picture
+    // for the repeat, so it presents no repeated real picture.
+    double realPresentedFps = 0.0;
+    double repeatedPresentedFps = 0.0;
     double bitrateMbps = 0.0;
 
     bool packetLossValid = false;
@@ -72,10 +77,11 @@ public:
     void addCadenceFrame(Clock::time_point at, bool distinct);
     // Packet counters since the previous call, from the session.
     void addPacketStats(Clock::time_point at, std::uint64_t received, std::uint64_t lost);
-    // One present of a new decoded picture. The interval is absent for the
-    // first new frame, and so is the time from the frame being ready.
+    // One real present; `newFrame` says it showed a picture the decoder just
+    // produced, not a redraw of the one already on screen. The interval is
+    // absent for the first new frame, and so is the time from frame ready.
     void addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
-                       std::optional<Clock::duration> readyToPresent);
+                       std::optional<Clock::duration> readyToPresent, bool newFrame);
     // One present of a picture DLSS Frame Generation produced.
     void addGeneratedPresent(Clock::time_point at);
 
@@ -90,6 +96,7 @@ private:
     SlidingWindow received_;
     SlidingWindow distinct_;
     SlidingWindow generated_;
+    SlidingWindow presented_;
     SlidingWindow decodeTime_;
     SlidingWindow presentInterval_;
     SlidingWindow readyToPresent_;

@@ -64,9 +64,10 @@ TEST_CASE("StreamMetrics keeps present intervals for the frame time plot")
 {
     StreamMetrics metrics(kStart);
 
-    metrics.addPresented(kStart + 100ms, std::nullopt, 2ms);
-    metrics.addPresented(kStart + 116ms, 16ms, 3ms);
-    metrics.addPresented(kStart + 133ms, 17ms, 4ms);
+    metrics.addPresented(kStart + 100ms, std::nullopt, 2ms, true);
+    metrics.addPresented(kStart + 116ms, 16ms, 3ms, true);
+    metrics.addPresented(kStart + 133ms, 17ms, 4ms, true);
+    metrics.addPresented(kStart + 150ms, std::nullopt, std::nullopt, false);
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
 
@@ -77,6 +78,8 @@ TEST_CASE("StreamMetrics keeps present intervals for the frame time plot")
     CHECK(snapshot.presentIntervalMilliseconds == Catch::Approx(16.5));
     CHECK(snapshot.readyToPresentValid);
     CHECK(snapshot.readyToPresentMilliseconds == Catch::Approx(3.0));
+    // The redraw at 150 ms presented the picture already on screen.
+    CHECK(snapshot.realPresentedFps == Catch::Approx(3.0));
 }
 
 TEST_CASE("StreamMetrics separates the source and the game rate of a 30 in 60 stream")
@@ -84,12 +87,14 @@ TEST_CASE("StreamMetrics separates the source and the game rate of a 30 in 60 st
     StreamMetrics metrics(kStart);
 
     // Sixty access units arrive per second, but only every other picture is
-    // distinct: the game runs at 30.
+    // distinct: the game runs at 30. Without generation, every picture is
+    // shown, repeats included.
     for (int frame = 0; frame < 60; ++frame)
     {
         const auto at = kStart + (frame + 1) * 16ms;
         metrics.addReceived(at, 100'000);
         metrics.addCadenceFrame(at, frame % 2 == 0);
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
     }
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
@@ -98,6 +103,8 @@ TEST_CASE("StreamMetrics separates the source and the game rate of a 30 in 60 st
     CHECK(snapshot.gameFps == Catch::Approx(30.0));
     CHECK(snapshot.generatedFps == 0.0);
     CHECK(snapshot.displayedFps == Catch::Approx(30.0));
+    CHECK(snapshot.realPresentedFps == Catch::Approx(60.0));
+    CHECK(snapshot.repeatedPresentedFps == Catch::Approx(30.0));
 }
 
 TEST_CASE("StreamMetrics counts generated pictures in the displayed rate")
@@ -105,17 +112,22 @@ TEST_CASE("StreamMetrics counts generated pictures in the displayed rate")
     StreamMetrics metrics(kStart);
 
     // The same 30 fps game with Frame Generation 2x: one generated picture
-    // per distinct source picture doubles what reaches the screen.
+    // per distinct source picture, and the real one held for the repeat, so
+    // the two presents per pair carry one picture each.
     for (int frame = 0; frame < 60; ++frame)
     {
         const auto at = kStart + (frame + 1) * 16ms;
+        const bool distinct = frame % 2 == 0;
         metrics.addReceived(at, 100'000);
-        metrics.addCadenceFrame(at, frame % 2 == 0);
+        metrics.addCadenceFrame(at, distinct);
 
-        if (frame % 2 == 0)
+        if (distinct)
         {
             metrics.addGeneratedPresent(at);
+            continue;
         }
+
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
     }
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
@@ -124,6 +136,8 @@ TEST_CASE("StreamMetrics counts generated pictures in the displayed rate")
     CHECK(snapshot.gameFps == Catch::Approx(30.0));
     CHECK(snapshot.generatedFps == Catch::Approx(30.0));
     CHECK(snapshot.displayedFps == Catch::Approx(60.0));
+    CHECK(snapshot.realPresentedFps == Catch::Approx(30.0));
+    CHECK(snapshot.repeatedPresentedFps == 0.0);
 }
 
 TEST_CASE("StreamMetrics doubles a true 60 fps game with Frame Generation")
@@ -136,6 +150,7 @@ TEST_CASE("StreamMetrics doubles a true 60 fps game with Frame Generation")
         metrics.addReceived(at, 100'000);
         metrics.addCadenceFrame(at, true);
         metrics.addGeneratedPresent(at);
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
     }
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
@@ -144,6 +159,8 @@ TEST_CASE("StreamMetrics doubles a true 60 fps game with Frame Generation")
     CHECK(snapshot.gameFps == Catch::Approx(60.0));
     CHECK(snapshot.generatedFps == Catch::Approx(60.0));
     CHECK(snapshot.displayedFps == Catch::Approx(120.0));
+    CHECK(snapshot.realPresentedFps == Catch::Approx(60.0));
+    CHECK(snapshot.repeatedPresentedFps == 0.0);
 }
 
 TEST_CASE("StreamMetrics drops the rates of frames outside the window")
@@ -156,6 +173,7 @@ TEST_CASE("StreamMetrics drops the rates of frames outside the window")
         metrics.addReceived(at, 100'000);
         metrics.addCadenceFrame(at, true);
         metrics.addGeneratedPresent(at);
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
     }
 
     const StreamMetricsSnapshot snapshot = metrics.snapshot(kStart + 3000ms);
@@ -164,6 +182,8 @@ TEST_CASE("StreamMetrics drops the rates of frames outside the window")
     CHECK(snapshot.gameFps == 0.0);
     CHECK(snapshot.generatedFps == 0.0);
     CHECK(snapshot.displayedFps == 0.0);
+    CHECK(snapshot.realPresentedFps == 0.0);
+    CHECK(snapshot.repeatedPresentedFps == 0.0);
 }
 
 TEST_CASE("StreamMetrics carries the codec and the decoded size")
@@ -194,5 +214,7 @@ TEST_CASE("StreamMetrics reports quiet counters before the stream starts")
     CHECK(snapshot.gameFps == 0.0);
     CHECK(snapshot.generatedFps == 0.0);
     CHECK(snapshot.displayedFps == 0.0);
+    CHECK(snapshot.realPresentedFps == 0.0);
+    CHECK(snapshot.repeatedPresentedFps == 0.0);
     CHECK(snapshot.bitrateMbps == 0.0);
 }
