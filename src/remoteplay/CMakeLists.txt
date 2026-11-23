@@ -25,6 +25,10 @@ add_library(lynx_remoteplay STATIC
     HostAddress.h
     Pin.cpp
     Pin.h
+    PsnLogin.cpp
+    PsnLogin.h
+    PsnTokenStore.cpp
+    PsnTokenStore.h
     SecretProtector.h
     StreamSession.cpp
     StreamSession.h)

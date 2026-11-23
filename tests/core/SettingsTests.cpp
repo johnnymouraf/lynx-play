@@ -43,6 +43,8 @@ TEST_CASE("Settings survive a write and a read")
         .frameGeneration = FrameGenerationMode::X2,
     };
     settings.overlay.statisticsVisible = true;
+    settings.psn.signedIn = true;
+    settings.psn.tokenExpiry = 1'792'000'000;
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -60,6 +62,16 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->rtx.frameGeneration == FrameGenerationMode::X2);
     CHECK_FALSE(readBack->rtx.opticalFlow);
     CHECK(readBack->overlay == settings.overlay);
+    CHECK(readBack->psn == settings.psn);
+}
+
+TEST_CASE("A settings file without the PSN sign-in starts signed out")
+{
+    const auto readBack = read(R"({"version":1})");
+
+    REQUIRE(readBack.has_value());
+    CHECK_FALSE(readBack->psn.signedIn);
+    CHECK_FALSE(readBack->psn.tokenExpiry.has_value());
 }
 
 TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and Reflex")

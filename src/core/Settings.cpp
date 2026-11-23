@@ -303,6 +303,21 @@ KeyboardMouseSettings readKeyboardMouse(const Json& keyboardMouse)
     return settings;
 }
 
+PsnSettings readPsn(const Json& psn)
+{
+    PsnSettings settings;
+
+    if (!psn.is_object())
+    {
+        return settings;
+    }
+
+    settings.signedIn = booleanAt(psn, "signedIn", settings.signedIn);
+    settings.tokenExpiry = integerAt(psn, "tokenExpiry");
+
+    return settings;
+}
+
 } // namespace
 
 std::array<std::string, kKeyboardControlCount> defaultKeyboardBindings()
@@ -407,6 +422,11 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.keyboardMouse = readKeyboardMouse(*keyboardMouse);
     }
 
+    if (const auto psn = root.find("psn"); psn != root.end())
+    {
+        settings.psn = readPsn(*psn);
+    }
+
     return settings;
 }
 
@@ -418,12 +438,22 @@ void writeSettings(const Settings& settings, std::ostream& output)
     const RtxSettings& rtx = settings.rtx;
     const OverlaySettings& overlay = settings.overlay;
     const KeyboardMouseSettings& keyboardMouse = settings.keyboardMouse;
+    const PsnSettings& psn = settings.psn;
 
     Json bindings = Json::object();
 
     for (std::size_t index = 0; index < kKeyboardControlCount; ++index)
     {
         bindings[std::string(kKeyboardControlNames.at(index))] = keyboardMouse.bindings.at(index);
+    }
+
+    Json psnEntry{
+        {"signedIn", psn.signedIn},
+    };
+
+    if (psn.tokenExpiry)
+    {
+        psnEntry["tokenExpiry"] = *psn.tokenExpiry;
     }
 
     const Json root{
@@ -465,6 +495,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"mouseSensitivity", keyboardMouse.mouseSensitivity},
              {"invertY", keyboardMouse.invertY},
          }},
+        {"psn", psnEntry},
     };
 
     output << root.dump(kJsonIndent) << '\n';

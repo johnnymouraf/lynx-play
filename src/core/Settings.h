@@ -8,6 +8,7 @@
 #include <expected>
 #include <filesystem>
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -231,6 +232,16 @@ struct RtxSettings
     bool operator==(const RtxSettings&) const = default;
 };
 
+// The PSN sign-in; the tokens themselves live sealed in psn.json.
+struct PsnSettings
+{
+    bool signedIn = false;
+    // When the stored access token expires, in seconds since the epoch.
+    std::optional<std::int64_t> tokenExpiry;
+
+    bool operator==(const PsnSettings&) const = default;
+};
+
 // What settings.json holds.
 struct Settings
 {
@@ -240,6 +251,7 @@ struct Settings
     RtxSettings rtx;
     OverlaySettings overlay;
     KeyboardMouseSettings keyboardMouse;
+    PsnSettings psn;
 
     bool operator==(const Settings&) const = default;
 };
