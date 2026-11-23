@@ -42,6 +42,8 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.9 Controller parity with chiaki-ng**: the audit against chiaki-ng
         fixed the trigger scale, the touchpad, the sensors, the merge of
         keyboard and gamepad, and the rumble/trigger packets.
+  - [x] **1.10 Stream window mode and size**: fullscreen or a chosen size
+        (presets or a drag), remembered, with a usable cursor.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -932,64 +934,6 @@ The PS5 was on the network and the saved console opened real sessions.
 **Chosen: A**; the owner still confirms in their own session. Changing it:
 reclassify as an owner check.
 
-## Current: 1.10 The stream window's mode and size
-
-**Goal:** the owner picks how the stream window shows — borderless fullscreen
-or a window at a chosen size — from Configurações › Vídeo and from the F1
-menu, applied live; presets (1920×1080, 1600×900, 1280×720, 960×540,
-Personalizado) plus free mouse resize, and both F11 and a new stream use the
-last chosen mode and size.
-
-**Guardrails:** the stream's video profile doesn't change (the PS5 keeps the
-1080p chosen in Vídeo; this is the presentation size only); fullscreen stays
-borderless on the monitor of the main window; no session restart to apply;
-Frame Generation, VSR and the overlay keep working.
-
-**Success criteria:**
-
-1. CI green on `auto/1.10`, with unit tests: preset matching from a client
-   size (exact, near, custom), clamping to the monitor, and the settings
-   round trip.
-2. `settings.json` gains `video.windowMode` (`fullscreen`/`windowed`) and
-   `video.windowSize` (width, height), additive, with sane defaults
-   (fullscreen, 1280×720).
-3. Configurações › Vídeo has the mode selector and the size selector
-   (disabled in fullscreen); changing either applies to a running stream
-   without restarting it (screenshots/UIA).
-4. The F1 menu has the same control; F11 toggles fullscreen ↔ the last
-   windowed size; a new stream opens with the last mode and size (checked
-   in `--play-file` and a real session).
-5. Dragging the window's border in windowed mode is remembered (debounced)
-   and the selector shows "Personalizado" (checked by resizing with
-   `SetWindowPos` and reading the settings file).
-6. Owner check: a real session at a chosen size and in fullscreen, with F11.
-
-**Deliveries:**
-
-1. The settings model: mode, size, preset matching and clamping, with
-   tests.
-2. `StreamWindow`: open at the mode/size, apply a change live, F11 toggling
-   while preserving the windowed size, and remembering a drag-resize.
-3. The UI: the Vídeo rows and the F1 menu entry, in Brazilian Portuguese,
-   following the existing components.
-4. The verification (CI plus this machine).
-
-**Settled in planning:** selector of presets plus remembered mouse resize;
-the control lives in both Vídeo and the F1 menu; F11 returns to the last
-window size and new streams use it.
-
-**Changes:** `src/core/Settings.*`, `src/app/SettingsController.*`,
-`src/app/StreamController.cpp`, `src/render/StreamWindow.*`, the overlay's
-menu, the QML settings screen, tests.
-
-**Data and interfaces:** `settings.json` `video.windowMode` and
-`video.windowSize`, additive, version 1.
-
-**Edge cases:** a size larger than the monitor (clamp); multi-monitor (the
-main window's monitor); F11 while minimized; 4K monitors; odd custom sizes
-(aspect preserved with letterbox); entering fullscreen during the countdown
-before the first frame.
-
 ## Current: 1.11 The stats panel must tell the game's rate, the generated frames and the presented frames
 
 **Goal:** the F2 panel separates what the owner needs to judge Frame
@@ -1097,3 +1041,63 @@ chiaki-ng's `settings/keyboard_enabled` defaults to true.
 - B. Always on: no way to isolate a gamepad problem.
 
 **Chosen: A**. Changing it: `Settings`/`KeyboardMouse`/`SettingsController`/QML.
+
+#### D82 – The F1 window row cycles instead of opening a submenu (1.10)
+
+The menu has no dropdown and is driven by mouse and D-pad.
+
+- A. A row that cycles fullscreen and the presets, in the existing rows'
+  pattern; leaving fullscreen restores the remembered size (or the first
+  preset when the size is custom, so no preset is unreachable).
+- B. A new submenu with its own state.
+
+**Chosen: A**. Changing it: `MenuResult`/`drawMenu`.
+
+#### D83 – A 500 ms debounce for resizes (1.10)
+
+`SetWindowPos` doesn't send `WM_EXITSIZEMOVE`.
+
+- A. Only `WM_EXITSIZEMOVE`: misses programmatic sizes.
+- B. A 500 ms timer on `WM_SIZE` plus an immediate report at the end of a
+  user drag.
+
+**Chosen: B**. Changing it: `kSizeSettleMilliseconds`.
+
+#### D84 – The cursor through `SetCursor`, not `ShowCursor` (1.10)
+
+`ShowCursor` is a per-thread counter, and the old code hid the cursor in
+every mode.
+
+- A. A balanced `ShowCursor` counter.
+- B. `SetCursor(nullptr)` with `WM_SETCURSOR`, showing the arrow in windowed
+  mode and hiding after two idle seconds in fullscreen, keeping it visible
+  with the F1 menu.
+
+**Chosen: B**. Changing it: `applyCursor()`/`kCursorHideMilliseconds`.
+
+#### D85 – F11 persists the mode (1.10)
+
+- A. Keep it in memory only.
+- B. An `onWindowModeChanged` callback stores it, so a new stream opens the
+  same way.
+
+**Chosen: B**. Changing it: remove the callback wiring.
+
+#### D86 – A two-pixel tolerance for the presets (1.10)
+
+A drag lands one or two pixels off the round sizes.
+
+- A. Exact matching: a 1280×721 window shows "Personalizado".
+- B. Two pixels per dimension, storing the real client size.
+
+**Chosen: B**. Changing it: `kWindowSizePresetTolerance`.
+
+#### D87 – The video test follows the same layout (1.10)
+
+It is the only path that runs a stream window with the settings UI alive,
+used in this step's live checks.
+
+- A. Apply the same layout there too, without touching the video profile.
+- B. Leave it fixed at its own size.
+
+**Chosen: A**. Changing it: `AppController`.
