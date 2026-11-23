@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -469,7 +470,78 @@ void drawReflexSection(const Fonts& fonts, const ReflexOverlayStats& reflex)
     }
 }
 
-void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
+std::string touchText(const OverlayGamepad::Touch& touch)
+{
+    if (!touch.down)
+    {
+        return "—";
+    }
+
+    return std::format("({}, {})", touch.x, touch.y);
+}
+
+// The line the statistics write to the log once a second, so a controller
+// problem can be reported with the exact values the console receives.
+std::string controllerSummary(const OverlayGamepad& gamepad)
+{
+    if (!gamepad.connected)
+    {
+        return "controller: none";
+    }
+
+    return std::format(
+        "controller: buttons={} L2={} R2={} touch1={} touch2={} "
+        "gyro=({:.2f}, {:.2f}, {:.2f}) accel=({:.2f}, {:.2f}, {:.2f})",
+        gamepad.buttons.empty() ? "none" : gamepad.buttons, gamepad.leftTrigger,
+        gamepad.rightTrigger, touchText(gamepad.touches[0]), touchText(gamepad.touches[1]),
+        gamepad.gyro[0], gamepad.gyro[1], gamepad.gyro[2], gamepad.accel[0], gamepad.accel[1],
+        gamepad.accel[2]);
+}
+
+void wrappedValue(const Fonts& fonts, const std::string& value)
+{
+    ImGui::PushFont(fonts.mono, kMonoSize);
+    ImGui::TextWrapped("%s", value.c_str());
+    ImGui::PopFont();
+}
+
+void valueLine(const Fonts& fonts, const char* label, const std::string& value)
+{
+    ImGui::PushFont(fonts.label, kBodySize);
+    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
+    ImGui::TextUnformatted(label);
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+
+    wrappedValue(fonts, value);
+}
+
+void drawControllerSection(const Fonts& fonts, const OverlayGamepad& gamepad)
+{
+    sectionLabel(fonts, "CONTROLE");
+
+    if (!gamepad.connected)
+    {
+        valueRow(fonts, "Estado", "sem controle");
+        return;
+    }
+
+    valueLine(fonts, "Botões", gamepad.buttons.empty() ? "—" : gamepad.buttons);
+    valueRow(fonts, "Gatilhos",
+             std::format("L2 {} · R2 {}", gamepad.leftTrigger, gamepad.rightTrigger).c_str());
+    valueRow(fonts, "Toque 1", touchText(gamepad.touches[0]).c_str());
+    valueRow(fonts, "Toque 2", touchText(gamepad.touches[1]).c_str());
+    valueRow(fonts, "Giroscópio",
+             std::format("{:.2f} {:.2f} {:.2f} rad/s", gamepad.gyro[0], gamepad.gyro[1],
+                         gamepad.gyro[2])
+                 .c_str());
+    valueRow(fonts, "Acelerômetro",
+             std::format("{:.2f} {:.2f} {:.2f} g", gamepad.accel[0], gamepad.accel[1],
+                         gamepad.accel[2])
+                 .c_str());
+}
+
+void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const OverlayGamepad& gamepad)
 {
     ImGui::SetNextWindowPos(ImVec2(kPanelMargin, kPanelMargin), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(kStatsWidth, 0.0F), ImGuiCond_Always);
@@ -486,6 +558,9 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
     ImGui::PopFont();
     rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
 
+    // The controller section goes first: the panel is taller than a 720p
+    // window, and this is the part a controller report has to see.
+    drawControllerSection(fonts, gamepad);
     drawVideoSection(fonts, stats);
     drawLatencySection(fonts, stats);
     drawGpuSection(fonts, stats);
@@ -1052,7 +1127,15 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
 
     if (statisticsVisible)
     {
-        drawStatistics(fonts, stats);
+        drawStatistics(fonts, stats, gamepad);
+
+        const auto now = std::chrono::steady_clock::now();
+
+        if (now >= nextControllerLog_)
+        {
+            spdlog::info("{}", controllerSummary(gamepad));
+            nextControllerLog_ = now + std::chrono::seconds(1);
+        }
     }
 
     if (menuOpen)

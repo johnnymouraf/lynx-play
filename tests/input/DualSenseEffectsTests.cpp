@@ -14,6 +14,9 @@ constexpr std::size_t kAudioMute = 9;
 constexpr std::size_t kRightTrigger = DualSenseEffects::kTriggerEffectOffset;
 constexpr std::size_t kLeftTrigger = DualSenseEffects::kLeftTriggerEffectOffset;
 constexpr std::size_t kIntensity = DualSenseEffects::kIntensityOffset;
+constexpr std::size_t kEnableBits3 = DualSenseEffects::kEnableBits3Offset;
+constexpr std::size_t kRumbleRight = DualSenseEffects::kRumbleRightOffset;
+constexpr std::size_t kRumbleLeft = DualSenseEffects::kRumbleLeftOffset;
 
 } // namespace
 
@@ -27,7 +30,7 @@ TEST_CASE("A fresh DualSense effect packet is all zero")
     }
 }
 
-TEST_CASE("Rumble events map to SDL's 16-bit range")
+TEST_CASE("Rumble events map to SDL's 16-bit range and back")
 {
     const ChiakiRumbleEvent event{.unknown = 0, .left = 200, .right = 32};
     const DualSenseCommand command = dualSenseCommand(event);
@@ -38,6 +41,51 @@ TEST_CASE("Rumble events map to SDL's 16-bit range")
     CHECK(rumbleAmplitude(0) == 0);
     CHECK(rumbleAmplitude(200) == 51400);
     CHECK(rumbleAmplitude(255) == 65535);
+
+    CHECK(rumbleLevel(0) == 0);
+    CHECK(rumbleLevel(257) == 1);
+    CHECK(rumbleLevel(51400) == 200);
+    CHECK(rumbleLevel(65535) == 255);
+}
+
+TEST_CASE("The DualSense rumble encoding follows the firmware, as chiaki-ng's")
+{
+    CHECK(rumbleEncoding(false, 0) == DualSenseRumbleEncoding::Current);
+    CHECK(rumbleEncoding(false, 0x0223) == DualSenseRumbleEncoding::Legacy);
+    CHECK(rumbleEncoding(false, 0x0224) == DualSenseRumbleEncoding::Current);
+    CHECK(rumbleEncoding(false, 0x0300) == DualSenseRumbleEncoding::Current);
+    CHECK(rumbleEncoding(true, 0x0100) == DualSenseRumbleEncoding::Current);
+}
+
+TEST_CASE("A rumble packet carries the levels in chiaki-ng's bits")
+{
+    const auto current =
+        dualSenseRumblePacket({.left = 200, .right = 32}, DualSenseRumbleEncoding::Current, 0x92);
+
+    CHECK(current[kEnableBits1] == 0x02);
+    CHECK(current[kEnableBits2] == 0x40);
+    CHECK(current[kEnableBits3] == 0x04);
+    CHECK(current[kRumbleLeft] == 200);
+    CHECK(current[kRumbleRight] == 32);
+    CHECK(current[kIntensity] == 0x92);
+    CHECK(current.size() == DualSenseEffects::kPacketSize);
+
+    const auto legacy =
+        dualSenseRumblePacket({.left = 200, .right = 32}, DualSenseRumbleEncoding::Legacy, 0);
+
+    CHECK(legacy[kEnableBits1] == 0x03);
+    CHECK(legacy[kEnableBits3] == 0x00);
+    CHECK(legacy[kRumbleLeft] == 100);
+    CHECK(legacy[kRumbleRight] == 16);
+    CHECK(legacy[kIntensity] == 0x00);
+}
+
+TEST_CASE("Rumble uses the effect packet on a DualSense and SDL only without audio haptics")
+{
+    CHECK(rumblePath(true, false) == RumblePath::DualSenseEffect);
+    CHECK(rumblePath(true, true) == RumblePath::DualSenseEffect);
+    CHECK(rumblePath(false, false) == RumblePath::SdlRumble);
+    CHECK(rumblePath(false, true) == RumblePath::None);
 }
 
 TEST_CASE("Trigger effects keep the console's mode and ten parameters")

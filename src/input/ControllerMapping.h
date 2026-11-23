@@ -2,8 +2,13 @@
 
 #include <chiaki/controller.h>
 
+#include <SDL3/SDL_gamepad.h>
+
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace lynx::input
 {
@@ -38,6 +43,8 @@ struct GamepadTouch
     // Normalized 0..1, origin at the top left, as SDL reports it.
     float x = 0.0f;
     float y = 0.0f;
+    // The id the console sees; -1 while the finger is up.
+    std::int8_t id = -1;
 };
 
 // Everything the console needs to know about the controller at one moment.
@@ -50,31 +57,78 @@ struct GamepadSample
     std::int16_t leftY = 0;
     std::int16_t rightX = 0;
     std::int16_t rightY = 0;
+    // The console allocates a fresh id per touch, masked like chiaki's.
+    std::uint8_t touchIdNext = 0;
     std::array<GamepadTouch, CHIAKI_CONTROLLER_TOUCHES_MAX> touches{};
     // Radians per second.
     std::array<float, 3> gyro{};
-    // In g, gravity included.
-    std::array<float, 3> accel{};
+    // In g, gravity included; a controller at rest reads 1 on Y, as chiaki's
+    // idle state does.
+    std::array<float, 3> accel{0.0f, 1.0f, 0.0f};
     // The console reads a quaternion.
     std::array<float, 4> orientation{0.0f, 0.0f, 0.0f, 1.0f};
-    bool hasMotion = false;
 };
 
-// The PS5's touchpad coordinates.
-inline constexpr std::uint16_t kTouchpadWidth = 1919;
+// The PS5's touchpad coordinates, as chiaki-ng sends them.
+inline constexpr std::uint16_t kTouchpadWidth = 1920;
 inline constexpr std::uint16_t kTouchpadHeight = 1079;
 
-// SDL reports a trigger at rest as -32768 and fully pressed as 32767.
+namespace touch_id
+{
+
+inline constexpr std::uint8_t kMask = 0x7F;
+
+} // namespace touch_id
+
+// SDL3 reports a trigger at rest as 0 and fully pressed as 32767; the console
+// takes 0..255, as chiaki-ng's `value >> 7`.
+inline constexpr std::int16_t kTriggerMaximum = 32767;
+
 [[nodiscard]] constexpr std::uint8_t triggerLevel(std::int16_t value)
 {
-    return static_cast<std::uint8_t>((static_cast<std::int32_t>(value) + 32768) >> 8);
+    const std::int16_t pressed = std::clamp(value, std::int16_t{0}, kTriggerMaximum);
+    return static_cast<std::uint8_t>(pressed >> 7);
 }
+
+// SDL reports accelerometer data in m/s²; the console takes g.
+inline constexpr float kStandardGravity = 9.80665f;
+
+[[nodiscard]] constexpr std::array<float, 3> accelerationInG(std::array<float, 3> si)
+{
+    return {
+        si[0] / kStandardGravity,
+        si[1] / kStandardGravity,
+        si[2] / kStandardGravity,
+    };
+}
+
+[[nodiscard]] std::uint16_t touchCoordinate(float normalized, std::uint16_t maximum);
+
+enum class TouchPhase
+{
+    Down,
+    Motion,
+    Up,
+};
+
+// Tracks one finger through SDL's phases, allocating the console's touch id
+// when it goes down, as chiaki-ng does. `finger` is SDL's finger index.
+void applyTouch(GamepadSample& sample, int finger, TouchPhase phase, float x, float y);
+
+// The internal mask for one SDL gamepad button; 0 for the controls the
+// console doesn't take as buttons (the microphone is a mute toggle).
+[[nodiscard]] std::uint32_t gamepadButtonMask(SDL_GamepadButton button);
+
+// The pressed controls, by chiaki's names, for the debug view.
+[[nodiscard]] std::string buttonNames(std::uint32_t chiakiButtons);
 
 [[nodiscard]] ChiakiControllerState toChiakiControllerState(const GamepadSample& sample);
 
-// Adds a second input source (the keyboard and mouse) to the controller's
-// sample: buttons add up, triggers take the stronger pull and each axis the
-// larger deflection.
-[[nodiscard]] GamepadSample mergeSamples(const GamepadSample& first, const GamepadSample& second);
+// Combines two sources exactly like chiaki's chiaki_controller_state_or: the
+// buttons add up, the triggers take the stronger pull, each axis the larger
+// deflection, the first down touch fills each slot, and the whole sensor
+// block comes from the first state that isn't at rest.
+[[nodiscard]] ChiakiControllerState mergeControllerStates(ChiakiControllerState first,
+                                                          ChiakiControllerState second);
 
 } // namespace lynx::input

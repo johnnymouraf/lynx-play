@@ -14,6 +14,11 @@ bool hasButton(const GamepadSample& sample, std::uint32_t button)
     return (sample.buttons & button) != 0;
 }
 
+bool hasControllerButton(const ChiakiControllerState& state, ChiakiControllerButton button)
+{
+    return (state.buttons & static_cast<std::uint32_t>(button)) != 0;
+}
+
 } // namespace
 
 TEST_CASE("The default keyboard plays the controller")
@@ -110,6 +115,28 @@ TEST_CASE("Losing the window's focus releases every key")
     CHECK(sample.rightX == 0);
 }
 
+TEST_CASE("A disabled keyboard plays nothing")
+{
+    KeyboardMouseSettings settings;
+    settings.enabled = false;
+    KeyboardMouseInput input{settings};
+
+    input.keyDown('W');
+    input.mouseButton(lynx::core::kMouseLeft, true);
+    input.mouseMoved(50, 0);
+
+    const GamepadSample sample = input.sample();
+
+    CHECK(sample.buttons == 0);
+    CHECK(sample.leftY == 0);
+    CHECK(sample.rightTrigger == 0);
+    CHECK(sample.rightX == 0);
+
+    settings.enabled = true;
+    input.setSettings(settings);
+    CHECK(input.sample().leftY == -32767);
+}
+
 TEST_CASE("A second input source adds to the controller's sample")
 {
     GamepadSample gamepad;
@@ -123,11 +150,12 @@ TEST_CASE("A second input source adds to the controller's sample")
     keyboard.leftY = 30000;
     keyboard.rightTrigger = 255;
 
-    const GamepadSample merged = mergeSamples(gamepad, keyboard);
+    const ChiakiControllerState merged = mergeControllerStates(
+        toChiakiControllerState(gamepad), toChiakiControllerState(keyboard));
 
-    CHECK(hasButton(merged, buttons::kCross));
-    CHECK(hasButton(merged, buttons::kCircle));
-    CHECK(merged.leftX == -20000);
-    CHECK(merged.leftY == 30000);
-    CHECK(merged.rightTrigger == 255);
+    CHECK(hasControllerButton(merged, CHIAKI_CONTROLLER_BUTTON_CROSS));
+    CHECK(hasControllerButton(merged, CHIAKI_CONTROLLER_BUTTON_MOON));
+    CHECK(merged.left_x == -20000);
+    CHECK(merged.left_y == 30000);
+    CHECK(merged.r2_state == 255);
 }

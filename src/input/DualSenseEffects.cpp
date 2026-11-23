@@ -22,6 +22,9 @@ constexpr std::uint8_t kClassicRumble = 0x02;
 constexpr std::uint8_t kLeftTrigger = 0x04;
 constexpr std::uint8_t kRightTrigger = 0x08;
 
+constexpr std::uint8_t kLegacyRumble = 0x01;
+constexpr std::uint8_t kCurrentRumble = 0x04;
+
 constexpr std::uint8_t kMicrophoneLightEnabled = 0x01;
 constexpr std::uint8_t kMicrophoneEnabled = 0x02;
 
@@ -41,6 +44,28 @@ void applyTrigger(std::array<std::uint8_t, DualSenseEffects::kPacketSize>& bytes
 DualSenseCommand dualSenseCommand(const ChiakiRumbleEvent& event)
 {
     return {.rumble = std::pair{rumbleAmplitude(event.left), rumbleAmplitude(event.right)}};
+}
+
+std::array<std::uint8_t, kDualSensePacketSize> dualSenseRumblePacket(
+    DualSenseRumble rumble, DualSenseRumbleEncoding encoding, std::uint8_t intensity)
+{
+    std::array<std::uint8_t, kDualSensePacketSize> bytes{};
+    bytes[kEnableBits2] = kEffectsEnabled;
+    bytes[kEnableBits1] = kClassicRumble;
+    bytes[DualSenseEffects::kIntensityOffset] = intensity;
+
+    if (encoding == DualSenseRumbleEncoding::Legacy)
+    {
+        bytes[kEnableBits1] |= kLegacyRumble;
+        bytes[DualSenseEffects::kRumbleRightOffset] = static_cast<std::uint8_t>(rumble.right >> 1);
+        bytes[DualSenseEffects::kRumbleLeftOffset] = static_cast<std::uint8_t>(rumble.left >> 1);
+        return bytes;
+    }
+
+    bytes[DualSenseEffects::kEnableBits3Offset] = kCurrentRumble;
+    bytes[DualSenseEffects::kRumbleRightOffset] = rumble.right;
+    bytes[DualSenseEffects::kRumbleLeftOffset] = rumble.left;
+    return bytes;
 }
 
 DualSenseCommand dualSenseCommand(const ChiakiTriggerEffectsEvent& event)
@@ -111,7 +136,7 @@ void DualSenseEffects::apply(const DualSenseCommand& command)
         }
     }
 
-    if (command.leftTrigger || command.rightTrigger || command.microphoneMuted || command.intensity)
+    if (command.leftTrigger || command.rightTrigger || command.intensity)
     {
         bytes_[kEnableBits2] |= kEffectsEnabled;
     }

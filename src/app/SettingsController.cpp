@@ -968,6 +968,18 @@ int SettingsController::mouseSensitivityPercent() const
     return static_cast<int>(std::lround(settings_.keyboardMouse.mouseSensitivity * 100.0));
 }
 
+bool SettingsController::keyboardMouseEnabled() const
+{
+    return settings_.keyboardMouse.enabled;
+}
+
+void SettingsController::setKeyboardMouseEnabled(bool enabled)
+{
+    core::KeyboardMouseSettings keyboardMouse = settings_.keyboardMouse;
+    keyboardMouse.enabled = enabled;
+    applyKeyboardMouse(keyboardMouse);
+}
+
 void SettingsController::setMouseSensitivityPercent(int percent)
 {
     core::KeyboardMouseSettings keyboardMouse = settings_.keyboardMouse;
@@ -1270,7 +1282,8 @@ void SettingsController::applyKeyboardMouse(const core::KeyboardMouseSettings& k
     }
 
     settings_.keyboardMouse = keyboardMouse;
-    spdlog::info("Keyboard and mouse: sensitivity {:.2f}, invert Y {}", keyboardMouse.mouseSensitivity,
+    spdlog::info("Keyboard and mouse: {}, sensitivity {:.2f}, invert Y {}",
+                 keyboardMouse.enabled ? "on" : "off", keyboardMouse.mouseSensitivity,
                  keyboardMouse.invertY ? "on" : "off");
     emit keyboardMouseChanged();
     save();

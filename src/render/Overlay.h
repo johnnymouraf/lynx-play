@@ -7,6 +7,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -135,9 +136,17 @@ struct OverlayActions
     std::function<void()> disconnect;
 };
 
-// The controller state the overlay navigates with while its menu is open.
+// The controller state the overlay navigates with while its menu is open, and
+// the debug view's snapshot of what the console receives.
 struct OverlayGamepad
 {
+    struct Touch
+    {
+        bool down = false;
+        std::uint16_t x = 0;
+        std::uint16_t y = 0;
+    };
+
     bool connected = false;
     bool cross = false;
     bool circle = false;
@@ -159,6 +168,15 @@ struct OverlayGamepad
     float leftY = 0.0F;
     float rightX = 0.0F;
     float rightY = 0.0F;
+
+    // The debug view: the buttons by chiaki's names, both trigger levels,
+    // both touchpad fingers in the console's coordinates, and the sensors.
+    std::string buttons;
+    std::uint8_t leftTrigger = 0;
+    std::uint8_t rightTrigger = 0;
+    std::array<Touch, 2> touches{};
+    std::array<float, 3> gyro{};
+    std::array<float, 3> accel{};
 };
 
 // The in-stream overlay, drawn with Dear ImGui into the stream's back buffer:
@@ -239,6 +257,8 @@ private:
     bool reportedStatisticsVisible_ = false;
     core::ReflexMode reflex_ = core::ReflexMode::Off;
     bool microphoneMuted_ = false;
+    // Paces the controller debug line written while the statistics are open.
+    std::chrono::steady_clock::time_point nextControllerLog_{};
 };
 
 } // namespace lynx::render

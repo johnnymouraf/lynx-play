@@ -3,6 +3,7 @@
 #include "input/ControllerMapping.h"
 #include "input/DualSenseEffects.h"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -11,6 +12,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <SDL3/SDL_events.h>
@@ -57,7 +59,8 @@ public:
     void tick();
 
     [[nodiscard]] std::vector<GamepadInfo> gamepads() const;
-    [[nodiscard]] std::optional<GamepadSample> sample() const;
+    // Every connected controller, combined like chiaki's controller state OR.
+    [[nodiscard]] std::optional<ChiakiControllerState> gamepadState() const;
     [[nodiscard]] std::optional<GamepadConnection> connection() const;
     [[nodiscard]] std::optional<std::string> activeName() const;
 
@@ -90,8 +93,11 @@ private:
     void publish();
     void applyCommand(Device& device, const DualSenseCommand& command);
     void sendEffects(Device& device);
+    void sendRumble(Device& device, const std::pair<std::uint16_t, std::uint16_t>& levels);
     void resetDeviceMotion(Device& device);
     void readCurrentState(Device& device);
+    void updateMotion(Device& device, bool accelerometer, const std::array<float, 3>& data,
+                      std::uint32_t timestamp);
     [[nodiscard]] Device* findDevice(SDL_JoystickID id);
     [[nodiscard]] Device* activeDevice();
 
@@ -99,6 +105,17 @@ private:
     std::vector<std::unique_ptr<Device>> devices_;
     std::optional<SDL_JoystickID> activeId_;
     DualSenseEffects effects_;
+    // The console's intensity byte; 0 is strong on both axes, as chiaki-ng
+    // starts.
+    std::uint8_t intensity_ = 0;
+    // While the DualSense's USB audio endpoint drives the actuators, SDL's
+    // rumble must stay off; the effect packet carries rumble instead.
+    bool audioHapticsActive_ = false;
+    bool effectsApplied_ = false;
+    // The last lightbar and player LED the console asked for, so a controller
+    // that appears later gets them too.
+    std::optional<std::array<std::uint8_t, 3>> led_;
+    std::optional<int> playerIndex_;
     bool packetErrorLogged_ = false;
     bool rumbleErrorLogged_ = false;
     std::chrono::steady_clock::time_point nextRefresh_{};
@@ -107,7 +124,7 @@ private:
 
     mutable std::mutex mutex_;
     std::vector<GamepadInfo> infos_;
-    std::optional<GamepadSample> activeSample_;
+    std::optional<ChiakiControllerState> activeState_;
     std::optional<GamepadConnection> activeConnection_;
     std::optional<std::string> activeName_;
 

@@ -335,6 +335,7 @@ KeyboardMouseSettings readKeyboardMouse(const Json& keyboardMouse)
     }
 
     settings.invertY = booleanAt(keyboardMouse, "invertY", settings.invertY);
+    settings.enabled = booleanAt(keyboardMouse, "enabled", settings.enabled);
 
     return settings;
 }
@@ -583,6 +584,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
          }},
         {"keyboardMouse",
          {
+             {"enabled", keyboardMouse.enabled},
              {"bindings", bindings},
              {"mouseSensitivity", keyboardMouse.mouseSensitivity},
              {"invertY", keyboardMouse.invertY},

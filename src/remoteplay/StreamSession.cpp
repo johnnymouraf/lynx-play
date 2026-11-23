@@ -169,10 +169,10 @@ struct StreamSession::State
     bool microphoneConnected = false;
     std::atomic<bool> controlConnected{false};
     std::atomic<bool> microphoneActive{false};
-    // Haptics are audible until the console says otherwise; the trigger
-    // strength starts off, as chiaki-ng does.
+    // Haptics are audible until the console says otherwise; both strengths
+    // start at chiaki-ng's strong default.
     std::atomic<int> hapticIntensity{::Strong};
-    std::atomic<int> triggerIntensity{::Off};
+    std::atomic<int> triggerIntensity{::Strong};
     std::jthread inputThread;
 
     State() = default;
@@ -370,33 +370,27 @@ void StreamSession::State::inputLoop(const std::stop_token& stop)
 {
     while (!stop.stop_requested())
     {
+        // chiaki-ng combines every source through chiaki_controller_state_or,
+        // so the controller and the keyboard never overwrite each other's
+        // touches or sensor block.
         ChiakiControllerState controllerState;
-        input::GamepadSample combined;
-        bool hasInput = false;
+        chiaki_controller_state_set_idle(&controllerState);
 
         if (gamepads != nullptr && !gamepads->overlayOpen())
         {
-            if (const std::optional<input::GamepadSample> sample = gamepads->sample(); sample)
+            if (const std::optional<ChiakiControllerState> state = gamepads->gamepadState();
+                state)
             {
-                combined = *sample;
-                hasInput = true;
+                ChiakiControllerState fromGamepad = *state;
+                chiaki_controller_state_or(&controllerState, &controllerState, &fromGamepad);
             }
         }
 
         if (keyboardMouse != nullptr)
         {
-            const input::GamepadSample keyboard = keyboardMouse->sample();
-            combined = hasInput ? input::mergeSamples(combined, keyboard) : keyboard;
-            hasInput = true;
-        }
-
-        if (hasInput)
-        {
-            controllerState = input::toChiakiControllerState(combined);
-        }
-        else
-        {
-            chiaki_controller_state_set_idle(&controllerState);
+            ChiakiControllerState fromKeyboard =
+                input::toChiakiControllerState(keyboardMouse->sample());
+            chiaki_controller_state_or(&controllerState, &controllerState, &fromKeyboard);
         }
 
         chiaki_session_set_controller_state(&session, &controllerState);
@@ -556,7 +550,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         return;
 
     case CHIAKI_EVENT_RUMBLE:
-        if (gamepads != nullptr && haptics->route() != audio::HapticsRoute::Audio)
+        if (gamepads != nullptr && hapticIntensity.load() != ::Off)
         {
             gamepads->submit(input::dualSenseCommand(event.rumble));
         }
@@ -564,7 +558,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         return;
 
     case CHIAKI_EVENT_TRIGGER_EFFECTS:
-        if (gamepads != nullptr)
+        if (gamepads != nullptr && triggerIntensity.load() != ::Off)
         {
             gamepads->submit(input::dualSenseCommand(event.trigger_effects));
         }
