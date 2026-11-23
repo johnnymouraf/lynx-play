@@ -11,3 +11,6 @@ CMakeUserPresets.json
 
 # The design file stays on the owner machine, not in the repository.
 /design/
+
+# The agent worktrees.
+/.claude/
