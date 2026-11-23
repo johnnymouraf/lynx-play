@@ -36,6 +36,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [x] **1.7 Minimizing the stream must not crash**: the overlay re-entered
         its own mutex on a click and Frame Generation kept presenting into an
         iconic window; both fixed, with the pipeline idle while hidden.
+  - [x] **1.8 Closing the stream must not kill the app**: releasing the
+        pictures the optical flow read faulted inside the NVIDIA driver; the
+        release now happens on the render thread under a guard.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -881,104 +884,47 @@ and the overlay locked its own non-recursive mutex again.
 
 **Chosen: A**. Changing it: `clientAreaOf`.
 
-## Current: 1.8 Closing the stream must not kill the app
 
-**Goal:** closing the stream window (Esc, its X, or the overlay's
-"Desconectar") ends the session and leaves the app open on the consoles
-screen, with every RTX feature on — including the optical flow.
+#### D73 – The optical-flow teardown runs on the render thread (1.8)
 
-**Guardrails:** the optical flow keeps working during playback; the fix must
-not disable it, nor leak a GPU session per stream; no feature changes.
+The fault is the driver releasing the presenter textures the NvOF read, not
+`nvOFDestroy` itself.
 
-**Success criteria:**
+- A. Release the session and the presenter pictures on the render thread
+  after the GPU is idle, each driver call under an SEH guard.
+- B. Guard only the current release on the main thread: survives, but off the
+  thread that used the driver.
+- C. Guard only the NvOF calls: insufficient, the fault comes later.
 
-1. CI green on `auto/1.8`, with a unit test for whatever state the fix
-   touches.
-2. Reproduced before the fix: `--play-file` with `rtx.opticalFlow: true`,
-   Esc in the stream window: the whole process dies with `0xC0000005` in
-   `nvwgf2umx.dll` (offsets `0xd2cd86`, `0xd8d217`) and no "Stream window
-   closed" line — the failure is inside the Esc handling, during teardown.
-   With the flow off the same close is clean.
-3. After the fix: with the flow on, closing the stream leaves the app running
-   (the log shows "Stream window closed; ending the session" and the normal
-   shutdown of the session; no new crash event), and ten open/close cycles
-   in a row don't crash; a real session (owner check) returns to the consoles
-   screen.
-4. The GPU is idle before the optical-flow session is released (the log names
-   the order), and the same holds when the window closes while minimized.
+**Chosen: A**. Changing it: remove `presenter_.releasePictures()` from the
+release path.
 
-**Deliveries:**
+#### D74 – One guard per driver call, not one around the block (1.8)
 
-1. Diagnosis: identify which release call faults (NvOF session destroy,
-   resource unregister, or the D3D11 device) and whether the GPU had work in
-   flight; a temporary SEH guard around the release to log and survive would
-   confirm it.
-2. The fix: wait for the GPU fence, unregister the flow resources, destroy the
-   NvOF session before the devices, on the render thread, with the release
-   inside a guard so a driver fault can't take the process down.
-3. The regression test and the verification cycles.
+A fault then doesn't skip the remaining releases, and the log names the
+resource; the cost is a `[critical]` line per picture.
 
-**Settled in planning:** the crash is in the NVIDIA driver's teardown
-(`nvwgf2umx.dll`), not in our code; the same offset appears in the 1.7
-report, where it was recorded as out of scope.
+- A. One guard per call.
+- B. A single guard around everything: one fault leaks the rest.
 
-**Changes:** `src/render/OpticalFlow.{h,cpp}`, `FrameRenderer` teardown,
-tests.
+**Chosen: A**. Changing it: a single guard.
 
-**Edge cases:** close while minimized or occluded; close during a feature
-recreation (resize); device removed; repeated open/close.
+#### D75 – The release order is frozen in an enum with tests (1.8)
 
-## Current: 1.9 Controller parity with chiaki-ng
+The CI runner has no GPU.
 
-**Goal:** the DualSense behaves like it does in chiaki-ng — every button,
-both triggers, the touchpad (two fingers, click), gyroscope and accelerometer,
-rumble and USB haptics, adaptive triggers, LEDs and hotplug, over USB and
-Bluetooth — with the app's own architecture.
+- A. An enum plus a runner test covering the order and the continue-after-fault
+  rule.
+- B. No test: the order depends on reading code.
 
-**Guardrails:** the Remote Play protocol and the session path don't change;
-keyboard/mouse keeps working; the USB haptics keep the rule that
-`SDL_RumbleGamepad` must not run while the audio haptics are active; no
-third-party dependency changes.
+**Chosen: A**. Changing it: remove the enum and the test.
 
-**Success criteria:**
+#### D76 – The owner check ran here (1.8)
 
-1. CI green on `auto/1.9`, with unit tests for every conversion the fix
-   touches: the button table against chiaki's, trigger scaling (SDL
-   0–32767 → chiaki 0–255), touchpad coordinates and touch ids, gyro/accel
-   units, and the rumble-vs-haptics selection.
-2. The report contains an audit of every behavior in chiaki-ng's
-   `gui/src/controllermanager.cpp` and `gui/src/streamsession.cpp`
-   (mapping, triggers, touchpad, sensors, rumble/haptics, trigger effects,
-   LED, hotplug) against ours, with chiaki-ng file and line, and says for
-   each "same", "fixed", or "not applicable".
-3. On this machine, with the owner's DualSense connected, a debug view (a
-   log line or the overlay's statistics) shows the pressed buttons with
-   their chiaki names, both trigger values from 0 to 255, two touchpad
-   fingers with coordinates, and gyro/accel changing when the controller
-   moves — checked by driving the controller (the owner may need to wake it).
-4. Owner check: in a real game, the same buttons, triggers, touchpad, gyro,
-   rumble, haptics and adaptive triggers respond as in chiaki-ng, over USB
-   and over Bluetooth.
-5. Keyboard/mouse and the overlay shortcuts still work.
+The PS5 was on the network and the saved console opened real sessions.
 
-**Deliveries:**
+- A. Ten real open/close cycles here, plus the file loops.
+- B. Leave it as an owner check.
 
-1. The audit: read chiaki-ng's controller code and list every difference;
-   report the table.
-2. The mapping fixes (buttons, trigger scaling, touchpad, sensors) with
-   tests.
-3. The feedback fixes (rumble vs USB haptics, trigger effects, LEDs) with
-   the rule enforced in one place, plus the hotplug/detection parity
-   (including the 0.5 s ghost and the sleeping controller).
-4. The debug instrumentation and the verification.
-
-**Settled in planning:** the owner reports swapped/unresponsive buttons and
-triggers, rumble, touchpad and gyro not working; chiaki-ng is the reference
-for both the mapping and the feedback.
-
-**Changes:** `src/input/` (`GamepadManager`, `Haptics`, the mappings),
-`src/app/InputController`, the overlay's debug section, tests.
-
-**Edge cases:** controller asleep at startup; connect/disconnect mid-session;
-two controllers; USB vs Bluetooth; a game that uses the gyro; the overlay
-open (input goes to it); keyboard/mouse combined with the controller.
+**Chosen: A**; the owner still confirms in their own session. Changing it:
+reclassify as an owner check.
