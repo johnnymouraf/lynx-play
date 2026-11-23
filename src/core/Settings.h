@@ -101,8 +101,8 @@ struct WindowLayout
 };
 
 // The next layout the F1 menu's row offers: from fullscreen it restores the
-// remembered windowed size, each preset moves to the next, and the last one
-// goes back to fullscreen.
+// remembered windowed size, or the first preset for a custom one; each preset
+// moves to the next, and the last one goes back to fullscreen.
 [[nodiscard]] WindowLayout nextWindowLayout(WindowLayout current);
 
 // What is asked of the PS5's HDR and what the renderer does with it.

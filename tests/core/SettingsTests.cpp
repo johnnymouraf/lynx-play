@@ -55,7 +55,7 @@ TEST_CASE("Settings survive a write and a read")
     REQUIRE(readBack.has_value());
     CHECK(readBack->video == settings.video);
     CHECK(readBack->video.windowMode == WindowMode::Windowed);
-    CHECK(readBack->video.windowSize == WindowSize{.width = 1600, .height = 900});
+    CHECK((readBack->video.windowSize == WindowSize{.width = 1600, .height = 900}));
     CHECK(readBack->audio == settings.audio);
     CHECK(readBack->controller == settings.controller);
     CHECK(readBack->rtx == settings.rtx);
@@ -89,7 +89,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.video.presentMode == PresentMode::VSync);
     CHECK(defaults.video.hdr == HdrMode::Auto);
     CHECK(defaults.video.windowMode == WindowMode::Fullscreen);
-    CHECK(defaults.video.windowSize == WindowSize{.width = 1280, .height = 720});
+    CHECK((defaults.video.windowSize == WindowSize{.width = 1280, .height = 720}));
     CHECK(defaults.rtx.reflex == ReflexMode::On);
     CHECK(defaults.rtx.upscaling == Upscaling::Shader);
     CHECK(defaults.rtx.opticalFlow);
@@ -108,28 +108,31 @@ TEST_CASE("Window sizes match the presets exactly or within a small tolerance")
 
 TEST_CASE("Window sizes clamp to the monitor's work area")
 {
-    CHECK(clampWindowSize({.width = 3840, .height = 2160}, {.width = 1920, .height = 1040}) ==
-          WindowSize{.width = 1920, .height = 1040});
-    CHECK(clampWindowSize({.width = 1280, .height = 720}, {.width = 1920, .height = 1040}) ==
-          WindowSize{.width = 1280, .height = 720});
-    CHECK(clampWindowSize({.width = 0, .height = -10}, {.width = 1920, .height = 1040}) ==
-          WindowSize{.width = 1, .height = 1});
+    CHECK((clampWindowSize({.width = 3840, .height = 2160}, {.width = 1920, .height = 1040}) ==
+           WindowSize{.width = 1920, .height = 1040}));
+    CHECK((clampWindowSize({.width = 1280, .height = 720}, {.width = 1920, .height = 1040}) ==
+           WindowSize{.width = 1280, .height = 720}));
+    CHECK((clampWindowSize({.width = 0, .height = -10}, {.width = 1920, .height = 1040}) ==
+           WindowSize{.width = 1, .height = 1}));
 }
 
 TEST_CASE("The quick menu's window row cycles through fullscreen and the presets")
 {
-    CHECK(nextWindowLayout({.mode = WindowMode::Fullscreen,
-                            .size = {.width = 1300, .height = 700}}) ==
-          WindowLayout{.mode = WindowMode::Windowed, .size = {.width = 1300, .height = 700}});
-    CHECK(nextWindowLayout({.mode = WindowMode::Windowed,
-                            .size = {.width = 1920, .height = 1080}}) ==
-          WindowLayout{.mode = WindowMode::Windowed, .size = {.width = 1600, .height = 900}});
-    CHECK(nextWindowLayout({.mode = WindowMode::Windowed,
-                            .size = {.width = 960, .height = 540}}) ==
-          WindowLayout{.mode = WindowMode::Fullscreen, .size = {.width = 960, .height = 540}});
-    CHECK(nextWindowLayout({.mode = WindowMode::Windowed,
-                            .size = {.width = 1300, .height = 700}}) ==
-          WindowLayout{.mode = WindowMode::Fullscreen, .size = {.width = 1300, .height = 700}});
+    CHECK((nextWindowLayout({.mode = WindowMode::Fullscreen,
+                              .size = {.width = 1280, .height = 720}}) ==
+           WindowLayout{.mode = WindowMode::Windowed, .size = {.width = 1280, .height = 720}}));
+    CHECK((nextWindowLayout({.mode = WindowMode::Fullscreen,
+                              .size = {.width = 1300, .height = 700}}) ==
+           WindowLayout{.mode = WindowMode::Windowed, .size = {.width = 1920, .height = 1080}}));
+    CHECK((nextWindowLayout({.mode = WindowMode::Windowed,
+                              .size = {.width = 1920, .height = 1080}}) ==
+           WindowLayout{.mode = WindowMode::Windowed, .size = {.width = 1600, .height = 900}}));
+    CHECK((nextWindowLayout({.mode = WindowMode::Windowed,
+                              .size = {.width = 960, .height = 540}}) ==
+           WindowLayout{.mode = WindowMode::Fullscreen, .size = {.width = 960, .height = 540}}));
+    CHECK((nextWindowLayout({.mode = WindowMode::Windowed,
+                              .size = {.width = 1300, .height = 700}}) ==
+           WindowLayout{.mode = WindowMode::Fullscreen, .size = {.width = 1300, .height = 700}}));
 }
 
 TEST_CASE("Audio and controller defaults use the Windows default devices")

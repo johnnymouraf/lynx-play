@@ -438,7 +438,14 @@ WindowLayout nextWindowLayout(WindowLayout current)
 {
     if (current.mode == WindowMode::Fullscreen)
     {
-        return {.mode = WindowMode::Windowed, .size = current.size};
+        // Back to the remembered size when it is one of the choices, so a
+        // custom size doesn't hide the presets from the menu.
+        const bool rememberedIsPreset = windowSizePresetIndex(current.size).has_value();
+
+        return {
+            .mode = WindowMode::Windowed,
+            .size = rememberedIsPreset ? current.size : kWindowSizePresets.front(),
+        };
     }
 
     const auto preset = windowSizePresetIndex(current.size);
