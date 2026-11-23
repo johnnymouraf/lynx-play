@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdlib>
 
 namespace lynx::input
 {
@@ -228,38 +227,11 @@ ChiakiControllerState toChiakiControllerState(const GamepadSample& sample)
     return state;
 }
 
-GamepadSample mergeSamples(const GamepadSample& first, const GamepadSample& second)
+ChiakiControllerState mergeControllerStates(ChiakiControllerState first,
+                                            ChiakiControllerState second)
 {
-    const auto strongerAxis = [](std::int16_t left, std::int16_t right)
-    { return std::abs(left) >= std::abs(right) ? left : right; };
-
-    GamepadSample merged = first;
-    merged.buttons |= second.buttons;
-    merged.leftTrigger = std::max(first.leftTrigger, second.leftTrigger);
-    merged.rightTrigger = std::max(first.rightTrigger, second.rightTrigger);
-    merged.leftX = strongerAxis(first.leftX, second.leftX);
-    merged.leftY = strongerAxis(first.leftY, second.leftY);
-    merged.rightX = strongerAxis(first.rightX, second.rightX);
-    merged.rightY = strongerAxis(first.rightY, second.rightY);
-
-    for (std::size_t i = 0; i < merged.touches.size(); ++i)
-    {
-        if (!merged.touches[i].down && second.touches[i].down)
-        {
-            merged.touches[i] = second.touches[i];
-            merged.touchIdNext = second.touchIdNext;
-        }
-    }
-
-    if (!merged.hasMotion && second.hasMotion)
-    {
-        merged.gyro = second.gyro;
-        merged.accel = second.accel;
-        merged.orientation = second.orientation;
-        merged.hasMotion = true;
-    }
-
-    return merged;
+    chiaki_controller_state_or(&first, &first, &second);
+    return first;
 }
 
 } // namespace lynx::input

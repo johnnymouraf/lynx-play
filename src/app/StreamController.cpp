@@ -435,11 +435,11 @@ void StreamController::onFirstPicture(std::uint64_t session)
                                                          return render::OverlayGamepad{};
                                                      }
 
-                                                     const std::optional<input::GamepadSample>
-                                                         sample = gamepads->sample();
+                                                     const std::optional<ChiakiControllerState>
+                                                         state = gamepads->gamepadState();
 
-                                                     return sample ? overlayGamepad(*sample)
-                                                                   : render::OverlayGamepad{};
+                                                     return state ? overlayGamepad(*state)
+                                                                  : render::OverlayGamepad{};
                                                  },
                                                  .onClosed = closed,
                                              });

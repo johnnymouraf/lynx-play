@@ -59,7 +59,8 @@ public:
     void tick();
 
     [[nodiscard]] std::vector<GamepadInfo> gamepads() const;
-    [[nodiscard]] std::optional<GamepadSample> sample() const;
+    // Every connected controller, combined like chiaki's controller state OR.
+    [[nodiscard]] std::optional<ChiakiControllerState> gamepadState() const;
     [[nodiscard]] std::optional<GamepadConnection> connection() const;
     [[nodiscard]] std::optional<std::string> activeName() const;
 
@@ -123,7 +124,7 @@ private:
 
     mutable std::mutex mutex_;
     std::vector<GamepadInfo> infos_;
-    std::optional<GamepadSample> activeSample_;
+    std::optional<ChiakiControllerState> activeState_;
     std::optional<GamepadConnection> activeConnection_;
     std::optional<std::string> activeName_;
 

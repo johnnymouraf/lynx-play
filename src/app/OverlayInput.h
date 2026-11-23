@@ -6,53 +6,61 @@
 namespace lynx::app
 {
 
+namespace overlay_input
+{
+
+[[nodiscard]] constexpr std::uint32_t mask(ChiakiControllerButton button)
+{
+    return static_cast<std::uint32_t>(button);
+}
+
+} // namespace overlay_input
+
 // The controller state the overlay's menu navigates with, and the debug
 // view's snapshot of what the console receives.
-[[nodiscard]] inline render::OverlayGamepad overlayGamepad(const input::GamepadSample& sample)
+[[nodiscard]] inline render::OverlayGamepad overlayGamepad(const ChiakiControllerState& state)
 {
-    const ChiakiControllerState state = input::toChiakiControllerState(sample);
-    const bool firstTouch = state.touches[0].id >= 0;
-    const bool secondTouch = state.touches[1].id >= 0;
+    using overlay_input::mask;
 
     return {
         .connected = true,
-        .cross = (sample.buttons & input::buttons::kCross) != 0,
-        .circle = (sample.buttons & input::buttons::kCircle) != 0,
-        .square = (sample.buttons & input::buttons::kSquare) != 0,
-        .triangle = (sample.buttons & input::buttons::kTriangle) != 0,
-        .dpadUp = (sample.buttons & input::buttons::kDpadUp) != 0,
-        .dpadDown = (sample.buttons & input::buttons::kDpadDown) != 0,
-        .dpadLeft = (sample.buttons & input::buttons::kDpadLeft) != 0,
-        .dpadRight = (sample.buttons & input::buttons::kDpadRight) != 0,
-        .l1 = (sample.buttons & input::buttons::kL1) != 0,
-        .r1 = (sample.buttons & input::buttons::kR1) != 0,
-        .l3 = (sample.buttons & input::buttons::kL3) != 0,
-        .r3 = (sample.buttons & input::buttons::kR3) != 0,
-        .options = (sample.buttons & input::buttons::kOptions) != 0,
-        .create = (sample.buttons & input::buttons::kCreate) != 0,
-        .touchpad = (sample.buttons & input::buttons::kTouchpad) != 0,
-        .ps = (sample.buttons & input::buttons::kPs) != 0,
-        .leftX = static_cast<float>(sample.leftX) / 32767.0F,
-        .leftY = static_cast<float>(sample.leftY) / 32767.0F,
-        .rightX = static_cast<float>(sample.rightX) / 32767.0F,
-        .rightY = static_cast<float>(sample.rightY) / 32767.0F,
+        .cross = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_CROSS)) != 0,
+        .circle = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_MOON)) != 0,
+        .square = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_BOX)) != 0,
+        .triangle = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_PYRAMID)) != 0,
+        .dpadUp = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_DPAD_UP)) != 0,
+        .dpadDown = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_DPAD_DOWN)) != 0,
+        .dpadLeft = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT)) != 0,
+        .dpadRight = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT)) != 0,
+        .l1 = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_L1)) != 0,
+        .r1 = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_R1)) != 0,
+        .l3 = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_L3)) != 0,
+        .r3 = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_R3)) != 0,
+        .options = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_OPTIONS)) != 0,
+        .create = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_SHARE)) != 0,
+        .touchpad = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_TOUCHPAD)) != 0,
+        .ps = (state.buttons & mask(CHIAKI_CONTROLLER_BUTTON_PS)) != 0,
+        .leftX = static_cast<float>(state.left_x) / 32767.0F,
+        .leftY = static_cast<float>(state.left_y) / 32767.0F,
+        .rightX = static_cast<float>(state.right_x) / 32767.0F,
+        .rightY = static_cast<float>(state.right_y) / 32767.0F,
         .buttons = input::buttonNames(state.buttons),
         .leftTrigger = state.l2_state,
         .rightTrigger = state.r2_state,
         .touches = {{
             {
-                .down = firstTouch,
+                .down = state.touches[0].id >= 0,
                 .x = state.touches[0].x,
                 .y = state.touches[0].y,
             },
             {
-                .down = secondTouch,
+                .down = state.touches[1].id >= 0,
                 .x = state.touches[1].x,
                 .y = state.touches[1].y,
             },
         }},
-        .gyro = sample.gyro,
-        .accel = sample.accel,
+        .gyro = {state.gyro_x, state.gyro_y, state.gyro_z},
+        .accel = {state.accel_x, state.accel_y, state.accel_z},
     };
 }
 

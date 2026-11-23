@@ -70,6 +70,8 @@ class SettingsController : public QObject
     Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
                    setOverlayStatisticsVisible NOTIFY overlayChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
+    Q_PROPERTY(bool keyboardMouseEnabled READ keyboardMouseEnabled WRITE setKeyboardMouseEnabled
+                   NOTIFY keyboardMouseChanged)
     Q_PROPERTY(int mouseSensitivityPercent READ mouseSensitivityPercent WRITE
                    setMouseSensitivityPercent NOTIFY keyboardMouseChanged)
     Q_PROPERTY(bool invertMouseY READ invertMouseY WRITE setInvertMouseY NOTIFY
@@ -185,6 +187,8 @@ public:
     void setOverlayStatisticsVisible(bool visible);
 
     [[nodiscard]] QVariantMap keyboardBindings() const;
+    [[nodiscard]] bool keyboardMouseEnabled() const;
+    void setKeyboardMouseEnabled(bool enabled);
     [[nodiscard]] int mouseSensitivityPercent() const;
     void setMouseSensitivityPercent(int percent);
     [[nodiscard]] bool invertMouseY() const;

@@ -171,6 +171,8 @@ inline constexpr double kMaxMouseSensitivity = 5.0;
 
 struct KeyboardMouseSettings
 {
+    // When off, the keyboard and mouse no longer play the controller.
+    bool enabled = true;
     std::array<std::string, kKeyboardControlCount> bindings = defaultKeyboardBindings();
     double mouseSensitivity = 1.0;
     bool invertY = false;

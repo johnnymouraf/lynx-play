@@ -67,7 +67,6 @@ struct GamepadSample
     std::array<float, 3> accel{0.0f, 1.0f, 0.0f};
     // The console reads a quaternion.
     std::array<float, 4> orientation{0.0f, 0.0f, 0.0f, 1.0f};
-    bool hasMotion = false;
 };
 
 // The PS5's touchpad coordinates, as chiaki-ng sends them.
@@ -125,9 +124,11 @@ void applyTouch(GamepadSample& sample, int finger, TouchPhase phase, float x, fl
 
 [[nodiscard]] ChiakiControllerState toChiakiControllerState(const GamepadSample& sample);
 
-// Adds a second input source (the keyboard and mouse) to the controller's
-// sample: buttons add up, triggers take the stronger pull and each axis the
-// larger deflection.
-[[nodiscard]] GamepadSample mergeSamples(const GamepadSample& first, const GamepadSample& second);
+// Combines two sources exactly like chiaki's chiaki_controller_state_or: the
+// buttons add up, the triggers take the stronger pull, each axis the larger
+// deflection, the first down touch fills each slot, and the whole sensor
+// block comes from the first state that isn't at rest.
+[[nodiscard]] ChiakiControllerState mergeControllerStates(ChiakiControllerState first,
+                                                          ChiakiControllerState second);
 
 } // namespace lynx::input

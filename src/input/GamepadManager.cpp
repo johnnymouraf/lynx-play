@@ -377,11 +377,11 @@ void GamepadManager::publish()
     // Every connected controller drives the console, as chiaki-ng combines
     // them; the active one supplies feedback and the status line.
     const Device* active = activeDevice();
-    std::optional<GamepadSample> sample;
+    std::optional<ChiakiControllerState> state;
 
     if (active != nullptr)
     {
-        sample = active->sample;
+        state = toChiakiControllerState(active->sample);
     }
 
     for (const std::unique_ptr<Device>& device : devices_)
@@ -391,7 +391,8 @@ void GamepadManager::publish()
             continue;
         }
 
-        sample = sample ? mergeSamples(*sample, device->sample) : device->sample;
+        const ChiakiControllerState fromDevice = toChiakiControllerState(device->sample);
+        state = state ? mergeControllerStates(*state, fromDevice) : fromDevice;
     }
 
     std::optional<GamepadConnection> connection;
@@ -405,7 +406,7 @@ void GamepadManager::publish()
 
     const std::scoped_lock lock(mutex_);
     infos_ = std::move(infos);
-    activeSample_ = sample;
+    activeState_ = state;
     activeConnection_ = connection;
     activeName_ = std::move(name);
 }
@@ -416,10 +417,10 @@ std::vector<GamepadInfo> GamepadManager::gamepads() const
     return infos_;
 }
 
-std::optional<GamepadSample> GamepadManager::sample() const
+std::optional<ChiakiControllerState> GamepadManager::gamepadState() const
 {
     const std::scoped_lock lock(mutex_);
-    return activeSample_;
+    return activeState_;
 }
 
 std::optional<GamepadConnection> GamepadManager::connection() const
@@ -806,7 +807,6 @@ void GamepadManager::updateMotion(Device& device, bool accelerometer,
         state.orient_z,
         state.orient_w,
     };
-    device.sample.hasMotion = true;
 }
 
 void GamepadManager::readCurrentState(Device& device)
@@ -856,7 +856,6 @@ void GamepadManager::readCurrentState(Device& device)
     if (SDL_GetGamepadSensorData(device.handle, SDL_SENSOR_GYRO, data.data(), 3))
     {
         device.sample.gyro = data;
-        device.sample.hasMotion = true;
     }
 
     if (SDL_GetGamepadSensorData(device.handle, SDL_SENSOR_ACCEL, data.data(), 3))
@@ -864,7 +863,6 @@ void GamepadManager::readCurrentState(Device& device)
         device.sample.accel = accelerationInG(data);
         chiaki_accel_new_zero_set_active(&device.realAccel, device.sample.accel[0],
                                          device.sample.accel[1], device.sample.accel[2], true);
-        device.sample.hasMotion = true;
     }
 }
 

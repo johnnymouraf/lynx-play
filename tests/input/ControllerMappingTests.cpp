@@ -179,13 +179,54 @@ TEST_CASE("The accelerometer's meters per second squared become g")
     CHECK(tilted[2] == Catch::Approx(0.5F));
 }
 
+TEST_CASE("Merging two sources follows chiaki's controller-state OR")
+{
+    GamepadSample first;
+    applyTouch(first, 0, TouchPhase::Down, 0.25F, 0.25F);
+
+    GamepadSample second;
+    applyTouch(second, 0, TouchPhase::Down, 0.75F, 0.5F);
+    applyTouch(second, 1, TouchPhase::Down, 0.5F, 1.0F);
+    second.gyro = {1.0F, 2.0F, 3.0F};
+    second.accel = {0.0F, 1.0F, 0.5F};
+    second.orientation = {0.1F, 0.2F, 0.3F, 0.9F};
+
+    ChiakiControllerState merged = mergeControllerStates(toChiakiControllerState(first),
+                                                         toChiakiControllerState(second));
+
+    // The first down touch fills slot 0 and the second source fills slot 1.
+    CHECK(merged.touches[0].id == 0);
+    CHECK(merged.touches[0].x == 480);
+    CHECK(merged.touches[0].y == 269);
+    CHECK(merged.touches[1].id == 1);
+    CHECK(merged.touches[1].x == 960);
+    CHECK(merged.touches[1].y == 1079);
+    CHECK(merged.touch_id_next == 0);
+
+    // The first source is at rest, so the whole sensor block is the second's.
+    CHECK(merged.gyro_y == 2.0F);
+    CHECK(merged.accel_z == 0.5F);
+    CHECK(merged.orient_w == 0.9F);
+
+    // A non-default gyro picks the first block whole, even though the second
+    // has motion of its own.
+    first.gyro = {0.5F, 0.0F, 0.0F};
+    merged = mergeControllerStates(toChiakiControllerState(first),
+                                   toChiakiControllerState(second));
+
+    CHECK(merged.gyro_x == 0.5F);
+    CHECK(merged.gyro_y == 0.0F);
+    CHECK(merged.accel_y == 1.0F);
+    CHECK(merged.accel_z == 0.0F);
+    CHECK(merged.orient_w == 1.0F);
+}
+
 TEST_CASE("Gyroscope, accelerometer and orientation reach the console")
 {
     GamepadSample sample;
     sample.gyro = {1.5F, -2.0F, 3.0F};
     sample.accel = {0.0F, 1.0F, 0.0F};
     sample.orientation = {0.1F, 0.2F, 0.3F, 0.9F};
-    sample.hasMotion = true;
 
     const ChiakiControllerState state = toChiakiControllerState(sample);
 

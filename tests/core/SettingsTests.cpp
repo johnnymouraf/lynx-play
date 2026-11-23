@@ -43,6 +43,7 @@ TEST_CASE("Settings survive a write and a read")
         .frameGeneration = FrameGenerationMode::X2,
     };
     settings.overlay.statisticsVisible = true;
+    settings.keyboardMouse.enabled = false;
     settings.psn.signedIn = true;
     settings.psn.tokenExpiry = 1'792'000'000;
     std::ostringstream output;
@@ -62,6 +63,8 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->rtx.frameGeneration == FrameGenerationMode::X2);
     CHECK_FALSE(readBack->rtx.opticalFlow);
     CHECK(readBack->overlay == settings.overlay);
+    CHECK(readBack->keyboardMouse == settings.keyboardMouse);
+    CHECK_FALSE(readBack->keyboardMouse.enabled);
     CHECK(readBack->psn == settings.psn);
 }
 
@@ -94,12 +97,14 @@ TEST_CASE("Audio and controller defaults use the Windows default devices")
 {
     const AudioSettings audio;
     const ControllerSettings controller;
+    const KeyboardMouseSettings keyboardMouse;
 
     CHECK(audio.outputDevice.empty());
     CHECK(audio.microphoneDevice.empty());
     CHECK_FALSE(audio.microphoneMuted);
     CHECK(audio.volumePercent == 85);
     CHECK(controller.preferred.empty());
+    CHECK(keyboardMouse.enabled);
 }
 
 TEST_CASE("Settings keep their defaults for missing or invalid values")

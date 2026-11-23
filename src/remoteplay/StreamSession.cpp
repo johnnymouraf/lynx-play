@@ -370,33 +370,27 @@ void StreamSession::State::inputLoop(const std::stop_token& stop)
 {
     while (!stop.stop_requested())
     {
+        // chiaki-ng combines every source through chiaki_controller_state_or,
+        // so the controller and the keyboard never overwrite each other's
+        // touches or sensor block.
         ChiakiControllerState controllerState;
-        input::GamepadSample combined;
-        bool hasInput = false;
+        chiaki_controller_state_set_idle(&controllerState);
 
         if (gamepads != nullptr && !gamepads->overlayOpen())
         {
-            if (const std::optional<input::GamepadSample> sample = gamepads->sample(); sample)
+            if (const std::optional<ChiakiControllerState> state = gamepads->gamepadState();
+                state)
             {
-                combined = *sample;
-                hasInput = true;
+                ChiakiControllerState fromGamepad = *state;
+                chiaki_controller_state_or(&controllerState, &controllerState, &fromGamepad);
             }
         }
 
         if (keyboardMouse != nullptr)
         {
-            const input::GamepadSample keyboard = keyboardMouse->sample();
-            combined = hasInput ? input::mergeSamples(combined, keyboard) : keyboard;
-            hasInput = true;
-        }
-
-        if (hasInput)
-        {
-            controllerState = input::toChiakiControllerState(combined);
-        }
-        else
-        {
-            chiaki_controller_state_set_idle(&controllerState);
+            const ChiakiControllerState fromKeyboard =
+                input::toChiakiControllerState(keyboardMouse->sample());
+            chiaki_controller_state_or(&controllerState, &controllerState, &fromKeyboard);
         }
 
         chiaki_session_set_controller_state(&session, &controllerState);
