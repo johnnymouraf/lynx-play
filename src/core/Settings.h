@@ -33,6 +33,78 @@ enum class PresentMode
     LowestLatency,
 };
 
+// How the stream window shows.
+enum class WindowMode
+{
+    // Borderless, covering the whole monitor.
+    Fullscreen,
+    Windowed,
+};
+
+[[nodiscard]] constexpr std::string_view windowModeName(WindowMode mode)
+{
+    switch (mode)
+    {
+    case WindowMode::Fullscreen:
+        return "fullscreen";
+    case WindowMode::Windowed:
+        return "windowed";
+    }
+
+    return "fullscreen";
+}
+
+// The stream window's client size, in physical pixels.
+struct WindowSize
+{
+    int width = 1280;
+    int height = 720;
+
+    bool operator==(const WindowSize&) const = default;
+};
+
+inline constexpr WindowSize kDefaultWindowSize{.width = 1280, .height = 720};
+inline constexpr WindowSize kMaxWindowSize{.width = 16384, .height = 16384};
+
+inline constexpr std::array<WindowSize, 4> kWindowSizePresets{{
+    {.width = 1920, .height = 1080},
+    {.width = 1600, .height = 900},
+    {.width = 1280, .height = 720},
+    {.width = 960, .height = 540},
+}};
+
+inline constexpr std::array<std::string_view, 4> kWindowSizePresetNames{{
+    "1920x1080",
+    "1600x900",
+    "1280x720",
+    "960x540",
+}};
+
+// How far a client size may be from a preset and still read as one, in pixels
+// per dimension: a drag lands a pixel or two off the round numbers.
+inline constexpr int kWindowSizePresetTolerance = 2;
+
+// The preset a client size matches, if any.
+[[nodiscard]] std::optional<std::size_t> windowSizePresetIndex(WindowSize size);
+
+// The requested size, at least 1×1 and no bigger than the given maximum (a
+// monitor's work area).
+[[nodiscard]] WindowSize clampWindowSize(WindowSize size, WindowSize maximum);
+
+// A window mode with the windowed size it returns to.
+struct WindowLayout
+{
+    WindowMode mode = WindowMode::Fullscreen;
+    WindowSize size = kDefaultWindowSize;
+
+    bool operator==(const WindowLayout&) const = default;
+};
+
+// The next layout the F1 menu's row offers: from fullscreen it restores the
+// remembered windowed size, each preset moves to the next, and the last one
+// goes back to fullscreen.
+[[nodiscard]] WindowLayout nextWindowLayout(WindowLayout current);
+
 // What is asked of the PS5's HDR and what the renderer does with it.
 enum class HdrMode
 {
@@ -95,6 +167,11 @@ struct VideoSettings
     std::uint32_t bitrateKbps = kMaxBitrateKbps;
     PresentMode presentMode = PresentMode::VSync;
     HdrMode hdr = HdrMode::Auto;
+    // The stream window's presentation; the video profile above is what the
+    // PS5 sends either way.
+    WindowMode windowMode = WindowMode::Fullscreen;
+    // The last windowed client size, which fullscreen returns to.
+    WindowSize windowSize = kDefaultWindowSize;
 
     bool operator==(const VideoSettings&) const = default;
 };
