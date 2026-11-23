@@ -880,3 +880,50 @@ and the overlay locked its own non-recursive mutex again.
 - B. Only the client rect: a minimized window was seen presenting once.
 
 **Chosen: A**. Changing it: `clientAreaOf`.
+
+## Current: 1.8 Closing the stream must not kill the app
+
+**Goal:** closing the stream window (Esc, its X, or the overlay's
+"Desconectar") ends the session and leaves the app open on the consoles
+screen, with every RTX feature on — including the optical flow.
+
+**Guardrails:** the optical flow keeps working during playback; the fix must
+not disable it, nor leak a GPU session per stream; no feature changes.
+
+**Success criteria:**
+
+1. CI green on `auto/1.8`, with a unit test for whatever state the fix
+   touches.
+2. Reproduced before the fix: `--play-file` with `rtx.opticalFlow: true`,
+   Esc in the stream window: the whole process dies with `0xC0000005` in
+   `nvwgf2umx.dll` (offsets `0xd2cd86`, `0xd8d217`) and no "Stream window
+   closed" line — the failure is inside the Esc handling, during teardown.
+   With the flow off the same close is clean.
+3. After the fix: with the flow on, closing the stream leaves the app running
+   (the log shows "Stream window closed; ending the session" and the normal
+   shutdown of the session; no new crash event), and ten open/close cycles
+   in a row don't crash; a real session (owner check) returns to the consoles
+   screen.
+4. The GPU is idle before the optical-flow session is released (the log names
+   the order), and the same holds when the window closes while minimized.
+
+**Deliveries:**
+
+1. Diagnosis: identify which release call faults (NvOF session destroy,
+   resource unregister, or the D3D11 device) and whether the GPU had work in
+   flight; a temporary SEH guard around the release to log and survive would
+   confirm it.
+2. The fix: wait for the GPU fence, unregister the flow resources, destroy the
+   NvOF session before the devices, on the render thread, with the release
+   inside a guard so a driver fault can't take the process down.
+3. The regression test and the verification cycles.
+
+**Settled in planning:** the crash is in the NVIDIA driver's teardown
+(`nvwgf2umx.dll`), not in our code; the same offset appears in the 1.7
+report, where it was recorded as out of scope.
+
+**Changes:** `src/render/OpticalFlow.{h,cpp}`, `FrameRenderer` teardown,
+tests.
+
+**Edge cases:** close while minimized or occluded; close during a feature
+recreation (resize); device removed; repeated open/close.
