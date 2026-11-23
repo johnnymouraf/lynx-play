@@ -30,6 +30,10 @@ constexpr UINT kOverlayMenuMessage = WM_APP + 2;
 constexpr UINT_PTR kSizeSettleTimer = 1;
 constexpr UINT kSizeSettleMilliseconds = 500;
 
+// Fullscreen hides the idle cursor this long after the last movement.
+constexpr UINT_PTR kCursorHideTimer = 2;
+constexpr UINT kCursorHideMilliseconds = 2000;
+
 // Bit 29 of a key message's lParam: the Alt key was down.
 constexpr LPARAM kAltDownFlag = LPARAM{1} << 29;
 
@@ -240,7 +244,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     stream->updateOverlayLayout();
     ShowWindow(window, SW_SHOW);
     SetForegroundWindow(window);
-    stream->setCursorVisible(false);
+    stream->applyCursor();
 
     return stream;
 }
@@ -369,6 +373,34 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
             reportWindowedSize();
             return 0;
         }
+
+        if (wParam == kCursorHideTimer)
+        {
+            KillTimer(window_, kCursorHideTimer);
+
+            if (!overlayMenuOpen_)
+            {
+                cursorAwake_ = false;
+                applyCursor();
+            }
+
+            return 0;
+        }
+        break;
+
+    case WM_SETCURSOR:
+        // While hidden, DefWindowProc would put the class arrow back on every
+        // movement; keep the null cursor until the player moves again.
+        if (cursorHidden_)
+        {
+            SetCursor(nullptr);
+            return TRUE;
+        }
+        break;
+
+    case WM_MOUSEMOVE:
+    case WM_NCMOUSEMOVE:
+        noteMouseActivity();
         break;
 
     case WM_EXITSIZEMOVE:
@@ -442,7 +474,19 @@ LRESULT StreamWindow::handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
         return 0;
 
     case kOverlayMenuMessage:
-        setCursorVisible(wParam != 0);
+        overlayMenuOpen_ = wParam != 0;
+        cursorAwake_ = true;
+
+        if (overlayMenuOpen_)
+        {
+            KillTimer(window_, kCursorHideTimer);
+        }
+        else
+        {
+            SetTimer(window_, kCursorHideTimer, kCursorHideMilliseconds, nullptr);
+        }
+
+        applyCursor();
         return 0;
 
     default:
@@ -489,15 +533,38 @@ void StreamWindow::handleKey(WPARAM key)
     }
 }
 
-void StreamWindow::setCursorVisible(bool visible)
+void StreamWindow::applyCursor()
 {
-    if (cursorVisible_ == visible)
+    if (window_ == nullptr)
     {
         return;
     }
 
-    ShowCursor(visible ? TRUE : FALSE);
-    cursorVisible_ = visible;
+    const bool hidden = mode_ == core::WindowMode::Fullscreen && !overlayMenuOpen_ && !cursorAwake_;
+
+    if (hidden == cursorHidden_)
+    {
+        return;
+    }
+
+    cursorHidden_ = hidden;
+    SetCursor(hidden ? nullptr : LoadCursorW(nullptr, IDC_ARROW));
+}
+
+void StreamWindow::noteMouseActivity()
+{
+    if (window_ == nullptr || mode_ != core::WindowMode::Fullscreen)
+    {
+        return;
+    }
+
+    cursorAwake_ = true;
+    applyCursor();
+
+    if (!overlayMenuOpen_)
+    {
+        SetTimer(window_, kCursorHideTimer, kCursorHideMilliseconds, nullptr);
+    }
 }
 
 void StreamWindow::handleRawInput(LPARAM lParam)
@@ -699,6 +766,12 @@ void StreamWindow::enterFullscreen()
                  area.bottom - area.top, SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
     applyingLayout_ = false;
     mode_ = core::WindowMode::Fullscreen;
+
+    // The cursor stays for a moment, in case the player only wanted the
+    // bigger picture, and then hides until the next movement.
+    cursorAwake_ = true;
+    SetTimer(window_, kCursorHideTimer, kCursorHideMilliseconds, nullptr);
+    applyCursor();
 }
 
 void StreamWindow::leaveFullscreen()
@@ -719,6 +792,8 @@ void StreamWindow::leaveFullscreen()
     // screen or the menu); the placement's own size can be stale.
     resizeWindowed(windowedSize_);
     applyingLayout_ = false;
+    KillTimer(window_, kCursorHideTimer);
+    applyCursor();
 }
 
 // Resizes the windowed window to a client size, keeping it inside the work
@@ -790,7 +865,10 @@ void StreamWindow::close(CloseReason reason)
         keyboardMouse_->releaseAll();
     }
 
-    setCursorVisible(true);
+    KillTimer(window_, kSizeSettleTimer);
+    KillTimer(window_, kCursorHideTimer);
+    cursorHidden_ = false;
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     renderer_.reset();
 
     if (window_ != nullptr)

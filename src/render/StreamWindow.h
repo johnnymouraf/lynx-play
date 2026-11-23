@@ -118,7 +118,11 @@ private:
     void resizeWindowed(core::WindowSize size);
     void reportWindowedSize();
     void updateOverlayLayout();
-    void setCursorVisible(bool visible);
+    // Keeps the cursor visible in windowed mode and hides it in fullscreen
+    // after two seconds without movement; windowed keeps the system's resize
+    // arrow over the borders through DefWindowProc.
+    void applyCursor();
+    void noteMouseActivity();
     void close(CloseReason reason);
 
     HWND window_ = nullptr;
@@ -136,7 +140,12 @@ private:
     // Set while the window resizes itself, so its own changes don't look
     // like the player's drags.
     bool applyingLayout_ = false;
-    bool cursorVisible_ = true;
+    // SetCursor(nullptr) hides the cursor over this window only, unlike
+    // ShowCursor's thread-wide counter.
+    bool cursorHidden_ = false;
+    // Fullscreen shows the cursor until a moment after the last movement.
+    bool cursorAwake_ = true;
+    bool overlayMenuOpen_ = false;
     bool haveAbsoluteMouse_ = false;
     LONG lastAbsoluteX_ = 0;
     LONG lastAbsoluteY_ = 0;
