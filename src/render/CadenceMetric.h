@@ -27,7 +27,9 @@ struct CadenceReadback
 // The block-difference metric behind cadence detection: one compute thread
 // per 4x4 luma block, a group reduction and one atomic per group into a
 // 16-byte buffer, copied to a readback buffer that the renderer maps on a
-// later frame once the fence has passed.
+// later frame once the fence has passed. Only blocks in the central three
+// quarters of each axis count: the outer eighth on each side is where HUDs
+// live, and a HUD may change at its own rate while the game repeats.
 class CadenceMetric
 {
 public:
