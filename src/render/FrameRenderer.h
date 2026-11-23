@@ -241,6 +241,9 @@ private:
     void signalCadence();
     // Reads the metric samples whose fences have passed into the detector.
     void drainCadence();
+    // Classifies one frame and reports its distinct/repeated decision to the
+    // statistics.
+    [[nodiscard]] CadenceDetector::Decision observeCadence(const CadenceSample& sample);
     // Ends the frame after the flow engine's fence, so the stage's time is
     // the engine's real cost.
     [[nodiscard]] std::expected<void, std::string> recordFlowWatch(UINT bufferIndex,

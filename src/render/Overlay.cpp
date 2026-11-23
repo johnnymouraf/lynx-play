@@ -216,7 +216,7 @@ std::uint32_t pqColor(std::uint32_t color, float sdrWhiteNits)
 
 std::string fpsText(const core::StreamMetricsSnapshot& video, double fps)
 {
-    return video.formatValid ? decimalText(fps) : "—";
+    return video.formatValid ? decimalText(fps) + " fps" : "—";
 }
 
 float textWidth(ImFont* font, float size, const char* text)
@@ -285,6 +285,29 @@ void applyStyle()
     style.Colors[ImGuiCol_PlotLines] = ImVec4(0.9608F, 0.6353F, 0.2275F, 1.0F);
 }
 
+void drawRateSection(const Fonts& fonts, const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+
+    sectionLabel(fonts, "TAXAS");
+
+    std::string cadence = "—";
+
+    if (stats.cadenceValid)
+    {
+        cadence = std::format("{} fps · {}/{} repetidos",
+                              decimalText(stats.cadenceFramesPerSecond),
+                              stats.cadenceRepeatedFrames, stats.cadenceWindowFrames);
+    }
+
+    valueRow(fonts, "Fonte", fpsText(video, video.sourceFps).c_str());
+    valueRow(fonts, "Jogo", fpsText(video, video.gameFps).c_str());
+    valueRow(fonts, "Gerados", fpsText(video, video.generatedFps).c_str(),
+             video.generatedFps > 0.0 ? kAccent : kText);
+    valueRow(fonts, "Exibidos", fpsText(video, video.displayedFps).c_str());
+    valueRow(fonts, "Cadência", cadence.c_str());
+}
+
 void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
 {
     const core::StreamMetricsSnapshot& video = stats.video;
@@ -301,23 +324,6 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
     valueRow(fonts, "Resolução", resolution.c_str());
     valueRow(fonts, "Codec", codec.c_str());
     valueRow(fonts, "HDR", hdr.c_str());
-    valueRow(fonts, "FPS recebidos", fpsText(video, video.receivedFps).c_str());
-    valueRow(fonts, "FPS decodificados", fpsText(video, video.decodedFps).c_str());
-    valueRow(fonts, "FPS exibidos", fpsText(video, video.presentedFps).c_str());
-    valueRow(fonts, "FPS apresentados", fpsText(video, video.allPresentedFps).c_str());
-    valueRow(fonts, "Quadros gerados",
-             video.formatValid ? std::format("{}", video.generatedFrames).c_str() : "—");
-
-    std::string cadence = "—";
-
-    if (stats.cadenceValid)
-    {
-        cadence = std::format("{} fps · {}/{} repetidos",
-                              decimalText(stats.cadenceFramesPerSecond),
-                              stats.cadenceRepeatedFrames, stats.cadenceWindowFrames);
-    }
-
-    valueRow(fonts, "Cadência", cadence.c_str());
     valueRow(fonts, "Bitrate", bitrate.c_str());
     valueRow(fonts, "Perda de pacotes", loss.c_str());
 }
@@ -469,6 +475,7 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats)
     ImGui::PopFont();
     rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
 
+    drawRateSection(fonts, stats);
     drawVideoSection(fonts, stats);
     drawLatencySection(fonts, stats);
     drawGpuSection(fonts, stats);

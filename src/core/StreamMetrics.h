@@ -25,15 +25,15 @@ struct StreamMetricsSnapshot
     std::uint32_t height = 0;
     std::string codec;
 
-    double receivedFps = 0.0;
-    double decodedFps = 0.0;
-    // New decoded pictures shown on screen.
-    double presentedFps = 0.0;
-    // Every picture shown, real and generated.
-    double allPresentedFps = 0.0;
-    // Pictures DLSS Frame Generation produced since the stream started.
-    std::uint64_t generatedFrames = 0;
+    // The container rate: access units the decoder received per second.
+    double sourceFps = 0.0;
+    // Distinct source pictures per second: the game's own rate.
+    double gameFps = 0.0;
+    // Pictures DLSS Frame Generation produced and presented per second.
     double generatedFps = 0.0;
+    // New pictures shown per second, the distinct source ones plus the
+    // generated ones. With Frame Generation off it equals the game rate.
+    double displayedFps = 0.0;
     double bitrateMbps = 0.0;
 
     bool packetLossValid = false;
@@ -67,16 +67,16 @@ public:
     void addReceived(Clock::time_point at, std::uint64_t bytes);
     // One picture the decoder finished, with how long it took.
     void addDecoded(Clock::time_point at, double milliseconds);
+    // One source picture the cadence detector classified: a distinct one is
+    // a new game picture and counts as shown.
+    void addCadenceFrame(Clock::time_point at, bool distinct);
     // Packet counters since the previous call, from the session.
     void addPacketStats(Clock::time_point at, std::uint64_t received, std::uint64_t lost);
-    // One present; `uniqueFrame` says it showed a new decoded picture, so it
-    // counts as a presented frame. The interval is absent for the first new
-    // frame, and the time from the frame being ready only for new frames.
+    // One present of a new decoded picture. The interval is absent for the
+    // first new frame, and so is the time from the frame being ready.
     void addPresented(Clock::time_point at, std::optional<Clock::duration> interval,
-                       std::optional<Clock::duration> readyToPresent, bool uniqueFrame);
-    // One present of a picture DLSS Frame Generation produced. It counts in
-    // the all-presents rate and in the generated count, never as a real
-    // presented frame.
+                       std::optional<Clock::duration> readyToPresent);
+    // One present of a picture DLSS Frame Generation produced.
     void addGeneratedPresent(Clock::time_point at);
 
     [[nodiscard]] StreamMetricsSnapshot snapshot(Clock::time_point now);
@@ -88,11 +88,8 @@ private:
     std::uint32_t height_ = 0;
     std::string codec_;
     SlidingWindow received_;
-    SlidingWindow decoded_;
-    SlidingWindow presented_;
-    SlidingWindow allPresented_;
+    SlidingWindow distinct_;
     SlidingWindow generated_;
-    std::uint64_t generatedFrames_ = 0;
     SlidingWindow decodeTime_;
     SlidingWindow presentInterval_;
     SlidingWindow readyToPresent_;

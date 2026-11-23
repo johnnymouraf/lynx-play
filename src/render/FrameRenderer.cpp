@@ -939,7 +939,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
                                               ? static_cast<double>(sample->sad) / blockSamples
                                               : 0.0,
                     };
-                    decision = cadence_.observe(comparison);
+                    decision = observeCadence(comparison);
                 }
             }
 
@@ -1043,7 +1043,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     if (metrics_ != nullptr && realPresented)
     {
-        metrics_->addPresented(now, interval, readyToPresent, showsNewFrame);
+        metrics_->addPresented(now, interval, readyToPresent);
     }
 
     if (showsNewFrame && realPresented)
@@ -2170,13 +2170,29 @@ void FrameRenderer::drainCadence()
                 blockSamples > 0.0 ? static_cast<double>(sample->sad) / blockSamples : 0.0,
         };
 
-        if (cadence_.observe(comparison) == CadenceDetector::Decision::SceneCut)
+        if (observeCadence(comparison) == CadenceDetector::Decision::SceneCut)
         {
             dlssResetPending_ = true;
             frameSchedule_.reset();
             spdlog::debug("Cadence: scene cut, window restarted");
         }
     }
+}
+
+CadenceDetector::Decision FrameRenderer::observeCadence(const CadenceSample& sample)
+{
+    const CadenceDetector::Decision decision = cadence_.observe(sample);
+
+    if (metrics_ != nullptr)
+    {
+        // A scene cut is still a new picture, though the detector restarts
+        // its windows around it.
+        const bool distinct = decision == CadenceDetector::Decision::Distinct ||
+                              decision == CadenceDetector::Decision::SceneCut;
+        metrics_->addCadenceFrame(Clock::now(), distinct);
+    }
+
+    return decision;
 }
 
 std::expected<void, std::string> FrameRenderer::recordFlowWatch(UINT bufferIndex,
@@ -2902,6 +2918,16 @@ void FrameRenderer::reportStatistics()
                  "ms at most), {} frames replaced before being shown",
                  summary->perSecond, summary->averageMilliseconds, summary->maxMilliseconds,
                  dropped);
+
+    if (metrics_ != nullptr)
+    {
+        const core::StreamMetricsSnapshot video =
+            metrics_->snapshot(core::StreamMetrics::Clock::now());
+
+        spdlog::info("Rates: source {:.1f} fps, game {:.1f} fps, generated {:.1f} fps, displayed "
+                     "{:.1f} fps",
+                     video.sourceFps, video.gameFps, video.generatedFps, video.displayedFps);
+    }
 
     if (lastGpuTimes_)
     {
