@@ -44,6 +44,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         keyboard and gamepad, and the rumble/trigger packets.
   - [x] **1.10 Stream window mode and size**: fullscreen or a chosen size
         (presets or a drag), remembered, with a usable cursor.
+  - [x] **1.11 The stats panel tells the game, generated and presented rates**:
+        source 60 with a 30 fps game reads game 30, generated 30, displayed
+        60, with no repeated frame presented as real.
 - [x] **2. RTX features**: image enhancement and lower latency on the RTX.
   - [x] **2.1 Reflex + Boost and the effects pipeline** [auto], with GPU time
         per stage.
@@ -934,170 +937,44 @@ The PS5 was on the network and the saved console opened real sessions.
 **Chosen: A**; the owner still confirms in their own session. Changing it:
 reclassify as an owner check.
 
-## Current: 1.11 The stats panel must tell the game's rate, the generated frames and the presented frames
 
-**Goal:** the F2 panel separates what the owner needs to judge Frame
-Generation: the **source** rate (what arrives, usually 60), the **game** rate
-(distinct frames, e.g., 30), the **generated** frames per second and the
-**presented** rate — so a 30 fps game with Frame Generation 2x reads
-"jogo 30 · gerados 30 · exibidos 60" instead of a single 60 that hides it.
+#### D88 – The game rate counts cadence decisions in the same 2 s window (1.11)
 
-**Guardrails:** no change to the Frame Generation schedule or to the stream
-protocol; the overlay keeps its shortcuts and stays cheap; the existing
-statistics (GPU stages, cadence, Reflex) stay.
+- A. Count the distinct decisions in the metrics' 2 s window.
+- B. Use the detector's published estimate: safer on a static scene but slow
+  after a cut and a second cadence line.
 
-**Success criteria:**
+**Chosen: A**. Changing it: `StreamMetrics::addCadenceFrame`/`gameFps`.
 
-1. CI green on `auto/1.11`, with unit tests for the derived rates (distinct
-   frames over a window, generated per second, presented per second) against
-   fixtures.
-2. The report explains how Veyra-NRVideo derives and shows the source,
-   real and generated rates (its cadence/FG code and UI labels, with sources)
-   and what this step copied or deliberately did not.
-3. `--play-file` of the 30 fps stream carried in a 60 fps container with
-   Frame Generation 2x: the panel shows source 60, game 30, generated ~30/s
-   and presented ~60/s (screenshot + the periodic log line), the cadence line
-   agrees, and the pipeline proves 30 distinct + 30 generated presented per
-   second — no repeated source frame presented as real. With a true 60 fps
-   stream: source 60, game 60, generated ~60/s, presented ~120/s where the
-   display allows. If the cadence reads 60 on 30-in-60 content (a 60 fps HUD
-   would make frames differ), the repeated-frame metric must be fixed (its
-   region or threshold) and the fixture must carry motion and a HUD.
-4. With Frame Generation off, the panel shows generated 0 and presented equal
-   to the distinct rate, making the difference obvious.
-5. Owner check: in a real 30 fps game (GTA VI-like), the panel shows the
-   game at 30 and the generated frames taking it to 60.
+#### D89 – "Exibidos" means new pictures (1.11)
 
-**Deliveries:**
+- A. Distinct plus generated.
+- B. Every Present call: counts repeats and shows 60 in a 30 fps game with
+  FG off.
 
-1. The research on Veyra's approach, summarized in the report.
-2. The metrics: distinct/game rate from the cadence window, generated and
-   presented per second from the present counters, source from the decoder,
-   with tests.
-3. The panel and the log line with the four rates and clear Portuguese
-   labels; the cadence line kept.
-4. The verification with both clips and FG on/off.
+**Chosen: A**, matching the criterion that FG off shows generated 0 and
+displayed equal to the game. Changing it: `StreamMetrics::snapshot`.
 
-**Settled in planning:** the container is always 60 from the PS5; the game
-rate comes from the cadence detection (2.4) and the generated frames from
-the Frame Generation counters (2.5); Veyra-NRVideo is the reference for how
-to present them.
+#### D90 – Repeated presents are derived, not counted separately (1.11)
 
-**Changes:** `src/core/StreamMetrics.*`, `src/render/Overlay.*` (statistics
-section), the periodic log, tests.
+- A. Count real presents of new frames and derive repeats as real minus game.
+- B. Count every Present, including overlay redraws.
 
-**Edge cases:** a 30 fps game with a 60 fps HUD; a scene change resetting the
-cadence; FG on but the cadence at 60 (no generation needed); the overlay open
-while frames are idle (minimized) showing stale rates; a 120 Hz display.
+**Chosen: A**. Changing it: `addPresented(..., newFrame)`.
 
-#### D77 – Keyboard and gamepad merge through chiaki's own OR (1.9)
+#### D91 – The cadence ignores the HUD band (1.11)
 
-Our sample merge handled touches and the motion block differently from
-chiaki's.
+A 60 fps HUD over a 30 fps picture made every frame differ.
 
-- A. Convert each source to `ChiakiControllerState` and call
-  `chiaki_controller_state_or`, exactly as `streamsession.cpp` does.
-- B. Fix the sample-level merge by hand.
-- C. Disable the keyboard by default.
+- A. Count only the central 3/4 of each axis in the cadence shader.
+- B. Raise the repeat threshold: a large HUD still crosses it.
+- C. Average the whole picture: same problem.
 
-**Chosen: A**, with the keyboard as its own toggle (D81). Changing it:
-`StreamSession`/`GamepadManager::publish`/`OverlayInput`.
+**Chosen: A**. Changing it: the `/8` margin in `Cadence.hlsl`.
 
-#### D78 – DualSense rumble goes in the effect packet (1.9)
+#### D92 – The metrics window is the panel's 2 s (1.11)
 
-`SDL_RumbleGamepad` disables the USB audio haptics, and chiaki-ng never uses
-it on a DualSense.
+- A. 2 s, the window the panel already used.
+- B. 1 s, as Veyra's rate windows do.
 
-- A. SDL rumble always.
-- B. The effect packet only with the haptics active.
-- C. The packet on a DualSense, SDL on other pads and only without audio
-  haptics.
-
-**Chosen: C**. Changing it: `applyCommand`/`sendRumble`/`rumblePath`.
-
-#### D79 – Touch ids are allocated on the contact (1.9)
-
-- A. Fixed ids per finger.
-- B. Sequential masked ids at down, as chiaki's protocol expects.
-
-**Chosen: B**. Changing it: `applyTouch`/`toChiakiControllerState`.
-
-#### D80 – The controller debug lives at the top and in the log (1.9)
-
-The bottom of the 720p panel was cut off, and precise reports need text.
-
-- A. The controller section at the top plus a 1 Hz log line while the
-  statistics are open.
-- B. Keep it at the bottom (cut).
-- C. A separate panel.
-
-**Chosen: A**. Changing it: `drawStatistics`/`render`.
-
-#### D81 – "Keyboard as controller" is a toggle, on by default (1.9)
-
-chiaki-ng's `settings/keyboard_enabled` defaults to true.
-
-- A. A toggle with the same default, off means an empty keyboard sample.
-- B. Always on: no way to isolate a gamepad problem.
-
-**Chosen: A**. Changing it: `Settings`/`KeyboardMouse`/`SettingsController`/QML.
-
-#### D82 – The F1 window row cycles instead of opening a submenu (1.10)
-
-The menu has no dropdown and is driven by mouse and D-pad.
-
-- A. A row that cycles fullscreen and the presets, in the existing rows'
-  pattern; leaving fullscreen restores the remembered size (or the first
-  preset when the size is custom, so no preset is unreachable).
-- B. A new submenu with its own state.
-
-**Chosen: A**. Changing it: `MenuResult`/`drawMenu`.
-
-#### D83 – A 500 ms debounce for resizes (1.10)
-
-`SetWindowPos` doesn't send `WM_EXITSIZEMOVE`.
-
-- A. Only `WM_EXITSIZEMOVE`: misses programmatic sizes.
-- B. A 500 ms timer on `WM_SIZE` plus an immediate report at the end of a
-  user drag.
-
-**Chosen: B**. Changing it: `kSizeSettleMilliseconds`.
-
-#### D84 – The cursor through `SetCursor`, not `ShowCursor` (1.10)
-
-`ShowCursor` is a per-thread counter, and the old code hid the cursor in
-every mode.
-
-- A. A balanced `ShowCursor` counter.
-- B. `SetCursor(nullptr)` with `WM_SETCURSOR`, showing the arrow in windowed
-  mode and hiding after two idle seconds in fullscreen, keeping it visible
-  with the F1 menu.
-
-**Chosen: B**. Changing it: `applyCursor()`/`kCursorHideMilliseconds`.
-
-#### D85 – F11 persists the mode (1.10)
-
-- A. Keep it in memory only.
-- B. An `onWindowModeChanged` callback stores it, so a new stream opens the
-  same way.
-
-**Chosen: B**. Changing it: remove the callback wiring.
-
-#### D86 – A two-pixel tolerance for the presets (1.10)
-
-A drag lands one or two pixels off the round sizes.
-
-- A. Exact matching: a 1280×721 window shows "Personalizado".
-- B. Two pixels per dimension, storing the real client size.
-
-**Chosen: B**. Changing it: `kWindowSizePresetTolerance`.
-
-#### D87 – The video test follows the same layout (1.10)
-
-It is the only path that runs a stream window with the settings UI alive,
-used in this step's live checks.
-
-- A. Apply the same layout there too, without touching the video profile.
-- B. Leave it fixed at its own size.
-
-**Chosen: A**. Changing it: `AppController`.
+**Chosen: A**. Changing it: `kMetricsWindow`.
