@@ -44,6 +44,16 @@ AppController::AppController(StartupState state, SettingsController& settings,
                     videoTestWindow_->setFrameGeneration(settings_.frameGenerationMode());
                 }
             });
+
+    connect(&settings_, &SettingsController::videoChanged, this,
+            [this]
+            {
+                if (videoTestWindow_ != nullptr)
+                {
+                    videoTestWindow_->applyWindowLayout(settings_.video().windowMode,
+                                                        settings_.video().windowSize);
+                }
+            });
 }
 
 AppController::~AppController() = default;
@@ -137,6 +147,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .opticalFlow = settings_.opticalFlow(),
                                                  .frameGeneration =
                                                      settings_.frameGenerationMode(),
+                                                 .mode = settings_.video().windowMode,
+                                                 .windowedSize = settings_.video().windowSize,
                                                  .overlayFonts = overlayFonts(),
                                                  .overlay =
                                                      {
@@ -146,6 +158,10 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                          .microphoneMuted =
                                                              settings_.microphoneMuted(),
                                                          .sessionName = "Teste de vídeo",
+                                                         .windowMode =
+                                                             settings_.video().windowMode,
+                                                         .windowSize =
+                                                             settings_.video().windowSize,
                                                      },
                                                  .overlayActions =
                                                      {
@@ -163,6 +179,12 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                              settings_.setOverlayStatisticsVisible(
                                                                  visible);
                                                          },
+                                                         .windowLayoutChanged =
+                                                             [this](core::WindowMode mode,
+                                                                    core::WindowSize size)
+                                                         {
+                                                             settings_.setWindowLayout(mode, size);
+                                                         },
                                                          .disconnect = [this]
                                                          {
                                                              QMetaObject::invokeMethod(
@@ -172,6 +194,16 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                      },
                                                  .metrics = metrics,
                                                  .onClosed = closeLater,
+                                                 .onWindowModeChanged =
+                                                     [this](core::WindowMode mode)
+                                                 {
+                                                     const QString name = QString::fromLatin1(
+                                                         core::windowModeName(mode).data());
+                                                     settings_.setWindowMode(name);
+                                                 },
+                                                 .onWindowedSizeChanged =
+                                                     [this](core::WindowSize size)
+                                                 { settings_.setWindowedSize(size); },
                                              });
 
     if (!window)
