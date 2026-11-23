@@ -38,7 +38,8 @@ qt_add_executable(lynx-play WIN32
     SettingsController.h
     StreamController.cpp
     StreamController.h
-    main.cpp)
+    main.cpp
+    lynx-play.rc)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 

@@ -161,32 +161,21 @@ jobs:
           retention-days: 1
 
       # The artifact expires in a day; the versioned release is where the
-      # build stays, with an installer and the portable zip.
-      - name: Install Inno Setup
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: choco install innosetup --yes --no-progress
-
-      - name: Build the installer
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw),
-            'project\(LynxPlay\s+VERSION\s+([0-9.]+)').Groups[1].Value
-          $full = "$version-build.${{ github.run_number }}"
-          "LYNX_RELEASE_VERSION=$full" >> $env:GITHUB_ENV
-          iscc /DAppVersion="$full" /DSourceDir="${{ github.workspace }}\dist\lynx-play" installer\lynx-play.iss
-
+      # portable build stays.
       - name: Publish the release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $version = [regex]::Match((Get-Content CMakeLists.txt -Raw),
+            'project\(LynxPlay\s+VERSION\s+([0-9.]+)').Groups[1].Value
+          $full = "$version-build.${{ github.run_number }}"
           Compress-Archive -Path dist/lynx-play/* -DestinationPath lynx-play-windows-x64.zip
-          $tag = "v$env:LYNX_RELEASE_VERSION"
-          gh release create $tag `
-            --title "Lynx Play $env:LYNX_RELEASE_VERSION" `
-            --notes "Build of main at ``${{ github.sha }}``." `
+          gh release create "v$full" `
+            --title "Lynx Play $full" `
+            --notes "Portable build of main at ``${{ github.sha }}``." `
             --latest `
-            "dist/LynxPlay-Setup-$env:LYNX_RELEASE_VERSION.exe" lynx-play-windows-x64.zip
+            lynx-play-windows-x64.zip
           # Keep the newest twelve releases; older assets would pile up.
           $old = gh release list --limit 100 --json tagName --jq ".[12:][] | .tagName"
           foreach ($name in $old) {
