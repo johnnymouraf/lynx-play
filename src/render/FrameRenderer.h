@@ -18,6 +18,7 @@
 #include "render/NgxHost.h"
 #include "render/OpticalFlow.h"
 #include "render/Overlay.h"
+#include "render/PresentGate.h"
 #include "render/ReflexSession.h"
 #include "render/SwapChain.h"
 #include "render/VideoFrame.h"
@@ -253,6 +254,11 @@ private:
     GpuDevice gpu_;
     HWND window_ = nullptr;
     SwapChain swapChain_;
+    // Keeps the frame path idle while the window can't show a picture.
+    PresentGate presentGate_;
+    // The last frame found the window hidden; the first one after it starts
+    // fresh picture pairs.
+    bool hidden_ = false;
     FramePresenter presenter_;
     HdrDisplayState display_;
     Presentation presentation_;

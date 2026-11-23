@@ -95,6 +95,22 @@ std::string reflexUnavailableReason(ReflexUnavailable reason)
     return "indisponível";
 }
 
+SurfaceSize clientAreaOf(HWND window)
+{
+    RECT client{};
+    GetClientRect(window, &client);
+
+    return {
+        .width = static_cast<std::uint32_t>(client.right - client.left),
+        .height = static_cast<std::uint32_t>(client.bottom - client.top),
+    };
+}
+
+PresentOutcome outcomeOf(HRESULT result)
+{
+    return result == DXGI_STATUS_OCCLUDED ? PresentOutcome::Occluded : PresentOutcome::Presented;
+}
+
 float contentPeakNitsOf(const VideoFrame& frame)
 {
     double peak = frame.hdr.maxContentLightNits;
@@ -596,8 +612,37 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 {
     drainCadence();
 
+    // A minimized window has an empty client area: presenting into it would
+    // run the whole frame for a picture nobody sees, so the pipeline stays
+    // idle until it comes back. The newest picture waits for the redraw.
+    presentGate_.setClientSize(clientAreaOf(window_));
+
     std::optional<VideoFrame> newest = mailbox_->take();
     const bool redraw = redrawRequested_.exchange(false);
+
+    if (!presentGate_.mayPresent())
+    {
+        hidden_ = true;
+
+        if (newest)
+        {
+            shownFrame_ = std::move(newest);
+        }
+
+        redrawRequested_.store(true);
+        return {};
+    }
+
+    if (hidden_)
+    {
+        // The first picture after the window comes back has no pair with the
+        // one from before it: DLSS-G and the cadence start over.
+        hidden_ = false;
+        cadenceReferenceValid_ = false;
+        flowReferenceValid_ = false;
+        dlssResetPending_ = true;
+        frameSchedule_.reset();
+    }
 
     if (!newest && !redraw)
     {
@@ -915,6 +960,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         }
 
         const HRESULT presentResult = swapChain_.present(options_.timing);
+        presentGate_.observe(outcomeOf(presentResult));
 
         if (marked)
         {
@@ -1885,6 +1931,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
     reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentStart);
     const HRESULT presentResult = swapChain_.present(options_.timing);
     reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentEnd);
+    presentGate_.observe(outcomeOf(presentResult));
 
     if (FAILED(presentResult))
     {
@@ -1962,6 +2009,7 @@ std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameI
     }
 
     const HRESULT presentResult = swapChain_.present(options_.timing);
+    presentGate_.observe(outcomeOf(presentResult));
 
     if (frameId != 0)
     {

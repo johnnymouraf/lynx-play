@@ -35,6 +35,8 @@ add_library(lynx_render STATIC
     OpticalFlow.h
     Overlay.cpp
     Overlay.h
+    PresentGate.cpp
+    PresentGate.h
     ReflexSession.cpp
     ReflexSession.h
     StreamWindow.cpp

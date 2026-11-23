@@ -34,6 +34,7 @@ add_executable(lynx_tests
     render/HdrTests.cpp
     render/LayoutTests.cpp
     render/OpticalFlowTests.cpp
+    render/PresentGateTests.cpp
     render/ReflexTests.cpp
     render/TestPatternTests.cpp
     render/VideoSuperResolutionTests.cpp)
