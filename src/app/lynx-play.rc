@@ -1,0 +1,2 @@
+// The window, taskbar and Explorer icon.
+IDI_APP_ICON ICON "assets/lynx-play.ico"

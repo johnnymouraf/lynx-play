@@ -30,17 +30,14 @@ The plan and its progress live in [docs/plan.md](docs/plan.md).
 ## Download
 
 Every green build of `main` publishes a versioned release
-(`v0.1.0-build.N`) with two assets:
-
-- `LynxPlay-Setup-<version>.exe`: the installer, with Start-menu and desktop
-  shortcuts and an uninstaller.
-- `lynx-play-windows-x64.zip`: the portable package; extract it anywhere and
-  run `lynx-play.exe`.
+(`v0.1.0-build.N`) with the portable package,
+`lynx-play-windows-x64.zip`: extract it anywhere and run `lynx-play.exe`.
+There is no installer.
 
 Download the newest release with the GitHub CLI, or from the Releases page:
 
 ```powershell
-gh release download --repo johnnymouraf/lynx-play --pattern "LynxPlay-Setup-*.exe"
+gh release download --repo johnnymouraf/lynx-play --pattern "lynx-play-windows-x64.zip"
 ```
 
 Logs are written to `%LOCALAPPDATA%\LynxPlay\logs`. The newest twelve
