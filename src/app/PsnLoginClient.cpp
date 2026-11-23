@@ -308,6 +308,11 @@ void PsnLoginClient::onTokenReply(QNetworkReply* reply, std::uint64_t attempt, b
 
     if (refresh)
     {
+        if (attempt != attempt_)
+        {
+            return;
+        }
+
         if (timedOut || status != kOkStatus)
         {
             spdlog::warn("The PSN token refresh failed (HTTP {}, {})", status,
