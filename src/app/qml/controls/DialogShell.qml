@@ -70,7 +70,7 @@ T.Popup {
                 color: Theme.accent
                 iconName: dialog.iconName
                 iconSize: Theme.sizeIcon
-                iconColor: Theme.onAccent
+                iconColor: Theme.accentContent
             }
 
             ColumnLayout {
