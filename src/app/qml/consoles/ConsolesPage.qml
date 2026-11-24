@@ -19,7 +19,8 @@ FocusScope {
     readonly property bool listMode: page.settings.consoleView === "list"
     // The width the counters and the cards share; both use the same columns.
     readonly property real gridWidth: Math.max(0, scroller.width - 2 * page.ringRoom)
-    readonly property int minimumColumnWidth: 200
+    // Enough for a card's name, address and action at the minimum window.
+    readonly property int minimumColumnWidth: 216
     readonly property int columnCount: {
         const minimum = page.minimumColumnWidth + Theme.space4;
 
