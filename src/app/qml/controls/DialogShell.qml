@@ -11,8 +11,11 @@ T.Popup {
     property string title
     property string eyebrow
     property string iconName
+    // "accent" for the design's usual tile, "danger" for an error.
+    property string iconTone: "accent"
     default property alias body: bodyColumn.data
     property alias actions: actionRow.data
+    property alias leadingActions: leadingRow.data
     property bool showFooter: true
 
     parent: T.Overlay.overlay
@@ -67,10 +70,10 @@ T.Popup {
                 implicitWidth: Theme.space10
                 implicitHeight: Theme.space10
                 radius: Theme.radiusMd
-                color: Theme.accent
+                color: dialog.iconTone === "danger" ? Theme.danger : Theme.accent
                 iconName: dialog.iconName
                 iconSize: Theme.sizeIcon
-                iconColor: Theme.onAccent
+                iconColor: dialog.iconTone === "danger" ? Theme.bg : Theme.accentContent
             }
 
             ColumnLayout {
@@ -115,14 +118,29 @@ T.Popup {
             spacing: Theme.space4
         }
 
-        Row {
-            id: actionRow
-
-            Layout.alignment: Qt.AlignRight
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.space5
             Layout.rightMargin: Theme.space5
             Layout.bottomMargin: Theme.space5
             visible: dialog.showFooter
             spacing: 10
+
+            Row {
+                id: leadingRow
+
+                spacing: 10
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            Row {
+                id: actionRow
+
+                spacing: 10
+            }
         }
     }
 }

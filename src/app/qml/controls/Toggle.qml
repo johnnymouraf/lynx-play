@@ -80,7 +80,7 @@ T.Switch {
 
             PropertyChanges {
                 target: thumb
-                color: Theme.onAccent
+                color: Theme.accentContent
             }
         }
     ]

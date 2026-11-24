@@ -5,6 +5,8 @@ import QtQuick
 // The design's "Theme" variables, named after them: `color/x` is `x`, every
 // other group keeps its prefix (`space/4` is `space4`, `size/control` is
 // `sizeControl`). Colors with alpha are written #AARRGGBB, as QML reads them.
+// The two content colors drop the design's "on" prefix, which QML reads as a
+// signal handler when the singleton loads.
 QtObject {
     id: theme
 
@@ -24,7 +26,7 @@ QtObject {
     readonly property color accent: "#0070D1"
     readonly property color accentHover: "#1A85E6"
     readonly property color accentPressed: "#005BB0"
-    readonly property color onAccent: "#FFFFFF"
+    readonly property color accentContent: "#FFFFFF"
     readonly property color accentSubtle: "#12263B"
     readonly property color focus: "#FFFFFF"
     readonly property color ready: "#3DD68C"
@@ -35,7 +37,7 @@ QtObject {
     readonly property color offlineSubtle: "#262626"
     readonly property color danger: "#F2625F"
     readonly property color dangerSubtle: "#331E1E"
-    readonly property color onDanger: "#1C0707"
+    readonly property color dangerContent: "#1C0707"
     readonly property color info: "#B0B0B0"
     readonly property color infoSubtle: "#2C2C2C"
     readonly property color scrim: "#CC000000"

@@ -8,10 +8,25 @@ FocusScope {
     id: page
 
     required property ConsolesController consoles
+    required property SettingsController settings
+    // The page's side margins, set by the shell for the window's width.
+    property int sideMargin: Theme.space12
+    property int currentIndex: 0
 
     readonly property bool hasConsoles: page.consoles.model.count > 0
-    readonly property int minimumCardWidth: 280
-    property int currentIndex: 0
+    readonly property bool listMode: page.settings.consoleView === "list"
+    // The design narrows the gaps along with the margins in a small window.
+    readonly property int cardGap: page.sideMargin < Theme.space12 ? Theme.space3 : Theme.space4
+    readonly property int minimumCardWidth: 220
+    // The grid's card: the badge row over the body; the list's row: the
+    // action and its padding.
+    readonly property int cardHeight: page.listMode
+                                      ? Theme.sizeControlLg + 2 * Theme.space4
+                                      : 182
+    // Room around the cards for the focus ring, which the scroller would clip.
+    readonly property int ringRoom: Theme.sizeFocusRing + 1
+    readonly property int topMargin: 26
+    readonly property int emptyTopMargin: Theme.space10
 
     signal toastRequested(string tone, string title, string message)
 
@@ -29,31 +44,40 @@ FocusScope {
             if (cards.itemAt(i).key === key) {
                 page.currentIndex = i;
                 cardsArea.forceActiveFocus(Qt.TabFocusReason);
-                page.revealCard(cards.itemAt(i));
+                page.revealItem(cards.itemAt(i));
                 return;
             }
         }
     }
 
+    // The add tile follows the cards, so it is the last index.
+    function navigableItem(index) {
+        if (index === cards.count) {
+            return addTile;
+        }
+
+        return cards.itemAt(index);
+    }
+
     function moveCurrent(step) {
         const next = page.currentIndex + step;
 
-        if (next < 0 || next >= cards.count) {
+        if (next < 0 || next > cards.count) {
             return;
         }
 
         page.currentIndex = next;
-        page.revealCard(cards.itemAt(next));
+        page.revealItem(page.navigableItem(next));
     }
 
-    function revealCard(card) {
-        if (!card) {
+    function revealItem(item) {
+        if (!item) {
             return;
         }
 
-        const cardTop = card.mapToItem(content, 0, 0).y + content.y;
-        const top = cardTop - Theme.space2;
-        const bottom = cardTop + card.height + Theme.space2;
+        const itemTop = item.mapToItem(content, 0, 0).y + content.y;
+        const top = itemTop - page.ringRoom;
+        const bottom = itemTop + item.height + page.ringRoom;
 
         if (top < scroller.contentY) {
             scroller.contentY = top;
@@ -65,9 +89,24 @@ FocusScope {
         }
     }
 
-    function handleCardKey(event) {
-        const current = cards.itemAt(page.currentIndex);
+    function triggerCurrent() {
+        if (page.currentIndex === cards.count) {
+            addDialog.openEmpty();
+            return;
+        }
 
+        cards.itemAt(page.currentIndex)?.triggerPrimary();
+    }
+
+    function openCurrentMenu() {
+        if (page.currentIndex === cards.count) {
+            return;
+        }
+
+        cards.itemAt(page.currentIndex)?.openMenu();
+    }
+
+    function handleCardKey(event) {
         switch (event.key) {
         case Qt.Key_Left:
             page.moveCurrent(-1);
@@ -76,18 +115,18 @@ FocusScope {
             page.moveCurrent(1);
             break;
         case Qt.Key_Up:
-            page.moveCurrent(-cardsArea.columns);
+            page.moveCurrent(-grid.columns);
             break;
         case Qt.Key_Down:
-            page.moveCurrent(cardsArea.columns);
+            page.moveCurrent(grid.columns);
             break;
         case Qt.Key_Return:
         case Qt.Key_Enter:
         case Qt.Key_Space:
-            current?.triggerPrimary();
+            page.triggerCurrent();
             break;
         case Qt.Key_Menu:
-            current?.openMenu();
+            page.openCurrentMenu();
             break;
         default:
             return;
@@ -106,7 +145,46 @@ FocusScope {
         target: page.consoles.model
 
         function onCountChanged() {
-            page.currentIndex = Math.min(page.currentIndex, Math.max(0, cards.count - 1));
+            page.currentIndex = Math.min(page.currentIndex, page.consoles.model.count);
+        }
+    }
+
+    ColumnLayout {
+        id: emptyView
+
+        anchors.fill: parent
+        anchors.topMargin: page.emptyTopMargin
+        anchors.leftMargin: page.sideMargin
+        anchors.rightMargin: page.sideMargin
+        visible: !page.hasConsoles
+        spacing: Theme.space5
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: Theme.space10
+            visible: page.consoles.discoveryStatus === ConsolesController.Searching
+            radius: Theme.radiusMd
+            color: Theme.surface
+
+            ScanIndicator {
+                anchors.left: parent.left
+                anchors.leftMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+
+        DiscoveryBanner {
+            Layout.fillWidth: true
+            status: page.consoles.discoveryStatus
+            onRetryRequested: page.consoles.retryDiscovery()
+        }
+
+        EmptyState {
+            id: emptyState
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            onAddByAddressRequested: addDialog.openEmpty()
         }
     }
 
@@ -114,12 +192,12 @@ FocusScope {
         id: scroller
 
         anchors.fill: parent
-        anchors.topMargin: Theme.space6
-        anchors.leftMargin: Theme.space8
-        anchors.rightMargin: Theme.space8
-        anchors.bottomMargin: Theme.space6
+        anchors.topMargin: page.topMargin - page.ringRoom
+        anchors.leftMargin: page.sideMargin - page.ringRoom
+        anchors.rightMargin: page.sideMargin - page.ringRoom
+        visible: page.hasConsoles
         contentWidth: width
-        contentHeight: content.implicitHeight + 2 * Theme.space2
+        contentHeight: content.implicitHeight + 2 * page.ringRoom
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -128,59 +206,84 @@ FocusScope {
         ColumnLayout {
             id: content
 
-            x: Theme.space2
-            y: Theme.space2
-            width: scroller.width - 2 * Theme.space2
-            spacing: Theme.space8
-
-            RowLayout {
-                id: header
-
-                Layout.fillWidth: true
-                spacing: Theme.space6
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignBottom
-                    spacing: Theme.space1
-
-                    AppText {
-                        Layout.fillWidth: true
-                        text: "Consoles"
-                        textStyle: "titleLarge"
-                        Accessible.role: Accessible.Heading
-                    }
-
-                    ScanIndicator {
-                        visible: page.consoles.discoveryStatus === ConsolesController.Searching
-                    }
-                }
-
-                ActionButton {
-                    Layout.alignment: Qt.AlignBottom
-                    visible: page.hasConsoles
-                    iconName: "plus"
-                    text: "Adicionar pelo IP"
-                    onClicked: addDialog.openEmpty()
-                }
-            }
+            x: page.ringRoom
+            y: page.ringRoom
+            width: scroller.width - 2 * page.ringRoom
+            spacing: 0
 
             DiscoveryBanner {
                 Layout.fillWidth: true
+                Layout.bottomMargin: 22
                 status: page.consoles.discoveryStatus
                 onRetryRequested: page.consoles.retryDiscovery()
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: page.cardGap
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    status: "ready"
+                    label: "Pronto"
+                    count: page.consoles.model.readyCount
+                }
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    status: "standby"
+                    label: "Em repouso"
+                    count: page.consoles.model.standbyCount
+                }
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 0
+                    status: "unpaired"
+                    label: "Não pareado"
+                    count: page.consoles.model.unpairedCount
+                }
+
+                // The design gives the toggle a whole cell beside the counters
+                // in a wide window, and only its own width in a small one.
+                Item {
+                    Layout.fillWidth: page.sideMargin >= Theme.space12
+                    Layout.preferredWidth: page.sideMargin >= Theme.space12
+                                                ? -1
+                                                : viewToggle.implicitWidth
+                    Layout.preferredHeight: Theme.space10
+
+                    ViewToggle {
+                        id: viewToggle
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        mode: page.settings.consoleView
+                        onActivated: mode => page.settings.consoleView = mode
+                    }
+                }
+            }
+
+            AppText {
+                Layout.topMargin: 22
+                Layout.bottomMargin: Theme.space4
+                Layout.leftMargin: 2
+                text: "Lista de consoles"
+                textStyle: "overline"
+                color: Theme.textSubtle
+                Accessible.role: Accessible.Heading
             }
 
             FocusScope {
                 id: cardsArea
 
-                readonly property int columns: Math.max(1, Math.floor(
-                    (width + Theme.space6) / (page.minimumCardWidth + Theme.space6)))
-                readonly property real cardWidth: (width - Theme.space6 * (columns - 1)) / columns
+                readonly property real cardWidth:
+                    (width - page.cardGap * (grid.columns - 1)) / grid.columns
 
                 Layout.fillWidth: true
                 implicitHeight: grid.implicitHeight
-                visible: page.hasConsoles
                 activeFocusOnTab: true
                 Accessible.role: Accessible.List
                 Accessible.name: "Consoles"
@@ -189,9 +292,10 @@ FocusScope {
                 Grid {
                     id: grid
 
-                    columns: cardsArea.columns
-                    columnSpacing: Theme.space6
-                    rowSpacing: Theme.space6
+                    columns: page.listMode ? 1 : Math.max(1, Math.floor(
+                        (cardsArea.width + page.cardGap) / (page.minimumCardWidth + page.cardGap)))
+                    columnSpacing: page.cardGap
+                    rowSpacing: page.cardGap
 
                     Repeater {
                         id: cards
@@ -202,6 +306,8 @@ FocusScope {
                             id: consoleCard
 
                             width: cardsArea.cardWidth
+                            height: page.cardHeight
+                            listMode: page.listMode
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
                             onPlayRequested: page.consoles.play(consoleCard.key)
                             onWakeRequested: page.consoles.wake(consoleCard.key)
@@ -211,22 +317,16 @@ FocusScope {
                             onMenuRequested: anchor => cardMenu.openFor(consoleCard, anchor)
                         }
                     }
-                }
-            }
 
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.max(emptyState.implicitHeight,
-                                                 scroller.height - 2 * Theme.space2
-                                                 - header.height - content.spacing)
-                visible: !page.hasConsoles
+                    AddConsoleTile {
+                        id: addTile
 
-                EmptyState {
-                    id: emptyState
-
-                    anchors.centerIn: parent
-                    width: parent.width
-                    onAddByAddressRequested: addDialog.openEmpty()
+                        width: cardsArea.cardWidth
+                        height: page.cardHeight
+                        listMode: page.listMode
+                        focused: cardsArea.activeFocus && page.currentIndex === cards.count
+                        onClicked: addDialog.openEmpty()
+                    }
                 }
             }
         }

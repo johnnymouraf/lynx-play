@@ -40,8 +40,7 @@ FailureText failureText(PairingFailure failure)
                 u"e tente de novo."_s};
     case PairingFailure::WrongPin:
         return {u"O PS5 recusou o código"_s,
-                u"Confira os 8 dígitos na TV. Se o código expirou, gere outro em Vincular "
-                u"dispositivo."_s};
+                u"Confira os 8 dígitos na TV ou gere outro em Vincular dispositivo."_s};
     case PairingFailure::InvalidAccountId:
         return {u"O PS5 não reconheceu o Account ID"_s,
                 u"Confira se é o Account ID da conta PSN usada no PS5."_s};

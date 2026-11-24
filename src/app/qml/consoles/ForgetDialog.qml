@@ -18,6 +18,8 @@ DialogShell {
     }
 
     title: `Esquecer ${dialog.consoleName}?`
+    iconName: "trash"
+    iconTone: "danger"
     onOpened: cancelButton.forceActiveFocus(Qt.TabFocusReason)
 
     AppText {
@@ -32,7 +34,8 @@ DialogShell {
         ActionButton {
             id: cancelButton
 
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "x"
             text: "Cancelar"
             onClicked: dialog.close()
         },

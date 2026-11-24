@@ -4,7 +4,7 @@ import MFPlay
 
 // The design's ViewToggle: shows the consoles as a grid or as a list.
 Rectangle {
-    id: toggle
+    id: viewToggle
 
     // "grid" or "list".
     property string mode: "grid"
@@ -34,7 +34,7 @@ Rectangle {
                 id: option
 
                 required property var modelData
-                readonly property bool selected: option.modelData.mode === toggle.mode
+                readonly property bool selected: option.modelData.mode === viewToggle.mode
 
                 implicitWidth: 34
                 implicitHeight: 32
@@ -43,7 +43,7 @@ Rectangle {
                 text: option.modelData.name
                 Accessible.role: Accessible.RadioButton
                 Accessible.checked: option.selected
-                onClicked: toggle.activated(option.modelData.mode)
+                onClicked: viewToggle.activated(option.modelData.mode)
 
                 contentItem: Item {
                     Icon {
