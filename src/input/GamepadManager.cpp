@@ -51,17 +51,27 @@ const char* connectionName(GamepadConnection connection)
     return "unknown connection";
 }
 
-int batteryPercentOf(SDL_Gamepad* gamepad)
+struct PowerInfo
+{
+    int percent = -1;
+    bool charging = false;
+};
+
+PowerInfo powerInfoOf(SDL_Gamepad* gamepad)
 {
     int percent = -1;
     const SDL_PowerState state = SDL_GetGamepadPowerInfo(gamepad, &percent);
+    const bool known = state != SDL_POWERSTATE_ERROR && state != SDL_POWERSTATE_UNKNOWN;
 
-    if (state == SDL_POWERSTATE_ERROR || state == SDL_POWERSTATE_UNKNOWN || percent < 0)
+    PowerInfo info;
+    info.charging = state == SDL_POWERSTATE_CHARGING;
+
+    if (known && percent >= 0)
     {
-        return -1;
+        info.percent = percent;
     }
 
-    return percent;
+    return info;
 }
 
 void clearDualSenseEffects(SDL_Gamepad* gamepad)
@@ -91,6 +101,7 @@ struct GamepadManager::Device
     bool hasPlayerLed = false;
     GamepadConnection connection = GamepadConnection::Unknown;
     int batteryPercent = -1;
+    bool batteryCharging = false;
     bool microphoneDown = false;
 
     GamepadSample sample;
@@ -223,7 +234,9 @@ void GamepadManager::openDevice(SDL_JoystickID id)
         SDL_GetBooleanProperty(properties, SDL_PROP_GAMEPAD_CAP_PLAYER_LED_BOOLEAN, false);
 
     device->connection = connectionOf(SDL_GetGamepadConnectionState(handle));
-    device->batteryPercent = batteryPercentOf(handle);
+    const PowerInfo power = powerInfoOf(handle);
+    device->batteryPercent = power.percent;
+    device->batteryCharging = power.charging;
 
     if (SDL_GamepadHasSensor(handle, SDL_SENSOR_GYRO))
     {
@@ -260,9 +273,9 @@ void GamepadManager::openDevice(SDL_JoystickID id)
 
     if (device->batteryPercent >= 0)
     {
-        spdlog::info("Gamepad detected: '{}' ({}{}, battery {}%)", device->name,
+        spdlog::info("Gamepad detected: '{}' ({}{}, battery {}%{})", device->name,
                      device->dualSense ? "DualSense, " : "", connectionName(device->connection),
-                     device->batteryPercent);
+                     device->batteryPercent, device->batteryCharging ? ", charging" : "");
     }
     else
     {
@@ -354,7 +367,9 @@ void GamepadManager::refreshDevices()
             spdlog::info("'{}' is now on {}", device->name, connectionName(connection));
         }
 
-        device->batteryPercent = batteryPercentOf(device->handle);
+        const PowerInfo power = powerInfoOf(device->handle);
+        device->batteryPercent = power.percent;
+        device->batteryCharging = power.charging;
     }
 }
 
@@ -370,6 +385,7 @@ void GamepadManager::publish()
             .dualSense = device->dualSense,
             .connection = device->connection,
             .batteryPercent = device->batteryPercent,
+            .batteryCharging = device->batteryCharging,
             .active = activeId_ && *activeId_ == device->id,
         });
     }

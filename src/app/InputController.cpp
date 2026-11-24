@@ -154,9 +154,14 @@ bool InputController::controllerBatteryLow() const
     return batteryLow_;
 }
 
-int InputController::controllerBattery() const
+int InputController::controllerBatteryPercent() const
 {
-    return battery_;
+    return batteryPercent_;
+}
+
+bool InputController::controllerCharging() const
+{
+    return charging_;
 }
 
 QVariantList InputController::controllers() const
@@ -275,7 +280,8 @@ void InputController::refreshStatus()
     QString status;
     bool wired = false;
     bool batteryLow = false;
-    int battery = -1;
+    int batteryPercent = -1;
+    bool charging = false;
 
     if (active != nullptr)
     {
@@ -293,16 +299,22 @@ void InputController::refreshStatus()
         }
 
         wired = active->connection == input::GamepadConnection::Wired;
+        charging = active->batteryCharging;
 
-        if (wired)
+        if (active->batteryPercent >= 0)
+        {
+            batteryPercent = active->batteryPercent;
+            batteryLow = batteryPercent < kLowBatteryPercent;
+            status = QStringLiteral("Bateria %1 %").arg(batteryPercent);
+
+            if (charging)
+            {
+                status += u" · Carregando"_s;
+            }
+        }
+        else if (wired)
         {
             status = u"USB"_s;
-        }
-        else if (active->batteryPercent >= 0)
-        {
-            status = QStringLiteral("Bateria %1 %").arg(active->batteryPercent);
-            battery = active->batteryPercent;
-            batteryLow = battery < kLowBatteryPercent;
         }
         else
         {
@@ -312,7 +324,8 @@ void InputController::refreshStatus()
 
     const bool statusChanged = connected != connected_ || title != title_ || detail != detail_ ||
                                status != status_ || wired != wired_ || batteryLow != batteryLow_ ||
-                               battery != battery_ || controllers != controllers_;
+                               batteryPercent != batteryPercent_ || charging != charging_ ||
+                               controllers != controllers_;
 
     connected_ = connected;
     title_ = title;
@@ -320,7 +333,8 @@ void InputController::refreshStatus()
     status_ = status;
     wired_ = wired;
     batteryLow_ = batteryLow;
-    battery_ = battery;
+    batteryPercent_ = batteryPercent;
+    charging_ = charging;
     controllers_ = controllers;
 
     if (statusChanged)

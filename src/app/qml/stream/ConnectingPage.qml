@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Shapes
 import MFPlay
 
 // The immersive screen while connecting to a console, and when that fails.
@@ -41,37 +40,6 @@ FocusScope {
         color: Theme.bg
     }
 
-    Shape {
-        anchors.fill: parent
-
-        ShapePath {
-            strokeWidth: 0
-            strokeColor: "transparent"
-            fillGradient: RadialGradient {
-                centerX: page.width / 2
-                centerY: page.height / 2
-                centerRadius: Math.hypot(page.width, page.height) / 2
-                focalX: page.width / 2
-                focalY: page.height / 2
-
-                GradientStop {
-                    position: 0
-                    color: "#1FF5A23A"
-                }
-
-                GradientStop {
-                    position: 1
-                    color: "#00F5A23A"
-                }
-            }
-
-            PathRectangle {
-                width: page.width
-                height: page.height
-            }
-        }
-    }
-
     // Keeps clicks from reaching the screen underneath.
     MouseArea {
         anchors.fill: parent
@@ -98,8 +66,8 @@ FocusScope {
 
             Rectangle {
                 implicitWidth: route.implicitWidth + 2 * Theme.space3
-                implicitHeight: route.implicitHeight + 2 * Theme.space1
-                radius: Theme.radiusFull
+                implicitHeight: 32
+                radius: Theme.radiusMd
                 color: Theme.surface
                 border.width: 1
                 border.color: Theme.border
@@ -133,35 +101,8 @@ FocusScope {
 
             ColumnLayout {
                 anchors.centerIn: parent
-                width: Math.min(parent.width, 560)
+                width: Math.min(parent.width, 640)
                 spacing: Theme.space6
-
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    implicitWidth: 420
-                    implicitHeight: 280
-                    radius: Theme.radiusXl
-                    color: Theme.mediaBackdrop
-
-                    RoundedImage {
-                        anchors.fill: parent
-                        opacity: page.failed ? 0.35 : 1
-                        source: Theme.consoleRender
-                        sourceWidth: 840
-                        topLeftRadius: Theme.radiusXl
-                        topRightRadius: Theme.radiusXl
-                        bottomLeftRadius: Theme.radiusXl
-                        bottomRightRadius: Theme.radiusXl
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.radiusXl
-                        color: "transparent"
-                        border.width: 1
-                        border.color: Theme.border
-                    }
-                }
 
                 ColumnLayout {
                     Layout.alignment: Qt.AlignHCenter
@@ -197,7 +138,7 @@ FocusScope {
                         color: Theme.surfaceHigh
 
                         Rectangle {
-                            width: parent.width * (page.startingVideo ? 0.85 : 0.55)
+                            width: parent.width * (page.startingVideo ? 0.85 : 0.58)
                             height: parent.height
                             radius: 3
                             color: Theme.accent
@@ -232,33 +173,26 @@ FocusScope {
                     }
                 }
 
+                AppText {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 560
+                    visible: page.failed
+                    text: `${page.stream.failureTitle}. ${page.stream.failureMessage}`
+                    textStyle: "bodyMedium"
+                    color: Theme.danger
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
                 ActionButton {
                     id: cancelButton
 
                     Layout.alignment: Qt.AlignHCenter
                     visible: !page.failed
+                    variant: "secondary"
+                    iconName: "x"
                     text: "Cancelar"
                     onClicked: page.stream.cancel()
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: page.failed
-                    spacing: Theme.space2
-
-                    Banner {
-                        Layout.fillWidth: true
-                        tone: "danger"
-                        title: page.stream.failureTitle
-                        message: page.stream.failureMessage
-                    }
-
-                    ActionButton {
-                        Layout.alignment: Qt.AlignHCenter
-                        iconName: "folder-open"
-                        text: "Abrir pasta de logs"
-                        onClicked: Qt.openUrlExternally(page.controller.logsUrl)
-                    }
                 }
 
                 Row {
@@ -267,9 +201,17 @@ FocusScope {
                     spacing: Theme.space3
 
                     ActionButton {
-                        variant: "ghost"
+                        variant: "secondary"
+                        iconName: "arrow-left"
                         text: "Voltar aos consoles"
                         onClicked: page.stream.cancel()
+                    }
+
+                    ActionButton {
+                        variant: "secondary"
+                        iconName: "folder-open"
+                        text: "Abrir pasta de logs"
+                        onClicked: Qt.openUrlExternally(page.controller.logsUrl)
                     }
 
                     ActionButton {

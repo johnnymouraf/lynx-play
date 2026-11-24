@@ -114,6 +114,7 @@ qt_add_qml_module(mfplay
         qml/dev/GallerySection.qml
         qml/settings/AudioSettings.qml
         qml/settings/ControllerSettings.qml
+        qml/settings/NetworkSettings.qml
         qml/settings/RtxSettings.qml
         qml/settings/SectionHeader.qml
         qml/settings/SettingsPage.qml
@@ -123,6 +124,7 @@ qt_add_qml_module(mfplay
     RESOURCES
         ${mfplay_fonts}
         ${mfplay_licenses}
+        assets/icons/arrow-left.svg
         assets/icons/check.svg
         assets/icons/chevron-down.svg
         assets/icons/chevron-up.svg
@@ -132,8 +134,10 @@ qt_add_qml_module(mfplay
         assets/icons/circle-question-mark.svg
         assets/icons/circle.svg
         assets/icons/clock.svg
+        assets/icons/code-xml.svg
         assets/icons/ellipsis.svg
         assets/icons/external-link.svg
+        assets/icons/file-text.svg
         assets/icons/folder-open.svg
         assets/icons/gamepad-2.svg
         assets/icons/flask-conical.svg
@@ -144,6 +148,7 @@ qt_add_qml_module(mfplay
         assets/icons/list.svg
         assets/icons/loader-circle.svg
         assets/icons/lock-keyhole.svg
+        assets/icons/log-in.svg
         assets/icons/menu.svg
         assets/icons/monitor-play.svg
         assets/icons/monitor.svg
@@ -162,7 +167,10 @@ qt_add_qml_module(mfplay
         assets/icons/trash.svg
         assets/icons/triangle.svg
         assets/icons/tv-minimal-play.svg
+        assets/icons/user-check.svg
+        assets/icons/user-x.svg
         assets/icons/volume-2.svg
+        assets/icons/wifi.svg
         assets/icons/wifi-off.svg
         assets/icons/x.svg
         assets/images/app-icon.svg

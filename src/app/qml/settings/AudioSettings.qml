@@ -36,20 +36,22 @@ ColumnLayout {
         subtitle: "O som do jogo sai no PC; o microfone vai para o PS5 (chat de voz e comandos)."
     }
 
-    Banner {
+    AppText {
         Layout.fillWidth: true
         visible: section.settings.outputDevices.length === 0
-        tone: "standby"
-        title: "Nenhuma saída de áudio encontrada"
-        message: "O som tenta a saída padrão do Windows. Confira os dispositivos no Windows."
+        text: "Nenhuma saída de áudio encontrada. O som tenta a saída padrão do Windows."
+        textStyle: "bodyMedium"
+        color: Theme.standby
+        wrapMode: Text.WordWrap
     }
 
-    Banner {
+    AppText {
         Layout.fillWidth: true
         visible: section.settings.microphoneDevices.length === 0
-        tone: "standby"
-        title: "Nenhum microfone encontrado"
-        message: "Verifique Configurações do Windows › Privacidade e segurança › Microfone, e se o microfone está conectado."
+        text: "Nenhum microfone encontrado. Confira Configurações do Windows › Privacidade e segurança › Microfone."
+        textStyle: "bodyMedium"
+        color: Theme.standby
+        wrapMode: Text.WordWrap
     }
 
     SettingRow {

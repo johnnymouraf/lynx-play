@@ -116,19 +116,19 @@ ColumnLayout {
         label: "DLSS Frame Generation 2x"
         description: section.settings.frameGenerationAvailable
                      ? "Gera um quadro entre cada dois: 30 → 60 ou 60 → 120 fps. Adiciona cerca "
-                       + "de 1 quadro de latência; usa o NVIDIA Reflex."
+                       + "de 1 quadro de latência; use com Reflex."
                      : "Indisponível: " + section.settings.frameGenerationUnavailableReason
 
-        SegmentedControl {
-            name: "DLSS Frame Generation 2x"
+        Toggle {
+            checked: section.settings.frameGeneration === "2x"
             enabled: section.settings.frameGenerationAvailable
             opacity: enabled ? 1 : 0.5
-            options: [
-                { label: "Desligado", value: "off" },
-                { label: "Ligado 2x", value: "2x" }
-            ]
-            currentValue: section.settings.frameGeneration
-            onActivated: value => section.settings.frameGeneration = value
+            Accessible.name: "DLSS Frame Generation 2x"
+            onCheckedChanged: {
+                if (checked !== (section.settings.frameGeneration === "2x")) {
+                    section.settings.frameGeneration = checked ? "2x" : "off";
+                }
+            }
         }
     }
 
