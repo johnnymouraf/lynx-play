@@ -154,7 +154,7 @@ qt_add_qml_module(mfplay
         assets/icons/volume-2.svg
         assets/icons/wifi-off.svg
         assets/icons/x.svg
-        assets/images/brand-mark.png
+        assets/images/app-icon.svg
         assets/images/console-glyph.svg
         assets/images/console-render.png)
 

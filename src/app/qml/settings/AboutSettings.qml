@@ -46,15 +46,12 @@ ColumnLayout {
             anchors.margins: Theme.space5
             spacing: Theme.space5
 
-            RoundedImage {
+            Image {
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 72
                 source: Theme.brandMark
-                sourceWidth: 216
-                topLeftRadius: 18
-                topRightRadius: 18
-                bottomLeftRadius: 18
-                bottomRightRadius: 18
+                sourceSize.width: 72
+                sourceSize.height: 72
             }
 
             ColumnLayout {
@@ -63,7 +60,7 @@ ColumnLayout {
 
                 AppText {
                     Layout.fillWidth: true
-                    text: `<b>MF</b><font color="${Theme.accent}">Play</font>`
+                    text: "<b>MF</b>Play"
                     textFormat: Text.StyledText
                     font.family: Theme.fontDisplay
                     font.pixelSize: 24

@@ -1,43 +1,43 @@
 import QtQuick
 import MFPlay
 
-// The app mark and the "MFPlay" wordmark.
+// The app mark beside the "MFPlay" wordmark and its tagline.
 Row {
     spacing: Theme.space3
     Accessible.role: Accessible.StaticText
     Accessible.name: "MFPlay"
 
-    RoundedImage {
+    Image {
         anchors.verticalCenter: parent.verticalCenter
         width: 36
         height: 36
         source: Theme.brandMark
-        sourceWidth: 144
-        topLeftRadius: 9
-        topRightRadius: 9
-        bottomLeftRadius: 9
-        bottomRightRadius: 9
+        sourceSize.width: width
+        sourceSize.height: height
     }
 
-    Row {
+    Column {
         anchors.verticalCenter: parent.verticalCenter
+        spacing: 2
 
         Text {
-            text: "MF"
+            text: "<b>MF</b>Play"
+            textFormat: Text.StyledText
             color: Theme.text
             font.family: Theme.fontDisplay
-            font.pixelSize: 20
-            font.weight: Font.Bold
-            font.letterSpacing: -0.2
+            font.pixelSize: 18
+            font.letterSpacing: -0.18
+            lineHeight: 20
+            lineHeightMode: Text.FixedHeight
         }
 
         Text {
-            text: "Play"
-            color: Theme.accent
-            font.family: Theme.fontDisplay
-            font.pixelSize: 20
-            font.weight: Font.Normal
-            font.letterSpacing: -0.2
+            text: "REMOTE PS5 SYSTEM"
+            color: Theme.textSubtle
+            font.family: Theme.fontMono
+            font.pixelSize: 9
+            font.weight: Font.DemiBold
+            font.letterSpacing: 1.5
         }
     }
 }

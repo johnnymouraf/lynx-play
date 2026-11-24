@@ -295,13 +295,15 @@ value in the settings store.
 
 **Chosen: A**. Changing it: replace the audio output module.
 
-#### D7 – Logo: amber eye between lynx ears (design)
+#### D7 – Logo: the MF monogram (design, 3.1)
 
-- A. Eye between ears: reads at small sizes.
-- B. Faceted lynx head: more detailed, muddled when small.
+- A. One vector `AppIcon` (MF monogram over △○✕□, white on the accent) at
+  every size, the tray included.
+- B. A simpler MF-only mark for the small sizes.
 
-**Chosen: A**. It is a raster image; it needs vectorizing before the `.ico`.
-Changing it: regenerate the mark and replace it in the design and the app.
+**Chosen: A** (the owner rejected B). The app's `app-icon.svg` and
+`mfplay.ico` (16–256 px) are exported from the design's `AppIcon`. Changing
+it: edit `AppIcon` in the design and export both again.
 
 #### D8 – Three font families (design)
 

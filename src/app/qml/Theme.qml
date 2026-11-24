@@ -130,7 +130,7 @@ QtObject {
         }
     })
 
-    readonly property url brandMark: "qrc:/qt/qml/MFPlay/assets/images/brand-mark.png"
+    readonly property url brandMark: "qrc:/qt/qml/MFPlay/assets/images/app-icon.svg"
     readonly property url consoleRender: "qrc:/qt/qml/MFPlay/assets/images/console-render.png"
     readonly property url consoleGlyph: "qrc:/qt/qml/MFPlay/assets/images/console-glyph.svg"
 }
