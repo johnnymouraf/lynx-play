@@ -10,8 +10,8 @@ T.Button {
     property string iconName: "x"
     property color restingFill: "transparent"
 
-    implicitWidth: Theme.control
-    implicitHeight: Theme.control
+    implicitWidth: Theme.sizeControl
+    implicitHeight: Theme.sizeControl
     padding: 0
     focusPolicy: Qt.StrongFocus
     hoverEnabled: true

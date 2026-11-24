@@ -49,7 +49,7 @@ FocusScope {
     }
 
     implicitWidth: 300
-    implicitHeight: Theme.control
+    implicitHeight: Theme.sizeControl
     activeFocusOnTab: true
     Accessible.role: Accessible.ComboBox
     Accessible.name: control.name

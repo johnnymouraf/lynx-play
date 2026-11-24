@@ -11,6 +11,7 @@ Text {
     font.pixelSize: styleSpec.pixelSize
     font.weight: styleSpec.weight
     font.letterSpacing: styleSpec.letterSpacing
+    font.capitalization: styleSpec.capitalization ?? Font.MixedCase
     lineHeightMode: Text.FixedHeight
     lineHeight: styleSpec.lineHeight
     verticalAlignment: Text.AlignVCenter

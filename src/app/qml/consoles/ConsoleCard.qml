@@ -207,7 +207,7 @@ Item {
 
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.control
+                Layout.preferredHeight: Theme.sizeControl
 
                 ActionButton {
                     anchors.fill: parent

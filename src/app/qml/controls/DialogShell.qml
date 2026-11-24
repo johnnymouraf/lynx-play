@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Templates as T
 import MFPlay
@@ -51,14 +50,6 @@ T.Popup {
         color: Theme.surfaceRaised
         border.width: 1
         border.color: Theme.border
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Theme.dialogShadow
-            shadowVerticalOffset: 24
-            shadowBlur: 1.0
-            blurMax: 64
-        }
     }
 
     contentItem: ColumnLayout {

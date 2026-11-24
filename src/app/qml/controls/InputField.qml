@@ -34,12 +34,12 @@ ColumnLayout {
         id: input
 
         Layout.fillWidth: true
-        implicitHeight: Theme.control
+        implicitHeight: Theme.sizeControl
         leftPadding: Theme.space3
         rightPadding: Theme.space3
         color: Theme.text
         selectionColor: Theme.accent
-        selectedTextColor: Theme.textOnAccent
+        selectedTextColor: Theme.onAccent
         placeholderTextColor: Theme.textSubtle
         font.family: Theme.fontBody
         font.pixelSize: 16

@@ -14,7 +14,7 @@ Rectangle {
 
     signal sectionRequested(string section)
 
-    implicitWidth: Theme.railWidth
+    implicitWidth: Theme.sizeRail
     color: Theme.surface
 
     Rectangle {

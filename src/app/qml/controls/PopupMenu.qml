@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Templates as T
 import MFPlay
 
@@ -28,13 +27,5 @@ T.Menu {
         color: Theme.surfaceRaised
         border.width: 1
         border.color: Theme.borderStrong
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Theme.toastShadow
-            shadowVerticalOffset: 8
-            shadowBlur: 1.0
-            blurMax: 24
-        }
     }
 }

@@ -45,7 +45,7 @@ T.Slider {
             anchors.fill: parent
             radius: width / 2
             color: "transparent"
-            border.width: Theme.focusRingWidth
+            border.width: Theme.sizeFocusRing
             border.color: Theme.focus
             visible: control.visualFocus
         }

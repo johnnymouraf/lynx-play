@@ -31,7 +31,7 @@ T.Switch {
             width: 22
             height: 22
             radius: width / 2
-            color: control.checked ? Theme.textOnAccent : Theme.textMuted
+            color: control.checked ? Theme.onAccent : Theme.textMuted
             x: control.checked ? track.width - width - 3 : 3
 
             Behavior on x {

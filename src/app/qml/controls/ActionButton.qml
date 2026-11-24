@@ -17,8 +17,8 @@ T.Button {
             pressedFill: Theme.accentPressed,
             focusFill: Theme.accent,
             disabledFill: Theme.surfaceHigh,
-            content: Theme.textOnAccent,
-            hoverContent: Theme.textOnAccent,
+            content: Theme.onAccent,
+            hoverContent: Theme.onAccent,
             border: "transparent",
             pressedBorder: "transparent",
             disabledBorder: "transparent"
@@ -54,7 +54,7 @@ T.Button {
             focusFill: Theme.dangerSubtle,
             disabledFill: Theme.surfaceRaised,
             content: Theme.danger,
-            hoverContent: Theme.textOnDanger,
+            hoverContent: Theme.onDanger,
             border: "transparent",
             pressedBorder: "transparent",
             disabledBorder: "transparent"
@@ -64,7 +64,7 @@ T.Button {
 
     implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
                             implicitContentWidth + leftPadding + rightPadding)
-    implicitHeight: Theme.control
+    implicitHeight: Theme.sizeControl
     leftPadding: Theme.space5
     rightPadding: Theme.space5
     spacing: Theme.space2
@@ -102,7 +102,7 @@ T.Button {
     background: Rectangle {
         id: fill
 
-        implicitHeight: Theme.control
+        implicitHeight: Theme.sizeControl
         radius: Theme.radiusMd
         color: control.tone.fill
         border.width: control.variant === "secondary" ? 1 : 0

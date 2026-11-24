@@ -46,9 +46,11 @@ qt_add_executable(mfplay WIN32
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 set(mfplay_fonts
+    assets/fonts/Inter-Bold.ttf
     assets/fonts/Inter-Medium.ttf
     assets/fonts/Inter-Regular.ttf
     assets/fonts/Inter-SemiBold.ttf
+    assets/fonts/JetBrainsMono-Bold.ttf
     assets/fonts/JetBrainsMono-Medium.ttf
     assets/fonts/JetBrainsMono-SemiBold.ttf
     assets/fonts/Sora-Bold.ttf

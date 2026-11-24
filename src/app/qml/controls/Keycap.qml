@@ -17,7 +17,7 @@ Rectangle {
     implicitHeight: 26
     radius: Theme.radiusSm
     color: Theme.surfaceHigh
-    border.width: capturing ? Theme.focusRingWidth : 1
+    border.width: capturing ? Theme.sizeFocusRing : 1
     border.color: capturing ? Theme.focus : Theme.borderStrong
     opacity: editable ? 1 : 0.6
 

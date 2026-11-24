@@ -9,7 +9,7 @@ T.Button {
     property string iconName: ""
 
     implicitWidth: implicitContentWidth + leftPadding + rightPadding
-    implicitHeight: Theme.controlSmall
+    implicitHeight: Theme.sizeControlSm
     leftPadding: Theme.space2
     rightPadding: Theme.space2
     spacing: Theme.space2

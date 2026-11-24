@@ -8,7 +8,7 @@ Image {
 
     property string name
     property color color: Theme.text
-    property int size: Theme.iconSize
+    property int size: Theme.sizeIcon
     property bool bold: false
 
     readonly property string colorHex: icon.color.toString().substring(1)

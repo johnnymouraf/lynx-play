@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import MFPlay
 
 // A Banner that floats over the screen for a few seconds.
@@ -31,14 +30,6 @@ Item {
         id: banner
 
         width: toast.width
-        layer.enabled: true
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Theme.toastShadow
-            shadowVerticalOffset: 8
-            shadowBlur: 1.0
-            blurMax: 24
-        }
     }
 
     Timer {
