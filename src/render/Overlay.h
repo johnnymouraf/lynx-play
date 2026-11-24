@@ -113,6 +113,8 @@ struct OverlayOptions
 {
     bool statisticsVisible = false;
     core::ReflexMode reflex = core::ReflexMode::On;
+    // Presents with no sync interval, letting the display tear.
+    bool lowestLatency = false;
     bool microphoneMuted = false;
     // The controller the microphone toggle names, if any.
     std::string microphoneDetail;
@@ -135,6 +137,7 @@ struct OverlayActions
     std::function<void(core::ReflexMode)> reflexChanged;
     std::function<void(core::Upscaling)> upscalingChanged;
     std::function<void(core::FrameGenerationMode)> frameGenerationChanged;
+    std::function<void(bool)> lowestLatencyChanged;
     std::function<void(bool)> microphoneMutedChanged;
     std::function<void(bool)> statisticsVisibleChanged;
     std::function<void(bool)> menuOpenChanged;
@@ -261,6 +264,7 @@ private:
     bool reportedMenuOpen_ = false;
     bool reportedStatisticsVisible_ = false;
     core::ReflexMode reflex_ = core::ReflexMode::Off;
+    bool lowestLatency_ = false;
     bool microphoneMuted_ = false;
     // Paces the controller debug line written while the statistics are open.
     std::chrono::steady_clock::time_point nextControllerLog_{};

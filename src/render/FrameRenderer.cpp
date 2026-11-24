@@ -196,6 +196,7 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
     requestedFrameGeneration_.store(options_.frameGeneration);
     requestedHdr_.store(options_.hdr);
     requestedHdrApplied_ = options_.hdr;
+    requestedTiming_.store(options_.timing);
     requestedWindowMode_.store(options_.overlay.windowMode);
     requestedWindowSize_.store(options_.overlay.windowSize);
     windowLayoutApplied_ = {
@@ -545,6 +546,19 @@ try
         if (appFrameGeneration)
         {
             appFrameGeneration(mode);
+        }
+    };
+
+    const std::function<void(bool)> appLowestLatency = overlayActions_.lowestLatencyChanged;
+
+    overlayActions_.lowestLatencyChanged = [this, appLowestLatency](bool lowest)
+    {
+        requestedTiming_.store(lowest ? PresentTiming::Immediate : PresentTiming::VSync);
+        SetEvent(wakeEvent_.get());
+
+        if (appLowestLatency)
+        {
+            appLowestLatency(lowest);
         }
     };
 
@@ -1036,7 +1050,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             reflex_.mark(reflexFrameId, LatencyMarker::PresentStart);
         }
 
-        const HRESULT presentResult = swapChain_.present(options_.timing);
+        const HRESULT presentResult = swapChain_.present(requestedTiming_.load());
         presentGate_.observe(outcomeOf(presentResult));
 
         if (marked)
@@ -2047,7 +2061,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
     generationAllocatorFenceValues_.at(index) = lastSignaledFence_;
 
     reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentStart);
-    const HRESULT presentResult = swapChain_.present(options_.timing);
+    const HRESULT presentResult = swapChain_.present(requestedTiming_.load());
     reflex_.markOutOfBand(frameId, LatencyMarker::OutOfBandPresentEnd);
     presentGate_.observe(outcomeOf(presentResult));
 
@@ -2126,7 +2140,7 @@ std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameI
         reflex_.mark(frameId, LatencyMarker::PresentStart);
     }
 
-    const HRESULT presentResult = swapChain_.present(options_.timing);
+    const HRESULT presentResult = swapChain_.present(requestedTiming_.load());
     presentGate_.observe(outcomeOf(presentResult));
 
     if (frameId != 0)

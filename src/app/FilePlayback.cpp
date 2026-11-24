@@ -141,6 +141,12 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                 &settings, [&settings, name] { settings.setFrameGeneration(name); },
                 Qt::QueuedConnection);
         },
+        .lowestLatencyChanged = [&settings](bool lowest)
+        {
+            QMetaObject::invokeMethod(
+                &settings, [&settings, lowest] { settings.setLowestLatency(lowest); },
+                Qt::QueuedConnection);
+        },
         .microphoneMutedChanged = [&settings](bool muted)
         {
             QMetaObject::invokeMethod(
@@ -182,6 +188,7 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                 {
                     .statisticsVisible = settings.overlayStatisticsVisible(),
                     .reflex = settings.reflexMode(),
+                    .lowestLatency = settings.lowestLatency(),
                     .microphoneMuted = settings.microphoneMuted(),
                     .microphoneDetail = gamepads != nullptr && gamepads->activeName().has_value()
                                             ? "DualSense"

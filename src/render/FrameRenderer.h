@@ -356,6 +356,8 @@ private:
     std::uint64_t droppedFrames_ = 0;
     std::atomic<core::HdrMode> requestedHdr_;
     core::HdrMode requestedHdrApplied_ = core::HdrMode::Auto;
+    // Read on every present, so the quick menu's toggle applies at once.
+    std::atomic<PresentTiming> requestedTiming_;
     // The layout the overlay's window row shows.
     std::atomic<core::WindowMode> requestedWindowMode_;
     std::atomic<core::WindowSize> requestedWindowSize_;

@@ -116,6 +116,8 @@ struct MenuResult
     core::Upscaling upscaling = core::Upscaling::Shader;
     bool frameGenerationChanged = false;
     core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
+    bool lowestLatencyChanged = false;
+    bool lowestLatency = false;
     bool microphoneToggled = false;
     bool windowLayoutChanged = false;
     core::WindowLayout windowLayout;
@@ -1024,8 +1026,8 @@ void menuFooter(const Fonts& fonts)
 }
 
 MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const OverlayOptions& options,
-                    core::ReflexMode currentReflex, bool microphoneMuted, bool statsVisible,
-                    core::WindowLayout windowLayout)
+                    core::ReflexMode currentReflex, bool lowestLatency, bool microphoneMuted,
+                    bool statsVisible, core::WindowLayout windowLayout)
 {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float height = std::min(kMenuHeight, std::max(320.0F, display.y - 2.0F * kPanelMargin));
@@ -1083,6 +1085,14 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
         result.statisticsToggled = true;
     }
 
+    if (toggleRow("vsync-row", fonts, "Sincronização vertical",
+                  "Menor latência pode mostrar cortes na imagem (tearing).", !lowestLatency))
+    {
+        result.lowestLatencyChanged = true;
+        result.lowestLatency = !lowestLatency;
+        spdlog::info("overlay: vsync {}", result.lowestLatency ? "off (lowest latency)" : "on");
+    }
+
     if (toggleRow("microphone-row", fonts, "Microfone", options.microphoneDetail,
                   !microphoneMuted))
     {
@@ -1130,6 +1140,7 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
     overlay->options_ = std::move(options);
     overlay->actions_ = std::move(actions);
     overlay->reflex_ = overlay->options_.reflex;
+    overlay->lowestLatency_ = overlay->options_.lowestLatency;
     overlay->microphoneMuted_ = overlay->options_.microphoneMuted;
     overlay->windowMode_.store(overlay->options_.windowMode);
     overlay->windowSize_.store(overlay->options_.windowSize);
@@ -1349,8 +1360,8 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             .mode = windowMode_.load(),
             .size = windowSize_.load(),
         };
-        const MenuResult menu = drawMenu(fonts, stats, options_, reflex_, microphoneMuted_,
-                                         statisticsVisible, windowLayout);
+        const MenuResult menu = drawMenu(fonts, stats, options_, reflex_, lowestLatency_,
+                                         microphoneMuted_, statisticsVisible, windowLayout);
 
         if (menu.statisticsToggled)
         {
@@ -1398,6 +1409,21 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             else
             {
                 spdlog::warn("overlay: no window layout action");
+            }
+        }
+
+        if (menu.lowestLatencyChanged)
+        {
+            lowestLatency_ = menu.lowestLatency;
+            spdlog::info("overlay: lowest latency {}", lowestLatency_);
+
+            if (actions_.lowestLatencyChanged)
+            {
+                actions_.lowestLatencyChanged(lowestLatency_);
+            }
+            else
+            {
+                spdlog::warn("overlay: no lowest latency action");
             }
         }
 

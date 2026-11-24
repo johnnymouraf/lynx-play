@@ -155,6 +155,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                          .statisticsVisible =
                                                              settings_.overlayStatisticsVisible(),
                                                          .reflex = settings_.reflexMode(),
+                                                         .lowestLatency =
+                                                             settings_.lowestLatency(),
                                                          .microphoneMuted =
                                                              settings_.microphoneMuted(),
                                                          .sessionName = "Teste de vídeo",
@@ -169,6 +171,18 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                          {
                                                              settings_.setReflex(QString::fromLatin1(
                                                                  render::reflexModeName(mode)));
+                                                         },
+                                                         .lowestLatencyChanged =
+                                                             [this](bool lowest)
+                                                         {
+                                                             QMetaObject::invokeMethod(
+                                                                 this,
+                                                                 [this, lowest]
+                                                                 {
+                                                                     settings_.setLowestLatency(
+                                                                         lowest);
+                                                                 },
+                                                                 Qt::QueuedConnection);
                                                          },
                                                          .microphoneMutedChanged =
                                                              [this](bool muted)

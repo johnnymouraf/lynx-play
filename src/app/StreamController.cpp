@@ -371,6 +371,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
             const QString name = QString::fromLatin1(core::frameGenerationName(mode).data());
             post([this, name] { settings_.setFrameGeneration(name); });
         },
+        .lowestLatencyChanged = [this](bool lowest)
+        { post([this, lowest] { settings_.setLowestLatency(lowest); }); },
         .microphoneMutedChanged = [this](bool muted)
         { post([this, muted] { settings_.setMicrophoneMuted(muted); }); },
         .statisticsVisibleChanged = [this](bool visible)
@@ -425,6 +427,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
                 {
                     .statisticsVisible = settings_.overlayStatisticsVisible(),
                     .reflex = settings_.reflexMode(),
+                    .lowestLatency = settings_.lowestLatency(),
                     .microphoneMuted = settings_.microphoneMuted(),
                     .microphoneDetail = input_.controllerConnected() ? "DualSense" : "Sem controle",
                     .sessionName = target_->name.toStdString(),
