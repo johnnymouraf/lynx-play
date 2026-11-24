@@ -54,12 +54,18 @@ Item {
     Accessible.role: Accessible.Grouping
     Accessible.name: card.name
 
-    // The design's "More" button: a small dark tile with an ellipsis.
+    // The design's "More" button: a small dark tile with an ellipsis. The
+    // list row gives it the action button's size.
     component MoreButton: T.Button {
         id: more
 
-        implicitWidth: 28
-        implicitHeight: 24
+        property int boxWidth: 28
+        property int boxHeight: 24
+        property int boxRadius: 3
+        property int glyphSize: 16
+
+        implicitWidth: more.boxWidth
+        implicitHeight: more.boxHeight
         focusPolicy: Qt.NoFocus
         hoverEnabled: true
 
@@ -67,13 +73,13 @@ Item {
             Icon {
                 anchors.centerIn: parent
                 name: "ellipsis"
-                size: 16
+                size: more.glyphSize
                 color: more.hovered ? Theme.text : Theme.textMuted
             }
         }
 
         background: Rectangle {
-            radius: 3
+            radius: more.boxRadius
             color: more.hovered ? Theme.surfaceHover : Theme.menu
         }
     }
@@ -224,6 +230,10 @@ Item {
         MoreButton {
             id: listMore
 
+            boxWidth: Theme.sizeControlLg
+            boxHeight: Theme.sizeControlLg
+            boxRadius: Theme.radiusMd
+            glyphSize: Theme.sizeIcon
             Layout.alignment: Qt.AlignVCenter
             text: `Opções de ${card.name}`
             onClicked: card.openMenu()
