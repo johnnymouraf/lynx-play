@@ -55,7 +55,7 @@ T.Button {
 
             PropertyChanges {
                 target: label
-                color: Theme.accentText
+                color: Theme.accentContent
             }
         },
         State {

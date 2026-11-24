@@ -66,12 +66,12 @@ T.Button {
             PropertyChanges {
                 target: tile
                 color: Theme.accentPressed
-                iconColor: Theme.accentText
+                iconColor: Theme.accentContent
             }
 
             PropertyChanges {
                 target: label
-                color: Theme.accentText
+                color: Theme.accentContent
             }
         },
         State {

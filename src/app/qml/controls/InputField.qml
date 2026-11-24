@@ -39,7 +39,7 @@ ColumnLayout {
         rightPadding: Theme.space3
         color: Theme.text
         selectionColor: Theme.accent
-        selectedTextColor: Theme.accentText
+        selectedTextColor: Theme.accentContent
         placeholderTextColor: Theme.textSubtle
         font.family: Theme.fontBody
         font.pixelSize: Theme.typeBodyLg
