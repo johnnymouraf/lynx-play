@@ -520,6 +520,34 @@ try
         }
     };
 
+    const std::function<void(core::Upscaling)> appUpscaling = overlayActions_.upscalingChanged;
+
+    overlayActions_.upscalingChanged = [this, appUpscaling](core::Upscaling upscaling)
+    {
+        requestedUpscaling_.store(upscaling);
+        SetEvent(wakeEvent_.get());
+
+        if (appUpscaling)
+        {
+            appUpscaling(upscaling);
+        }
+    };
+
+    const std::function<void(core::FrameGenerationMode)> appFrameGeneration =
+        overlayActions_.frameGenerationChanged;
+
+    overlayActions_.frameGenerationChanged = [this, appFrameGeneration](
+                                                 core::FrameGenerationMode mode)
+    {
+        requestedFrameGeneration_.store(mode);
+        SetEvent(wakeEvent_.get());
+
+        if (appFrameGeneration)
+        {
+            appFrameGeneration(mode);
+        }
+    };
+
     OverlayOptions overlayOptions = options_.overlay;
     overlayOptions.hdrOutput = presentation_.hdrSwapChain;
     overlayOptions.sdrWhiteNits = presentation_.sdrWhiteNits;
@@ -2853,6 +2881,8 @@ OverlayStats FrameRenderer::overlayStats()
 
     stats.opticalFlow = opticalFlowState();
     stats.dlss = dlssState();
+    stats.upscaling = requestedUpscalingApplied_;
+    stats.frameGeneration = requestedFrameGenerationApplied_;
 
     if (const auto& cadence = cadence_.estimate())
     {

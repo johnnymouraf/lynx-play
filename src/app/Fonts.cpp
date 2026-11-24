@@ -72,6 +72,7 @@ render::OverlayFonts overlayFonts()
         .label = fontBytes("Inter-Medium.ttf"),
         .title = fontBytes("Inter-SemiBold.ttf"),
         .mono = fontBytes("JetBrainsMono-Medium.ttf"),
+        .monoStrong = fontBytes("JetBrainsMono-SemiBold.ttf"),
     };
 }
 
