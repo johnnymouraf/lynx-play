@@ -80,21 +80,17 @@ struct FlowVector
 enum class SessionReleaseStep
 {
     WaitForLastFlow,
-    UnregisterCostResources,
     UnregisterFlowResources,
     UnregisterInputResources,
-    ReleaseCostPictures,
     ReleaseFlowPictures,
     ReleaseInputPictures,
     DestroySession,
 };
 
-inline constexpr std::array<SessionReleaseStep, 8> kSessionReleaseSteps{
+inline constexpr std::array<SessionReleaseStep, 6> kSessionReleaseSteps{
     SessionReleaseStep::WaitForLastFlow,
-    SessionReleaseStep::UnregisterCostResources,
     SessionReleaseStep::UnregisterFlowResources,
     SessionReleaseStep::UnregisterInputResources,
-    SessionReleaseStep::ReleaseCostPictures,
     SessionReleaseStep::ReleaseFlowPictures,
     SessionReleaseStep::ReleaseInputPictures,
     SessionReleaseStep::DestroySession,
@@ -111,7 +107,7 @@ void runSessionRelease(const std::function<void(SessionReleaseStep)>& step,
 // presenter's BGRA8 intermediates on the renderer's device. Each execute runs
 // on the engine's own queue and is ordered by fence points: the renderer's
 // queue signals the input value, and the engine signals the output value when
-// the vectors and the cost are ready. One instance per stream window.
+// the vectors are ready. One instance per stream window.
 class OpticalFlow
 {
 public:
@@ -152,10 +148,9 @@ public:
     // Waiting on it covers every flow the engine has written.
     [[nodiscard]] std::uint64_t lastOutputValue() const;
 
-    // The R16G16_SINT vectors and the R8_UINT cost of a slot, kept in
-    // D3D12_RESOURCE_STATE_COMMON while the engine owns them.
+    // The R16G16_SINT vectors of a slot, kept in D3D12_RESOURCE_STATE_COMMON
+    // while the engine owns them.
     [[nodiscard]] ID3D12Resource* flow(UINT slot) const;
-    [[nodiscard]] ID3D12Resource* cost(UINT slot) const;
     [[nodiscard]] SurfaceSize gridExtent() const;
 
     // What the session runs, for the log.

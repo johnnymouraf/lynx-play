@@ -373,26 +373,6 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 
     copyCommandList_->Close();
 
-    for (auto& allocator : flowAllocators_)
-    {
-        if (const HRESULT result = gpu_.device->CreateCommandAllocator(
-                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator));
-            FAILED(result))
-        {
-            return std::unexpected(describeFailure("CreateCommandAllocator (flow)", result));
-        }
-    }
-
-    if (const HRESULT result = gpu_.device->CreateCommandList(
-            0, D3D12_COMMAND_LIST_TYPE_DIRECT, flowAllocators_[0].Get(), nullptr,
-            IID_PPV_ARGS(&flowCommandList_));
-        FAILED(result))
-    {
-        return std::unexpected(describeFailure("CreateCommandList (flow)", result));
-    }
-
-    flowCommandList_->Close();
-
     for (auto& allocator : generationAllocators_)
     {
         if (const HRESULT result = gpu_.device->CreateCommandAllocator(
@@ -441,6 +421,16 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
     }
 
     timer_ = std::move(*timer);
+
+    if (auto flowTimer = OpticalFlowTimer::create(*gpu_.device.Get(), SwapChain::kBufferCount);
+        flowTimer)
+    {
+        flowTimer_ = std::move(*flowTimer);
+    }
+    else
+    {
+        spdlog::warn("The optical flow's own time won't be measured: {}", flowTimer.error());
+    }
 
     fenceEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
     wakeEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
@@ -857,12 +847,19 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     // finished the frame that last used it; so can the picture it read.
     waitForFence(allocatorFenceValues_.at(sourceIndex));
     waitForFence(copyAllocatorFenceValues_.at(sourceIndex));
-    waitForFence(flowAllocatorFenceValues_.at(sourceIndex));
     framesInFlight_.at(sourceIndex).reset();
 
     if (auto times = timer_->take(sourceIndex); times && bufferShowedNewFrame_.at(sourceIndex))
     {
         lastGpuTimes_ = *times;
+    }
+
+    if (flowTimer_)
+    {
+        if (const auto flowMilliseconds = flowTimer_->take(sourceIndex))
+        {
+            lastFlowMilliseconds_ = *flowMilliseconds;
+        }
     }
 
     const bool flowReady = prepareOpticalFlow();
@@ -957,6 +954,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             flow.submitted = true;
             flow.output = *output;
             flowSlotValid_.at(sourceIndex) = true;
+            timeOpticalFlow(sourceIndex, inputValue, *output);
         }
         else
         {
@@ -1066,17 +1064,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         realPresented = true;
     }
 
-    if (plan.opticalFlow && !flow.consumed)
-    {
-        if (auto watched = recordFlowWatch(sourceIndex, flow.submitted, flow.output); !watched)
-        {
-            return watched;
-        }
-    }
-
     gpu_.queue->Signal(fence_.Get(), ++lastSignaledFence_);
     allocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
-    flowAllocatorFenceValues_.at(sourceIndex) = lastSignaledFence_;
     bufferShowedNewFrame_.at(sourceIndex) = showsNewFrame;
     framesInFlight_.at(sourceIndex) = shownFrame_;
 
@@ -1502,6 +1491,13 @@ void FrameRenderer::releaseOpticalFlow()
     }
 
     waitForGpu();
+
+    if (flowTimer_)
+    {
+        flowTimer_->drain();
+    }
+
+    lastFlowMilliseconds_.reset();
     spdlog::info("Optical flow: the GPU is idle at fence {}; releasing the session",
                  lastSignaledFence_);
     opticalFlow_.reset();
@@ -2272,30 +2268,21 @@ CadenceDetector::Decision FrameRenderer::observeCadence(const CadenceSample& sam
     return decision;
 }
 
-std::expected<void, std::string> FrameRenderer::recordFlowWatch(UINT bufferIndex,
-                                                                bool waitForFlow,
-                                                                std::uint64_t outputValue)
+void FrameRenderer::timeOpticalFlow(UINT bufferIndex, std::uint64_t inputValue,
+                                    std::uint64_t outputValue)
 {
-    auto& allocator = flowAllocators_.at(bufferIndex);
-    allocator->Reset();
-    flowCommandList_->Reset(allocator.Get(), nullptr);
-
-    if (waitForFlow)
+    if (!flowTimer_)
     {
-        gpu_.queue->Wait(opticalFlow_->fence(), outputValue);
+        return;
     }
 
-    timer_->endStage(*flowCommandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
-    timer_->endFrame(*flowCommandList_.Get(), bufferIndex);
-
-    if (const HRESULT result = flowCommandList_->Close(); FAILED(result))
+    if (const auto queued =
+            flowTimer_->submit(bufferIndex, *opticalFlow_->fence(), inputValue, outputValue);
+        !queued)
     {
-        return std::unexpected(describeFailure("ID3D12GraphicsCommandList::Close (flow)", result));
+        spdlog::warn("The optical flow's own time stopped being measured: {}", queued.error());
+        flowTimer_.reset();
     }
-
-    const std::array<ID3D12CommandList*, 1> lists{flowCommandList_.Get()};
-    gpu_.queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
-    return {};
 }
 
 StageOverlayState FrameRenderer::opticalFlowState() const
@@ -2423,13 +2410,7 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan,
         realPictureState_ = target.after;
     }
 
-    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
-
-    if (!plan.opticalFlow)
-    {
-        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
-        timer_->endFrame(*commandList_.Get(), bufferIndex);
-    }
+    timer_->endFrame(*commandList_.Get(), bufferIndex);
 }
 
 std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
@@ -2471,7 +2452,6 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
     }
 
     timer_->endStage(*copyCommandList_.Get(), bufferIndex, EffectStage::Cadence);
-    timer_->beginStage(*copyCommandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
 
     if (const HRESULT result = copyCommandList_->Close(); FAILED(result))
     {
@@ -2507,6 +2487,7 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
             flow.output = *flowValue;
             waitForFlow = true;
             flowSlotValid_.at(bufferIndex) = true;
+            timeOpticalFlow(bufferIndex, inputValue, *flowValue);
         }
         else
         {
@@ -2533,8 +2514,6 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
         // newest value covers every flow it has written.
         gpu_.queue->Wait(opticalFlow_->fence(), lastFlow);
     }
-
-    timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
 
     bool drewDlss = false;
 
@@ -2802,13 +2781,7 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
         realPictureState_ = target.after;
     }
 
-    timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
-
-    if (!plan.opticalFlow)
-    {
-        timer_->endStage(*commandList_.Get(), bufferIndex, EffectStage::OpticalFlow);
-        timer_->endFrame(*commandList_.Get(), bufferIndex);
-    }
+    timer_->endFrame(*commandList_.Get(), bufferIndex);
 
     if (const HRESULT result = commandList_->Close(); FAILED(result))
     {
@@ -2891,6 +2864,13 @@ OverlayStats FrameRenderer::overlayStats()
         stats.gpuTimingsValid = true;
         stats.stageMilliseconds = lastGpuTimes_->stages;
         stats.totalMilliseconds = lastGpuTimes_->total;
+        stats.waitMilliseconds = lastGpuTimes_->wait;
+    }
+
+    if (lastFlowMilliseconds_)
+    {
+        stats.opticalFlowTimingValid = true;
+        stats.opticalFlowMilliseconds = *lastFlowMilliseconds_;
     }
 
     stats.opticalFlow = opticalFlowState();
@@ -3019,7 +2999,13 @@ void FrameRenderer::reportStatistics()
                                   lastGpuTimes_->stages.at(stage));
         }
 
-        spdlog::info("GPU: {}total {:.2f} ms", stages, lastGpuTimes_->total);
+        const std::string flow = lastFlowMilliseconds_
+                                     ? std::format("{:.2f} ms", *lastFlowMilliseconds_)
+                                     : "n/a";
+
+        spdlog::info("GPU: {}total {:.2f} ms (stage work, no waits), wait {:.2f} ms; optical "
+                     "flow engine {} (own engine, not in the total)",
+                     stages, lastGpuTimes_->total, lastGpuTimes_->wait, flow);
     }
 
     if (const auto& cadence = cadence_.estimate())

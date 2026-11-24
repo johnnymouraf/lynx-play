@@ -80,7 +80,12 @@ struct OverlayStats
 
     bool gpuTimingsValid = false;
     std::array<double, kEffectStageCount> stageMilliseconds{};
+    // The sum of the stages, without the queue's waits.
     double totalMilliseconds = 0.0;
+    double waitMilliseconds = 0.0;
+    // The flow engine's own execution, apart from the direct queue's stages.
+    bool opticalFlowTimingValid = false;
+    double opticalFlowMilliseconds = 0.0;
     StageOverlayState opticalFlow = StageOverlayState::Off;
     StageOverlayState dlss = StageOverlayState::Off;
     // The scaling path and DLSS Frame Generation the renderer is applying,

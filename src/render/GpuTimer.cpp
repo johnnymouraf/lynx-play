@@ -1,5 +1,6 @@
 #include "render/GpuTimer.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace mfplay::render
@@ -38,8 +39,6 @@ std::string_view stageName(EffectStage stage)
         return "scaling";
     case EffectStage::Overlay:
         return "overlay";
-    case EffectStage::OpticalFlow:
-        return "optical flow";
     }
 
     return "unknown";
@@ -78,17 +77,18 @@ std::optional<FrameGpuTimes> frameGpuTimes(const FrameTimestamps& timestamps,
         }
 
         times.stages.at(stage) = *elapsed;
+        times.total += *elapsed;
     }
 
-    const auto total = milliseconds(timestamps.ticks.at(kTotalEnd),
-                                    timestamps.ticks.at(kTotalBegin));
+    const auto span = milliseconds(timestamps.ticks.at(kTotalEnd),
+                                   timestamps.ticks.at(kTotalBegin));
 
-    if (!total)
+    if (!span)
     {
         return std::nullopt;
     }
 
-    times.total = *total;
+    times.wait = std::max(0.0, *span - times.total);
     return times;
 }
 

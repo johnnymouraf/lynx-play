@@ -17,6 +17,7 @@
 #include "render/MotionVectors.h"
 #include "render/NgxHost.h"
 #include "render/OpticalFlow.h"
+#include "render/OpticalFlowTimer.h"
 #include "render/Overlay.h"
 #include "render/PresentGate.h"
 #include "render/ReflexSession.h"
@@ -249,11 +250,9 @@ private:
     // Classifies one frame and reports its distinct/repeated decision to the
     // statistics.
     [[nodiscard]] CadenceDetector::Decision observeCadence(const CadenceSample& sample);
-    // Ends the frame after the flow engine's fence, so the stage's time is
-    // the engine's real cost.
-    [[nodiscard]] std::expected<void, std::string> recordFlowWatch(UINT bufferIndex,
-                                                                   bool waitForFlow,
-                                                                   std::uint64_t outputValue);
+    // Hands a flow the engine accepted to the flow timer, which measures the
+    // engine's execution apart from the direct queue.
+    void timeOpticalFlow(UINT bufferIndex, std::uint64_t inputValue, std::uint64_t outputValue);
     [[nodiscard]] StageOverlayState opticalFlowState() const;
     [[nodiscard]] StageOverlayState dlssState() const;
     [[nodiscard]] OverlayStats overlayStats();
@@ -281,6 +280,9 @@ private:
     std::atomic<Overlay*> overlayForMessages_{nullptr};
     std::optional<GpuTimer> timer_;
     std::optional<FrameGpuTimes> lastGpuTimes_;
+    // Measured on the flow timer's own queue; absent when that failed.
+    std::optional<OpticalFlowTimer> flowTimer_;
+    std::optional<double> lastFlowMilliseconds_;
     ReflexSession reflex_;
     ReflexUnavailable reflexReason_ = ReflexUnavailable::NoNvidiaGpu;
     std::atomic<core::ReflexMode> requestedReflex_;
@@ -381,11 +383,6 @@ private:
     ComPtr<ID3D12GraphicsCommandList> copyCommandList_;
     std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> copyAllocators_;
     std::array<UINT64, SwapChain::kBufferCount> copyAllocatorFenceValues_{};
-    // The small list that waits for the flow engine and closes the frame's
-    // stamps after it, on its own allocators.
-    ComPtr<ID3D12GraphicsCommandList> flowCommandList_;
-    std::array<ComPtr<ID3D12CommandAllocator>, SwapChain::kBufferCount> flowAllocators_;
-    std::array<UINT64, SwapChain::kBufferCount> flowAllocatorFenceValues_{};
     // The source ring advances once per decoded picture, independently of the
     // presents: with Frame Generation a source frame can present twice, so
     // the swap chain's current index no longer marks the previous source.

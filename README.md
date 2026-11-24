@@ -31,7 +31,7 @@ The plan and its progress live in [docs/plan.md](docs/plan.md).
 ## Download
 
 Every green build of `master` publishes a release tagged with the version in
-`CMakeLists.txt` (`v1.0.0`) and the portable package,
+`CMakeLists.txt` (`v1.0.1`) and the portable package,
 `mfplay-windows-x64.zip`: extract it anywhere and run `mfplay.exe`. There is
 no installer. Bump the version for every delivery, without a build suffix.
 

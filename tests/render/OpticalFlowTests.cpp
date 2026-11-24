@@ -129,8 +129,6 @@ TEST_CASE("The session waits for the GPU before it unregisters and destroys")
         return static_cast<std::size_t>(found - kSessionReleaseSteps.begin());
     };
 
-    CHECK(position(SessionReleaseStep::UnregisterCostResources) <
-          position(SessionReleaseStep::ReleaseCostPictures));
     CHECK(position(SessionReleaseStep::UnregisterFlowResources) <
           position(SessionReleaseStep::ReleaseFlowPictures));
     CHECK(position(SessionReleaseStep::UnregisterInputResources) <

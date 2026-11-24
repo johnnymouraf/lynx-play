@@ -265,14 +265,10 @@ std::string_view sessionReleaseStepName(SessionReleaseStep step)
     {
     case SessionReleaseStep::WaitForLastFlow:
         return "waiting for the last flow";
-    case SessionReleaseStep::UnregisterCostResources:
-        return "unregistering the cost pictures";
     case SessionReleaseStep::UnregisterFlowResources:
         return "unregistering the flow pictures";
     case SessionReleaseStep::UnregisterInputResources:
         return "unregistering the input pictures";
-    case SessionReleaseStep::ReleaseCostPictures:
-        return "releasing the cost pictures";
     case SessionReleaseStep::ReleaseFlowPictures:
         return "releasing the flow pictures";
     case SessionReleaseStep::ReleaseInputPictures:
@@ -308,7 +304,7 @@ struct OpticalFlow::Impl
 
     void releaseSession()
     {
-        if (!configured && handle == nullptr && costs.empty() && flows.empty() && inputs.empty())
+        if (!configured && handle == nullptr && flows.empty() && inputs.empty())
         {
             return;
         }
@@ -339,17 +335,11 @@ struct OpticalFlow::Impl
         case SessionReleaseStep::WaitForLastFlow:
             waitForLastFlow();
             break;
-        case SessionReleaseStep::UnregisterCostResources:
-            unregisterAll("cost", costHandles);
-            break;
         case SessionReleaseStep::UnregisterFlowResources:
             unregisterAll("flow", flowHandles);
             break;
         case SessionReleaseStep::UnregisterInputResources:
             unregisterAll("input", inputHandles);
-            break;
-        case SessionReleaseStep::ReleaseCostPictures:
-            releaseAll("cost", costs);
             break;
         case SessionReleaseStep::ReleaseFlowPictures:
             releaseAll("flow", flows);
@@ -449,10 +439,8 @@ struct OpticalFlow::Impl
     SurfaceSize grid;
     std::vector<ComPtr<ID3D12Resource>> inputs;
     std::vector<ComPtr<ID3D12Resource>> flows;
-    std::vector<ComPtr<ID3D12Resource>> costs;
     std::vector<NvOFGPUBufferHandle> inputHandles;
     std::vector<NvOFGPUBufferHandle> flowHandles;
-    std::vector<NvOFGPUBufferHandle> costHandles;
     std::uint64_t nextFenceValue = 0;
     std::uint64_t lastOutputValue = 0;
     std::string description;
@@ -567,14 +555,10 @@ OpticalFlowAvailability OpticalFlow::probe()
         surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_INPUT);
     const auto vectorFormats =
         surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_OUTPUT);
-    const auto costFormats =
-        surfaceFormats(loaded.functions, handle, NV_OF_BUFFER_USAGE_COST);
 
-    if (!inputFormats || !vectorFormats || !costFormats)
+    if (!inputFormats || !vectorFormats)
     {
-        const std::string detail = !inputFormats   ? inputFormats.error()
-                                   : !vectorFormats ? vectorFormats.error()
-                                                    : costFormats.error();
+        const std::string detail = !inputFormats ? inputFormats.error() : vectorFormats.error();
         destroy();
         return {.available = false,
                 .reason = OpticalFlowUnavailable::FormatUnsupported,
@@ -582,13 +566,12 @@ OpticalFlowAvailability OpticalFlow::probe()
     }
 
     if (!supports(*inputFormats, DXGI_FORMAT_B8G8R8A8_UNORM) ||
-        !supports(*vectorFormats, DXGI_FORMAT_R16G16_SINT) ||
-        !supports(*costFormats, DXGI_FORMAT_R8_UINT))
+        !supports(*vectorFormats, DXGI_FORMAT_R16G16_SINT))
     {
         destroy();
         return {.available = false,
                 .reason = OpticalFlowUnavailable::FormatUnsupported,
-                .detail = "the driver lacks BGRA8 input with R16G16_SINT flow and R8_UINT cost"};
+                .detail = "the driver lacks BGRA8 input with R16G16_SINT flow"};
     }
 
     const auto width = cap(loaded.functions, handle, NV_OF_CAPS_WIDTH_MAX);
@@ -743,16 +726,12 @@ std::expected<void, std::string> OpticalFlow::configure(
         surfaceFormats(impl.functions, impl.handle, NV_OF_BUFFER_USAGE_INPUT);
     const auto vectorFormats =
         surfaceFormats(impl.functions, impl.handle, NV_OF_BUFFER_USAGE_OUTPUT);
-    const auto costFormats =
-        surfaceFormats(impl.functions, impl.handle, NV_OF_BUFFER_USAGE_COST);
 
-    if (!inputFormats || !vectorFormats || !costFormats ||
+    if (!inputFormats || !vectorFormats ||
         !supports(*inputFormats, DXGI_FORMAT_B8G8R8A8_UNORM) ||
-        !supports(*vectorFormats, DXGI_FORMAT_R16G16_SINT) ||
-        !supports(*costFormats, DXGI_FORMAT_R8_UINT))
+        !supports(*vectorFormats, DXGI_FORMAT_R16G16_SINT))
     {
-        return std::unexpected("the driver lacks BGRA8 input with R16G16_SINT flow and R8_UINT "
-                               "cost");
+        return std::unexpected("the driver lacks BGRA8 input with R16G16_SINT flow");
     }
 
     NV_OF_INIT_PARAMS init{};
@@ -763,7 +742,7 @@ std::expected<void, std::string> OpticalFlow::configure(
     init.mode = NV_OF_MODE_OPTICALFLOW;
     init.perfLevel = NV_OF_PERF_LEVEL_MEDIUM;
     init.enableExternalHints = NV_OF_FALSE;
-    init.enableOutputCost = NV_OF_TRUE;
+    init.enableOutputCost = NV_OF_FALSE;
     init.hPrivData = nullptr;
     init.disparityRange = NV_OF_STEREO_DISPARITY_RANGE_UNDEFINED;
     init.enableRoi = NV_OF_FALSE;
@@ -782,12 +761,10 @@ std::expected<void, std::string> OpticalFlow::configure(
     impl.grid = flowGridExtent(picture, kFlowGridSize);
     const D3D12_HEAP_PROPERTIES heap{.Type = D3D12_HEAP_TYPE_DEFAULT};
     const D3D12_RESOURCE_DESC flowDescription = outputDescription(impl.grid, DXGI_FORMAT_R16G16_SINT);
-    const D3D12_RESOURCE_DESC costDescription = outputDescription(impl.grid, DXGI_FORMAT_R8_UINT);
 
     for (UINT slot = 0; slot < impl.slotCount; ++slot)
     {
         ComPtr<ID3D12Resource> flow;
-        ComPtr<ID3D12Resource> cost;
 
         if (const HRESULT result = impl.device->CreateCommittedResource(
                 &heap, D3D12_HEAP_FLAG_NONE, &flowDescription, D3D12_RESOURCE_STATE_COMMON,
@@ -797,16 +774,7 @@ std::expected<void, std::string> OpticalFlow::configure(
             return std::unexpected(describeFailure("CreateCommittedResource (flow)", result));
         }
 
-        if (const HRESULT result = impl.device->CreateCommittedResource(
-                &heap, D3D12_HEAP_FLAG_NONE, &costDescription, D3D12_RESOURCE_STATE_COMMON,
-                nullptr, IID_PPV_ARGS(&cost));
-            FAILED(result))
-        {
-            return std::unexpected(describeFailure("CreateCommittedResource (flow cost)", result));
-        }
-
         impl.flows.push_back(std::move(flow));
-        impl.costs.push_back(std::move(cost));
     }
 
     for (UINT slot = 0; slot < impl.slotCount; ++slot)
@@ -865,22 +833,6 @@ std::expected<void, std::string> OpticalFlow::configure(
         }
 
         impl.flowHandles.push_back(handle);
-        ++registered;
-    }
-
-    for (UINT slot = 0; slot < impl.slotCount; ++slot)
-    {
-        NvOFGPUBufferHandle handle = nullptr;
-        const NV_OF_STATUS status = registerResource(impl.costs.at(slot).Get(), &handle);
-
-        if (status != NV_OF_SUCCESS)
-        {
-            return std::unexpected(std::format("nvOFRegisterResourceD3D12 (cost {}): {}{}", slot,
-                                               statusName(status),
-                                               lastError(impl.functions, impl.handle)));
-        }
-
-        impl.costHandles.push_back(handle);
         ++registered;
     }
 
@@ -951,7 +903,7 @@ std::expected<std::uint64_t, std::string> OpticalFlow::execute(UINT slot,
     NV_OF_FENCE_POINT outputPoint{impl.fence.Get(), outputValue};
     NV_OF_EXECUTE_OUTPUT_PARAMS_D3D12 output{};
     output.outputBuffer = impl.flowHandles.at(slot);
-    output.outputCostBuffer = impl.costHandles.at(slot);
+    output.outputCostBuffer = nullptr;
     output.fencePoint = &outputPoint;
 
     if (const NV_OF_STATUS status = impl.functions.nvOFExecuteD3D12(impl.handle, &input, &output);
@@ -983,16 +935,6 @@ ID3D12Resource* OpticalFlow::flow(UINT slot) const
     }
 
     return impl_->flows.at(slot).Get();
-}
-
-ID3D12Resource* OpticalFlow::cost(UINT slot) const
-{
-    if (impl_ == nullptr || slot >= impl_->costs.size())
-    {
-        return nullptr;
-    }
-
-    return impl_->costs.at(slot).Get();
 }
 
 SurfaceSize OpticalFlow::gridExtent() const

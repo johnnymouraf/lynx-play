@@ -33,6 +33,8 @@ add_library(mfplay_render STATIC
     NgxHost.h
     OpticalFlow.cpp
     OpticalFlow.h
+    OpticalFlowTimer.cpp
+    OpticalFlowTimer.h
     Overlay.cpp
     Overlay.h
     PresentGate.cpp

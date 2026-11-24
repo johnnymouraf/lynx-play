@@ -28,22 +28,23 @@ enum class EffectStage : std::uint32_t
     Cadence = 4,
     Scaling = 5,
     Overlay = 6,
-    // Timed from the main list's end to the flow engine's completion, which
-    // arrives on its own fence between frames.
-    OpticalFlow = 7,
 };
 
-inline constexpr std::size_t kEffectStageCount = 8;
+inline constexpr std::size_t kEffectStageCount = 7;
 // The frame's first stamp, each stage's two stamps, and its last one.
 inline constexpr std::size_t kTimestampCount = 2 + 2 * kEffectStageCount;
 
 [[nodiscard]] std::string_view stageName(EffectStage stage);
 
-// What the GPU took on one frame, in milliseconds.
+// What the direct queue took on one frame, in milliseconds.
 struct FrameGpuTimes
 {
     std::array<double, kEffectStageCount> stages{};
+    // The sum of the stages: the queue's work, without waits.
     double total = 0.0;
+    // The frame's span on the queue beyond its stages: fence waits (the flow
+    // engine, the video processor) and the small gaps between stages.
+    double wait = 0.0;
 };
 
 // One frame's raw timestamps, in query ticks.

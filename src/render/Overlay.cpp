@@ -142,8 +142,6 @@ const char* stageLabel(EffectStage stage)
         return "Composição";
     case EffectStage::Overlay:
         return "Overlay";
-    case EffectStage::OpticalFlow:
-        return "Fluxo óptico";
     }
 
     return "?";
@@ -487,6 +485,23 @@ void drawLatencySection(const Fonts& fonts, const OverlayStats& stats)
             video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—");
 }
 
+// The flow engine runs apart from the 3D queue, so its time is not part of the
+// total.
+void drawOpticalFlowRow(const Fonts& fonts, const OverlayStats& stats)
+{
+    if (stats.opticalFlow != StageOverlayState::Running)
+    {
+        const char* const state =
+            stats.opticalFlow == StageOverlayState::Off ? "desligado" : "indisponível";
+        statRow(fonts, "Fluxo óptico (motor)", state, kTextSubtle);
+        return;
+    }
+
+    statRow(fonts, "Fluxo óptico (motor)",
+            stats.opticalFlowTimingValid ? millisecondsText(stats.opticalFlowMilliseconds, 2)
+                                         : "—");
+}
+
 void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
 {
     sectionHeading(fonts, "GPU POR ETAPA");
@@ -497,13 +512,8 @@ void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
         std::string value = "—";
         ImU32 color = kText;
 
-        if (stage == EffectStage::OpticalFlow && stats.opticalFlow != StageOverlayState::Running)
-        {
-            value = stats.opticalFlow == StageOverlayState::Off ? "desligado" : "indisponível";
-            color = kTextSubtle;
-        }
-        else if (stage == EffectStage::DlssSuperResolution &&
-                 stats.dlss != StageOverlayState::Running)
+        if (stage == EffectStage::DlssSuperResolution &&
+            stats.dlss != StageOverlayState::Running)
         {
             value = stats.dlss == StageOverlayState::Off ? "desligado" : "indisponível";
             color = kTextSubtle;
@@ -516,11 +526,16 @@ void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
         statRow(fonts, stageLabel(stage), value, color);
     }
 
+    drawOpticalFlowRow(fonts, stats);
+
     statRow(fonts, "Frame Generation",
             stats.frameGeneration == core::FrameGenerationMode::X2 ? "Ligado 2x" : "Desligado",
             stats.frameGeneration == core::FrameGenerationMode::X2 ? kAccent : kTextSubtle);
-    statRow(fonts, "Total",
+    statRow(fonts, "Total (sem espera)",
             stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds, 2) : "—");
+    statRow(fonts, "Espera",
+            stats.gpuTimingsValid ? millisecondsText(stats.waitMilliseconds, 2) : "—",
+            kTextSubtle);
 }
 
 void drawFrameTime(const Fonts& fonts, const OverlayStats& stats)
