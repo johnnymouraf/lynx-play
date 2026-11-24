@@ -9,15 +9,28 @@ FocusScope {
 
     required property ConsolesController consoles
     required property SettingsController settings
-    // The page's side margins, set by the shell for the window's width.
-    property int sideMargin: Theme.space12
+    // The page's side margins, set by the shell.
+    property int sideMargin: Theme.space6
+    // Room the footer keeps free under the list.
+    property int bottomInset: 0
     property int currentIndex: 0
 
     readonly property bool hasConsoles: page.consoles.model.count > 0
     readonly property bool listMode: page.settings.consoleView === "list"
-    // The design narrows the gaps along with the margins in a small window.
-    readonly property int cardGap: page.sideMargin < Theme.space12 ? Theme.space3 : Theme.space4
-    readonly property int minimumCardWidth: 220
+    // The width the counters and the cards share; both use the same columns.
+    readonly property real gridWidth: Math.max(0, scroller.width - 2 * page.ringRoom)
+    readonly property int minimumColumnWidth: 200
+    readonly property int columnCount: {
+        const minimum = page.minimumColumnWidth + Theme.space4;
+
+        return Math.max(2, Math.min(4, Math.floor((page.gridWidth + Theme.space4) / minimum)));
+    }
+    // The design narrows the gaps along with the column count.
+    readonly property int cardGap: page.columnCount >= 4 ? Theme.space4 : Theme.space3
+    readonly property real columnWidth: Math.max(0,
+                                                  (page.gridWidth
+                                                   - page.cardGap * (page.columnCount - 1))
+                                                  / page.columnCount)
     // The grid's card: the badge row over the body; the list's row: the
     // action and its padding.
     readonly property int cardHeight: page.listMode
@@ -156,6 +169,7 @@ FocusScope {
         anchors.topMargin: page.emptyTopMargin
         anchors.leftMargin: page.sideMargin
         anchors.rightMargin: page.sideMargin
+        anchors.bottomMargin: page.bottomInset
         visible: !page.hasConsoles
         spacing: Theme.space5
 
@@ -195,6 +209,7 @@ FocusScope {
         anchors.topMargin: page.topMargin - page.ringRoom
         anchors.leftMargin: page.sideMargin - page.ringRoom
         anchors.rightMargin: page.sideMargin - page.ringRoom
+        anchors.bottomMargin: page.bottomInset
         visible: page.hasConsoles
         contentWidth: width
         contentHeight: content.implicitHeight + 2 * page.ringRoom
@@ -218,46 +233,41 @@ FocusScope {
                 onRetryRequested: page.consoles.retryDiscovery()
             }
 
-            RowLayout {
+            Grid {
                 Layout.fillWidth: true
-                spacing: page.cardGap
+                columns: page.columnCount
+                columnSpacing: page.cardGap
+                rowSpacing: page.cardGap
 
                 StatusCount {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
+                    width: page.columnWidth
                     status: "ready"
                     label: "Pronto"
                     count: page.consoles.model.readyCount
                 }
 
                 StatusCount {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
+                    width: page.columnWidth
                     status: "standby"
                     label: "Em repouso"
                     count: page.consoles.model.standbyCount
                 }
 
                 StatusCount {
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
+                    width: page.columnWidth
                     status: "unpaired"
                     label: "Não pareado"
                     count: page.consoles.model.unpairedCount
                 }
 
                 // The design gives the toggle a whole cell beside the counters
-                // in a wide window, and only its own width in a small one.
+                // in a wide window; a narrow one keeps it in the list header.
                 Item {
-                    Layout.fillWidth: page.sideMargin >= Theme.space12
-                    Layout.preferredWidth: page.sideMargin >= Theme.space12
-                                                ? -1
-                                                : viewToggle.implicitWidth
-                    Layout.preferredHeight: Theme.space10
+                    width: page.columnWidth
+                    height: Theme.space10
+                    visible: page.columnCount >= 4
 
                     ViewToggle {
-                        id: viewToggle
-
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         mode: page.settings.consoleView
@@ -266,21 +276,34 @@ FocusScope {
                 }
             }
 
-            AppText {
+            RowLayout {
+                Layout.fillWidth: true
                 Layout.topMargin: 22
                 Layout.bottomMargin: Theme.space4
                 Layout.leftMargin: 2
-                text: "Lista de consoles"
-                textStyle: "overline"
-                color: Theme.textSubtle
-                Accessible.role: Accessible.Heading
+                spacing: Theme.space2
+
+                AppText {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "Lista de consoles"
+                    textStyle: "overline"
+                    color: Theme.textSubtle
+                    Accessible.role: Accessible.Heading
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                ViewToggle {
+                    visible: page.columnCount < 4
+                    mode: page.settings.consoleView
+                    onActivated: mode => page.settings.consoleView = mode
+                }
             }
 
             FocusScope {
                 id: cardsArea
-
-                readonly property real cardWidth:
-                    (width - page.cardGap * (grid.columns - 1)) / grid.columns
 
                 Layout.fillWidth: true
                 implicitHeight: grid.implicitHeight
@@ -292,8 +315,7 @@ FocusScope {
                 Grid {
                     id: grid
 
-                    columns: page.listMode ? 1 : Math.max(1, Math.floor(
-                        (cardsArea.width + page.cardGap) / (page.minimumCardWidth + page.cardGap)))
+                    columns: page.listMode ? 1 : page.columnCount
                     columnSpacing: page.cardGap
                     rowSpacing: page.cardGap
 
@@ -305,7 +327,7 @@ FocusScope {
                         delegate: ConsoleCard {
                             id: consoleCard
 
-                            width: cardsArea.cardWidth
+                            width: page.listMode ? cardsArea.width : page.columnWidth
                             height: page.cardHeight
                             listMode: page.listMode
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
@@ -321,7 +343,7 @@ FocusScope {
                     AddConsoleTile {
                         id: addTile
 
-                        width: cardsArea.cardWidth
+                        width: page.listMode ? cardsArea.width : page.columnWidth
                         height: page.cardHeight
                         listMode: page.listMode
                         focused: cardsArea.activeFocus && page.currentIndex === cards.count
