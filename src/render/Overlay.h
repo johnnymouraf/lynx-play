@@ -101,6 +101,7 @@ struct OverlayFonts
     std::shared_ptr<const std::vector<std::uint8_t>> label;
     std::shared_ptr<const std::vector<std::uint8_t>> title;
     std::shared_ptr<const std::vector<std::uint8_t>> mono;
+    std::shared_ptr<const std::vector<std::uint8_t>> monoStrong;
 };
 
 // What the overlay starts with, before the player changes anything.
@@ -237,11 +238,9 @@ private:
     OverlayFonts fontData_;
     ImFont* bodyFont_ = nullptr;
     ImFont* labelFont_ = nullptr;
-    ImFont* captionFont_ = nullptr;
-    ImFont* overlineFont_ = nullptr;
-    ImFont* buttonFont_ = nullptr;
-    ImFont* titleFont_ = nullptr;
+    ImFont* strongFont_ = nullptr;
     ImFont* monoFont_ = nullptr;
+    ImFont* monoStrongFont_ = nullptr;
 
     OverlayOptions options_;
     OverlayActions actions_;
