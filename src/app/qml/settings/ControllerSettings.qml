@@ -3,8 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Templates as T
 import MFPlay
 
-// Configurações › Controles: the controller in use, which one to prefer and
-// the keyboard/mouse mapping.
+// Configurações › Controles: the controller in use and its battery, which one
+// to prefer and the keyboard/mouse mapping.
 ColumnLayout {
     id: section
 
@@ -25,6 +25,37 @@ ColumnLayout {
         }
 
         return `${section.input.controllerTitle} conectado por ${section.connectionWord}`;
+    }
+    readonly property string cardDetail: {
+        if (!section.input.controllerConnected) {
+            return "Conecte um DualSense por USB ou Bluetooth. Sem controle, o teclado e o mouse fazem o papel dele.";
+        }
+
+        if (section.input.controllerWired) {
+            return "Vibração fina e gatilhos adaptáveis completos.";
+        }
+
+        return "Por Bluetooth, a vibração pode ficar mais simples. Conecte por USB para vibração fina e gatilhos adaptáveis completos.";
+    }
+    readonly property int batteryPercent: section.input.controllerBatteryPercent
+    readonly property int batteryCells: section.batteryPercent >= 0
+                                       ? Math.min(5, Math.ceil(section.batteryPercent / 20)) : 0
+    readonly property color batteryColor: section.input.controllerBatteryLow
+                                          ? Theme.standby : Theme.ready
+    readonly property string batteryDetail: {
+        if (!section.input.controllerConnected) {
+            return "";
+        }
+
+        if (section.input.controllerCharging) {
+            return "Carregando";
+        }
+
+        if (section.input.controllerWired) {
+            return "Alimentado por USB";
+        }
+
+        return section.batteryPercent >= 0 ? "Não está carregando" : "Sem leitura de bateria";
     }
     readonly property var controllerOptions: {
         const options = [{ label: "Primeiro conectado", value: "" }];
@@ -112,23 +143,18 @@ ColumnLayout {
     Rectangle {
         Layout.fillWidth: true
         implicitHeight: card.implicitHeight + 2 * Theme.space4
-        radius: Theme.radiusLg
+        radius: Theme.radiusMd
         color: Theme.surface
-        border.width: 1
-        border.color: Theme.border
 
         RowLayout {
             id: card
 
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: Theme.space4
-            anchors.rightMargin: Theme.space4
+            anchors.fill: parent
+            anchors.margins: Theme.space4
             spacing: Theme.space4
 
             Rectangle {
-                Layout.alignment: Qt.AlignVCenter
+                Layout.alignment: Qt.AlignTop
                 implicitWidth: 48
                 implicitHeight: 48
                 radius: Theme.radiusLg
@@ -144,30 +170,102 @@ ColumnLayout {
 
             ColumnLayout {
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
                 spacing: 2
 
-                AppText {
+                RowLayout {
                     Layout.fillWidth: true
-                    text: section.cardTitle
-                    textStyle: "labelLarge"
+                    spacing: Theme.space2
+
+                    AppText {
+                        Layout.fillWidth: true
+                        text: section.cardTitle
+                        textStyle: "labelLarge"
+                        wrapMode: Text.WordWrap
+                    }
+
+                    StateBadge {
+                        Layout.alignment: Qt.AlignVCenter
+                        visible: !section.input.controllerConnected
+                        status: "offline"
+                        label: "Desconectado"
+                    }
                 }
 
                 AppText {
                     Layout.fillWidth: true
-                    text: section.input.controllerConnected
-                          ? "Vibração fina e gatilhos adaptáveis completos. Por Bluetooth, a vibração pode ficar mais simples."
-                          : "Conecte um DualSense por USB ou Bluetooth. Sem controle, o teclado e o mouse fazem o papel dele."
+                    text: section.cardDetail
                     textStyle: "bodyMedium"
                     color: Theme.textMuted
                     wrapMode: Text.WordWrap
                 }
-            }
 
-            StateBadge {
-                Layout.alignment: Qt.AlignVCenter
-                status: section.input.controllerConnected ? "ready" : "offline"
-                label: section.input.controllerConnected ? section.input.controllerStatus
-                                                         : "Desconectado"
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Theme.space2
+                    implicitHeight: battery.implicitHeight + 2 * 14
+                    visible: section.input.controllerConnected
+                    radius: Theme.radiusMd
+                    color: Theme.surfaceRaised
+
+                    ColumnLayout {
+                        id: battery
+
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        spacing: Theme.space2
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.space2
+
+                            AppText {
+                                text: "Bateria"
+                                textStyle: "overline"
+                                color: Theme.textSubtle
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                            }
+
+                            AppText {
+                                text: section.batteryPercent >= 0
+                                      ? `${section.batteryPercent}%` : "—"
+                                font.family: Theme.fontDisplay
+                                font.pixelSize: 20
+                                font.weight: Font.Bold
+                                lineHeight: 22
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+
+                            Repeater {
+                                model: 5
+
+                                Rectangle {
+                                    required property int index
+
+                                    Layout.fillWidth: true
+                                    implicitHeight: 8
+                                    radius: 2
+                                    color: index < section.batteryCells ? section.batteryColor
+                                                                       : Theme.surfaceHover
+                                }
+                            }
+                        }
+
+                        AppText {
+                            Layout.fillWidth: true
+                            text: section.batteryDetail
+                            textStyle: "detail"
+                            color: Theme.textMuted
+                        }
+                    }
+                }
             }
         }
     }
@@ -215,9 +313,7 @@ ColumnLayout {
         Layout.fillWidth: true
         implicitHeight: tableContent.implicitHeight
         radius: Theme.radiusMd
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.border
+        color: Theme.surface
         clip: true
         enabled: section.settings.keyboardMouseEnabled
         opacity: enabled ? 1 : 0.5
@@ -243,14 +339,24 @@ ColumnLayout {
                     AppText {
                         Layout.preferredWidth: table.labelColumnWidth
                         text: "Botão do controle"
-                        textStyle: "overline"
+                        font.family: Theme.fontBody
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: 0.96
+                        font.capitalization: Font.AllUppercase
+                        lineHeight: 16
                         color: Theme.textSubtle
                     }
 
                     AppText {
                         Layout.fillWidth: true
                         text: "Tecla ou mouse"
-                        textStyle: "overline"
+                        font.family: Theme.fontBody
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: 0.96
+                        font.capitalization: Font.AllUppercase
+                        lineHeight: 16
                         color: Theme.textSubtle
                     }
                 }
@@ -274,7 +380,8 @@ ColumnLayout {
                     height: Math.max(44, keyFlow.implicitHeight + 2 * Theme.space1)
                     color: "transparent"
 
-                    RowLayout {                        anchors.fill: parent
+                    RowLayout {
+                        anchors.fill: parent
                         anchors.leftMargin: Theme.space4
                         anchors.rightMargin: Theme.space4
                         spacing: Theme.space4

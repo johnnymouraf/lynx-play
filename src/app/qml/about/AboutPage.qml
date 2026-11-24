@@ -14,6 +14,21 @@ Item {
 
     property bool videoTestFailed: false
 
+    readonly property var chips: [
+        { label: `Versão ${page.controller.version}` },
+        { label: "Windows x64" },
+        { label: "AGPL-3.0" }
+    ]
+    readonly property int cardColumns: {
+        const columns = Math.floor((cards.width + Theme.space2) / (280 + Theme.space2));
+
+        return Math.max(2, Math.min(4, columns));
+    }
+    readonly property int cardWidth: Math.max(240, Math.floor((cards.width
+                                                                - (page.cardColumns - 1)
+                                                                  * cards.spacing)
+                                                               / page.cardColumns))
+
     function videoTestDescription() {
         if (page.videoTestFailed) {
             return "Não foi possível abrir a janela de vídeo. Veja o log.";
@@ -51,109 +66,215 @@ Item {
                 subtitle: "Versão, licenças e onde ficam os registros do app."
             }
 
+            AppText {
+                Layout.fillWidth: true
+                visible: !page.controller.remotePlayReady
+                text: "O Remote Play não iniciou: os consoles não podem ser encontrados nem pareados. Veja o log em %LOCALAPPDATA%\\MFPlay\\logs."
+                textStyle: "bodyMedium"
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+            }
+
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: appCard.implicitHeight + 2 * Theme.space5
-                radius: Theme.radiusLg
+                implicitHeight: Math.max(152, appCard.implicitHeight + 2 * 28)
+                radius: Theme.radiusMd
                 color: Theme.surface
-                border.width: 1
-                border.color: Theme.border
 
                 RowLayout {
                     id: appCard
 
                     anchors.fill: parent
-                    anchors.margins: Theme.space5
-                    spacing: Theme.space5
+                    anchors.margins: 28
+                    spacing: Theme.space6
 
                     Image {
-                        Layout.preferredWidth: 72
-                        Layout.preferredHeight: 72
+                        Layout.preferredWidth: 88
+                        Layout.preferredHeight: 88
                         source: Theme.brandMark
-                        sourceSize.width: 72
-                        sourceSize.height: 72
+                        sourceSize.width: 88
+                        sourceSize.height: 88
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: Theme.space1
+                        spacing: 6
 
-                        AppText {
-                            Layout.fillWidth: true
+                        Text {
                             text: "<b>MF</b>Play"
                             textFormat: Text.StyledText
+                            color: Theme.text
                             font.family: Theme.fontDisplay
-                            font.pixelSize: 24
-                            lineHeight: 32
+                            font.pixelSize: 32
+                            lineHeight: 36
+                            lineHeightMode: Text.FixedHeight
                             Accessible.name: "MFPlay"
                         }
 
                         AppText {
-                            text: `Versão ${page.controller.version} · Windows x64`
-                            textStyle: "bodyMedium"
-                            color: Theme.textMuted
+                            text: "REMOTE PS5 SYSTEM"
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 2
+                            lineHeight: 13
+                            color: Theme.textSubtle
+                        }
+
+                        Row {
+                            spacing: 6
+
+                            Repeater {
+                                model: page.chips
+
+                                Rectangle {
+                                    required property var modelData
+
+                                    width: chipLabel.implicitWidth + 2 * 10
+                                    height: 25
+                                    radius: Theme.radiusSm
+                                    color: Theme.surfaceRaised
+
+                                    AppText {
+                                        id: chipLabel
+
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 11
+                                        font.weight: Font.DemiBold
+                                        lineHeight: 15
+                                        color: Theme.textMuted
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            Banner {
-                Layout.fillWidth: true
-                Layout.topMargin: Theme.space2
-                visible: !page.controller.remotePlayReady
-                tone: "danger"
-                title: "O Remote Play não iniciou"
-                message: "Os consoles não podem ser encontrados nem pareados. Veja o log em %LOCALAPPDATA%\MFPlay\logs."
-            }
+            Flow {
+                id: cards
 
-            SettingRow {
                 Layout.fillWidth: true
-                label: "Licença"
-                description: "MFPlay é software livre sob a AGPL-3.0, baseado no chiaki-ng. "
-                             + "NVIDIA, RTX, DLSS e Reflex são marcas da NVIDIA Corporation."
+                spacing: Theme.space2
 
-                ActionButton {
+                LinkCard {
+                    width: page.cardWidth
+                    title: "Licença"
+                    detail: "Software livre sob a AGPL-3.0, baseado no chiaki-ng. NVIDIA, RTX, DLSS e Reflex são marcas da NVIDIA Corporation."
                     iconName: "scroll-text"
-                    text: "Ver licenças de terceiros"
+                    buttonIcon: "scroll-text"
+                    buttonText: "Ver licenças"
                     onClicked: Qt.openUrlExternally(page.controller.licensesUrl)
                 }
-            }
 
-            SettingRow {
-                Layout.fillWidth: true
-                label: "Registros (logs)"
-                description: "%LOCALAPPDATA%\MFPlay\logs"
-
-                ActionButton {
-                    iconName: "folder-open"
-                    text: "Abrir pasta"
+                LinkCard {
+                    width: page.cardWidth
+                    title: "Registros (logs)"
+                    detail: "%LOCALAPPDATA%\\MFPlay\\logs"
+                    monoDetail: true
+                    iconName: "file-text"
+                    buttonIcon: "folder-open"
+                    buttonText: "Abrir pasta"
                     onClicked: Qt.openUrlExternally(page.controller.logsUrl)
                 }
-            }
 
-            SettingRow {
-                Layout.fillWidth: true
-                label: "Código-fonte"
-                description: "github.com/johnnymouraf/mfplay"
-
-                ActionButton {
-                    iconName: "external-link"
-                    text: "Abrir no navegador"
+                LinkCard {
+                    width: page.cardWidth
+                    title: "Código-fonte"
+                    detail: "github.com/johnnymouraf/mfplay"
+                    monoDetail: true
+                    iconName: "code-xml"
+                    buttonIcon: "external-link"
+                    buttonText: "Abrir no navegador"
                     onClicked: Qt.openUrlExternally("https://github.com/johnnymouraf/mfplay")
                 }
-            }
 
-            SettingRow {
-                Layout.fillWidth: true
-                label: "Teste de vídeo"
-                description: page.videoTestDescription()
-
-                ActionButton {
+                LinkCard {
+                    width: page.cardWidth
+                    title: "Teste de vídeo"
+                    detail: page.videoTestDescription()
+                    dangerDetail: page.videoTestFailed
                     iconName: "monitor-play"
-                    text: "Abrir teste"
-                    enabled: page.controller.gpuName.length > 0
+                    buttonIcon: "monitor-play"
+                    buttonText: "Abrir teste"
+                    buttonEnabled: page.controller.gpuName.length > 0
                     onClicked: page.videoTestFailed = !page.controller.openVideoTest()
                 }
+            }
+        }
+    }
+
+    component LinkCard: Rectangle {
+        id: card
+
+        required property string title
+        required property string detail
+        required property string iconName
+        required property string buttonIcon
+        required property string buttonText
+        property bool monoDetail: false
+        property bool dangerDetail: false
+        property bool buttonEnabled: true
+
+        signal clicked
+
+        height: 224
+        radius: Theme.radiusMd
+        color: Theme.surface
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: Theme.space5
+            spacing: Theme.space3
+
+            Rectangle {
+                implicitWidth: 40
+                implicitHeight: 40
+                radius: Theme.radiusMd
+                color: Theme.surfaceRaised
+
+                Icon {
+                    anchors.centerIn: parent
+                    name: card.iconName
+                    size: 20
+                    color: Theme.text
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Theme.space1
+
+                AppText {
+                    Layout.fillWidth: true
+                    text: card.title
+                    font.pixelSize: 15
+                    font.weight: Font.DemiBold
+                    lineHeight: 18
+                    wrapMode: Text.WordWrap
+                }
+
+                AppText {
+                    Layout.fillWidth: true
+                    text: card.detail
+                    font.family: card.monoDetail ? Theme.fontMono : Theme.fontBody
+                    font.pixelSize: 12
+                    font.weight: Font.Normal
+                    lineHeight: 18
+                    color: card.dangerDetail ? Theme.danger : Theme.textMuted
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            ActionButton {
+                Layout.fillWidth: true
+                variant: "secondary"
+                iconName: card.buttonIcon
+                text: card.buttonText
+                enabled: card.buttonEnabled
+                onClicked: card.clicked()
             }
         }
     }

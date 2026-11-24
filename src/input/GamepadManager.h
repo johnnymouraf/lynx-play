@@ -33,6 +33,7 @@ struct GamepadInfo
     bool dualSense = false;
     GamepadConnection connection = GamepadConnection::Unknown;
     int batteryPercent = -1;
+    bool batteryCharging = false;
     bool active = false;
 };
 

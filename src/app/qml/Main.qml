@@ -50,13 +50,11 @@ ApplicationWindow {
     font.pixelSize: 14
 
     function controllerStatusText() {
-        const battery = window.input.controllerBattery;
-
-        if (battery >= 0) {
-            return `Bateria ${battery} %`;
+        if (!window.input.controllerConnected) {
+            return "Desconectado";
         }
 
-        return "Conectado";
+        return window.input.controllerBatteryLow ? "Bateria baixa" : "Conectado";
     }
 
     Component.onCompleted: consolesPage.focusFirstControl()
@@ -128,9 +126,13 @@ ApplicationWindow {
                     }
 
                     SettingsPage {
+                        id: settingsPage
+
                         controller: window.controller
+                        consoles: window.consoles
                         settings: window.settings
                         input: window.input
+                        sideMargin: window.pageMargin
                     }
 
                     AboutPage {
@@ -141,7 +143,8 @@ ApplicationWindow {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: window.pageMargin
+                    Layout.leftMargin: window.section === "settings"
+                                       ? 240 + Theme.space4 : window.pageMargin
                     Layout.rightMargin: window.pageMargin
                     Layout.bottomMargin: Theme.space4
                     spacing: Theme.space4
@@ -154,6 +157,9 @@ ApplicationWindow {
 
                     ControllerStatus {
                         Layout.preferredWidth: 240
+                        visible: window.section !== "settings"
+                                 || (settingsPage.section !== "controls"
+                                     && window.width >= 1180)
                         connected: window.input.controllerConnected
                         name: window.input.controllerTitle
                         status: window.controllerStatusText()
