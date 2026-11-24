@@ -12,7 +12,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Shared by the redesign steps (3.2–3.5)](#shared-by-the-redesign-steps-3235)
-  - [3.2 Theme and shared components](#32-theme-and-shared-components)
   - [3.3 Consoles and pairing](#33-consoles-and-pairing)
   - [3.4 Settings, Sobre and connecting](#34-settings-sobre-and-connecting)
   - [3.5 Stream overlay](#35-stream-overlay)
@@ -70,7 +69,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         QML module, exe, workflow, docs), the vector icon and logo from the
         design, data moved from `MFPlay` to `MFPlay`, the repository renamed
         to `johnnymouraf/mfplay`.
-  - [ ] **3.2 Theme and shared components** [auto]: the new `Theme` tokens (blue
+  - [x] **3.2 Theme and shared components** [auto]: the new `Theme` tokens (blue
         accent, radii, rail), buttons in the menu-button pattern, badges,
         fields, toggles, segmented controls, slider, dialogs, the rail with
         Sobre, the controller hint bar and the DualSense card.
@@ -227,50 +226,6 @@ pushes each delivery there so CI builds it, and the orchestrator fast-forwards
   at most three rounds of fixes per screen, then report what still differs.
 - **Interface text** stays Brazilian Portuguese, with "MFPlay" as the name.
 
-### 3.2 Theme and shared components
-
-- **Goal:** the `Theme` singleton holds the design's variables and every shared
-  control in `src/app/qml/controls/` looks like its design component, with the
-  app shell (rail, hint bar, DualSense card) laid out as the design's screens.
-- **Guardrails:** shared controls and the shell only; screens get their own
-  layouts in 3.3 and 3.4 (they may only adapt to changed control APIs); no C++
-  behavior change beyond what a control needs to show (for example the battery
-  value the DualSense card shows).
-- **Success criteria:**
-  1. Every `Theme` value matches the design's `Theme` collection
-     (`GetVariables`), with the design's names; tokens the code needs and the
-     design lacks are kept and named for their role. Checked by reading both.
-  2. Each control matches its design component in each variant and state:
-     Button→`ActionButton`, IconButton, LinkButton (becomes a secondary
-     button), StateBadge, ControllerHint/`ControllerHintBar`,
-     TextField→`InputField`, Select, PinDigit/PinInput, Toggle,
-     SegmentItem/SegmentedControl, Slider→`ValueSlider`, NavItem, AppRail,
-     Spinner, ScanIndicator, SettingRow, DialogShell, StatusCount and
-     ViewToggle (new), ControllerStatus (new). Checked by screenshots of the
-     running app against the design system page.
-  3. The shell matches "Consoles — início": rail 232 px with the brand, the
-     "MENU" overline, Consoles and Configurações, and Sobre pinned at the
-     bottom; the hint bar and the DualSense card along the bottom of the
-     content. Sobre opens the existing About content (moved out of the
-     settings sections). Checked at 1280×800 and 960×600.
-  4. CI green; no QML warnings in the log at startup and while visiting each
-     screen.
-- **Deliveries:** (1) `Theme` tokens and typography; (2) buttons, badges and
-  inputs; (3) toggles, segmented controls, slider, select, PIN; (4) the shell:
-  rail with Sobre, hint bar, ControllerStatus, dialogs.
-- **Settled in planning:** Banner's tone boxes go away in favor of plain
-  colored text where messages appear (the preference above); the rail's
-  DualSense block moves into the ControllerStatus card.
-- **Changes:** `src/app/qml/Theme.qml`; `src/app/qml/controls/*.qml`; new
-  `StatusCount.qml`, `ViewToggle.qml`, `ControllerStatus.qml`;
-  `src/app/qml/Main.qml` for the shell; `src/app/CMakeLists.txt` for new QML
-  files and Lucide icons the design uses (copied from Lucide, ISC, as the
-  existing ones).
-- **Data and interfaces:** none beyond QML properties.
-- **Edge cases:** no controller connected (the card says so, as the current
-  rail does); 960×600 minimum window; keyboard and controller focus rings on
-  every focusable control.
-
 ### 3.3 Consoles and pairing
 
 - **Goal:** the Consoles screen, its dialogs and the pairing flow match
@@ -372,6 +327,16 @@ pushes each delivery there so CI builds it, and the orchestrator fast-forwards
 - **Data and interfaces:** none.
 - **Edge cases:** 1080p and 1440p+ outputs (the overlay scales as today);
   HDR output (colors stay correct in HDR10); a game at 30 fps.
+
+### Run stopped (3.3–3.5)
+
+The owner stopped the run on 2026-11-24 to save tokens. 3.2 is on `main`, CI
+green, not yet compared with the design in the app (the `--gallery` flag shows
+every control). Partial work, unchecked: `auto/3.3` (one delivery), `auto/3.4`
+and `auto/3.5` (a `wip:` commit each, before their first delivery). Next
+session: resume each from its branch, with no CI wait per delivery (owner's
+rule): one CI run and one design comparison at the end, then rename the project
+folder and the design file to `mfplay`.
 
 ### Decisions to review
 
@@ -1240,3 +1205,35 @@ A 60 fps HUD over a 30 fps picture made every frame differ.
 - B. 1 s, as Veyra's rate windows do.
 
 **Chosen: A**. Changing it: `kMetricsWindow`.
+
+#### D93 – A `--gallery` developer option (3.2)
+
+Some controls and states appear on no screen until 3.3.
+
+- A. A gallery behind a command-line flag, like `--play-file`.
+- B. Check only the controls that screens show.
+
+**Chosen: A**. Changing it: delete `qml/dev/`, the `gallery` property in
+`Main.qml` and the option in `main.cpp`.
+
+#### D94 – No controller: hint bar hidden, card stays (3.2)
+
+- A. Hint bar hidden (keeps its space); card says "Nenhum controle".
+- B. Show the PlayStation hints anyway. C. Hide the whole footer.
+
+**Chosen: A**, steady layout and truthful. Changing it: the hint bar's
+`opacity` binding in `Main.qml`.
+
+#### D95 – The controller card shows the battery (3.2)
+
+- A. "Bateria N %" when known, otherwise "Conectado", then "via USB/Bluetooth".
+- B. Always "Conectado", battery in the connection text: too wide.
+
+**Chosen: A**. Changing it: `controllerStatusText()` in `Main.qml`.
+
+#### D96 – The footer spans the content area (3.2)
+
+- A. The shell's footer spans the content area; 3.4 may narrow it.
+- B. Each page owns its footer.
+
+**Chosen: A**. Changing it: the footer `RowLayout` in `Main.qml`.
