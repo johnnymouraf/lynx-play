@@ -29,11 +29,14 @@ struct FrameGenerationPlan
 // Decides which source frames get a generated picture, from the published
 // cadence and each frame's distinct/repeated decision.
 //
-// A 60 fps source has a distinct picture every frame: each pair gets a
-// generated picture and the real one, for twice the presents. A 30 fps
-// source repeats every picture once: the distinct frame's generated picture
-// takes the first slot and the repeat's real picture takes the second, which
-// also keeps the real picture of a pair in presentation order. A repeat never
+// A source that fills the stream's rate has a distinct picture every frame:
+// each pair gets a generated picture and the real one, for twice the presents.
+// A source at half the stream's rate repeats every picture once: the distinct
+// frame's generated picture takes the first slot and the repeat's real
+// picture takes the second, which also keeps the real picture of a pair in
+// presentation order. The rates are relative to the stream's, so a 30 fps
+// game in a 30 fps stream has no repeats and in a 60 fps stream repeats every
+// picture. A repeat never
 // generates, and none of this runs until the cadence detector has published
 // an estimate from two agreeing windows.
 class FrameSchedule
@@ -41,8 +44,12 @@ class FrameSchedule
 public:
     struct Options
     {
-        // At or below this rate, a distinct picture is followed by repeats.
-        double repeatedSourceFramesPerSecond = 40.0;
+        // The rate the stream delivers frames at.
+        double containerFramesPerSecond = 60.0;
+        // At or below this share of the stream's rate, a distinct picture is
+        // followed by repeats. Two thirds sits between a source that fills
+        // the stream and the next step down, half of it.
+        double repeatedSourceShare = 2.0 / 3.0;
         // Only 2x, the most Ada supports; multiFrameCount is multiplier - 1.
         std::uint32_t multiplier = 2;
     };

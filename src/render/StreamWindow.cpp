@@ -205,6 +205,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
         .reflex = options.reflex,
         .upscaling = options.upscaling,
         .opticalFlow = options.opticalFlow,
+        .streamFramesPerSecond = options.streamFramesPerSecond,
         .frameGeneration = options.frameGeneration,
         .hdr = options.hdr,
         .rtxVideoHdrAvailable = options.rtxVideoHdrAvailable,

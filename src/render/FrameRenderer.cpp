@@ -190,6 +190,9 @@ FrameRenderer::FrameRenderer(GpuDevice gpu, HWND window, SwapChain swapChain,
       requestedSize_(swapChain_.size()),
       presented_(std::chrono::steady_clock::now(), kStatisticsPeriod)
 {
+    cadence_ = CadenceDetector(CadenceDetector::optionsFor(options_.streamFramesPerSecond));
+    frameSchedule_ = FrameSchedule({.containerFramesPerSecond = options_.streamFramesPerSecond});
+
     requestedReflex_.store(options_.reflex);
     requestedUpscaling_.store(options_.upscaling);
     requestedOpticalFlow_.store(options_.opticalFlow);

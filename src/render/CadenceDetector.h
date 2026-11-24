@@ -25,23 +25,26 @@ struct CadenceSample
 // period is frames / distinct frames and its cadence is the container rate
 // divided by that period. Two consecutive windows must agree within 1.6 fps
 // before an estimate is published, which keeps a single misread frame from
-// changing it. A window
-// with fewer than twelve distinct frames (a static scene) holds the last
-// estimate instead of claiming the container rate. reset() starts over after
-// a scene cut, a resize, a source change or dropped frames.
+// changing it. A window with too few distinct frames (a static scene) holds
+// the last estimate instead of claiming the container rate. reset() starts
+// over after a scene cut, a resize, a source change or dropped frames.
 class CadenceDetector
 {
 public:
     struct Options
     {
-        // The stream's frame rate; the PS5 always sends 60.
+        // The rate the stream delivers frames at, as negotiated with the
+        // console (30 or 60).
         double containerFramesPerSecond = 60.0;
         // A frame is a repeat when fewer than this share of its blocks change.
         double repeatFraction = 0.01;
         // A scene cut changes most of the picture and a lot of luma.
         double sceneCutFraction = 0.6;
         double sceneCutLevels = 32.0;
+        // One second of the stream: the estimate resolves whole frames per
+        // second and settles as fast at any rate. optionsFor() scales both.
         std::size_t windowSize = 60;
+        // A fifth of the window.
         std::size_t minimumDistinct = 12;
         double agreementFramesPerSecond = 1.6;
     };
@@ -65,6 +68,9 @@ public:
         std::size_t repeatedFrames = 0;
         std::size_t windowFrames = 0;
     };
+
+    // The defaults scaled to a stream of this rate.
+    [[nodiscard]] static Options optionsFor(double containerFramesPerSecond);
 
     CadenceDetector();
     explicit CadenceDetector(Options options);

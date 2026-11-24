@@ -7,6 +7,21 @@
 namespace mfplay::render
 {
 
+CadenceDetector::Options CadenceDetector::optionsFor(double containerFramesPerSecond)
+{
+    constexpr double kMinimumDistinctShare = 0.2;
+
+    const double windowFrames = std::max(std::round(containerFramesPerSecond), 1.0);
+    const double minimumDistinct = std::max(std::round(windowFrames * kMinimumDistinctShare), 1.0);
+
+    Options options;
+    options.containerFramesPerSecond = containerFramesPerSecond;
+    options.windowSize = static_cast<std::size_t>(windowFrames);
+    options.minimumDistinct = static_cast<std::size_t>(minimumDistinct);
+
+    return options;
+}
+
 CadenceDetector::CadenceDetector() : CadenceDetector(Options{})
 {
 }

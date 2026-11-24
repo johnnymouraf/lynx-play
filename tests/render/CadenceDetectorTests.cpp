@@ -182,3 +182,54 @@ TEST_CASE("The rolling window keeps the last sixty flags")
     CHECK(detector.windowFrames() == 60);
     CHECK(detector.repeatedFrames() == 60);
 }
+
+TEST_CASE("The options scale the window to one second of the stream")
+{
+    const CadenceDetector::Options options = CadenceDetector::optionsFor(30.0);
+
+    CHECK(options.containerFramesPerSecond == Catch::Approx(30.0));
+    CHECK(options.windowSize == 30);
+    CHECK(options.minimumDistinct == 6);
+}
+
+TEST_CASE("A 30 fps game in a 30 fps stream reads as 30 with nothing repeated")
+{
+    CadenceDetector detector(CadenceDetector::optionsFor(30.0));
+
+    feed(detector, 30, 0);
+    CHECK_FALSE(detector.estimate().has_value());
+
+    feed(detector, 30, 0);
+    REQUIRE(detector.estimate().has_value());
+    CHECK(detector.estimate()->framesPerSecond == Catch::Approx(30.0));
+    CHECK(detector.estimate()->repeatedFrames == 0);
+    CHECK(detector.estimate()->windowFrames == 30);
+}
+
+TEST_CASE("A 15 fps game in a 30 fps stream reads as 15")
+{
+    CadenceDetector detector(CadenceDetector::optionsFor(30.0));
+
+    for (int window = 0; window < 2; ++window)
+    {
+        feed(detector, 15, 15);
+    }
+
+    REQUIRE(detector.estimate().has_value());
+    CHECK(detector.estimate()->framesPerSecond == Catch::Approx(15.0));
+    CHECK(detector.estimate()->repeatedFrames == 15);
+}
+
+TEST_CASE("A 30 fps game in a 60 fps stream reads as 30 with half repeated")
+{
+    CadenceDetector detector(CadenceDetector::optionsFor(60.0));
+
+    for (int window = 0; window < 2; ++window)
+    {
+        feed(detector, 30, 30);
+    }
+
+    REQUIRE(detector.estimate().has_value());
+    CHECK(detector.estimate()->framesPerSecond == Catch::Approx(30.0));
+    CHECK(detector.estimate()->repeatedFrames == 30);
+}

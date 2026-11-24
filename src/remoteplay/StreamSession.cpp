@@ -795,4 +795,9 @@ void StreamSession::setVolumePercent(int percent)
     }
 }
 
+double StreamSession::framesPerSecond() const
+{
+    return static_cast<double>(state_->session.connect_info.video_profile.max_fps);
+}
+
 } // namespace mfplay::remoteplay

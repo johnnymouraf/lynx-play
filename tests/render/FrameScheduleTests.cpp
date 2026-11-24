@@ -146,3 +146,27 @@ TEST_CASE("The multiplier is the 2x pair Ada allows")
 
     CHECK(multi.observe(Decision::Distinct).multiFrameCount == 2);
 }
+
+TEST_CASE("A 30 fps source in a 30 fps stream generates one frame per pair and shows both")
+{
+    FrameSchedule schedule({.containerFramesPerSecond = 30.0});
+    schedule.setCadence(30.0);
+
+    const FrameGenerationPlan plan = schedule.observe(Decision::Distinct);
+
+    CHECK(plan.generate);
+    CHECK(plan.presentGenerated);
+    CHECK(plan.presentReal);
+}
+
+TEST_CASE("A 15 fps source in a 30 fps stream holds the real picture for the repeat")
+{
+    FrameSchedule schedule({.containerFramesPerSecond = 30.0});
+    schedule.setCadence(15.0);
+
+    const FrameGenerationPlan plan = schedule.observe(Decision::Distinct);
+
+    CHECK(plan.generate);
+    CHECK(plan.presentGenerated);
+    CHECK_FALSE(plan.presentReal);
+}

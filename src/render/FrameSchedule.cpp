@@ -65,7 +65,8 @@ FrameGenerationPlan FrameSchedule::observe(CadenceDetector::Decision decision)
 
 bool FrameSchedule::repeatedSource() const
 {
-    return cadence_ && *cadence_ <= options_.repeatedSourceFramesPerSecond;
+    return cadence_ &&
+           *cadence_ <= options_.containerFramesPerSecond * options_.repeatedSourceShare;
 }
 
 } // namespace mfplay::render

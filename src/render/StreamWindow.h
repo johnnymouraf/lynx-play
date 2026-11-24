@@ -39,6 +39,8 @@ struct StreamWindowOptions
     core::ReflexMode reflex = core::ReflexMode::Off;
     core::Upscaling upscaling = core::Upscaling::Shader;
     bool opticalFlow = true;
+    // The rate the source delivers frames at.
+    double streamFramesPerSecond = 60.0;
     core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
     core::HdrMode hdr = core::HdrMode::Auto;
     bool rtxVideoHdrAvailable = false;

@@ -57,6 +57,9 @@ public:
         // Computes the driver's optical flow between the picture and the one
         // before it; cadence detection runs either way, DLSS needs it.
         bool opticalFlow = true;
+        // The rate the source delivers frames at, as negotiated; the cadence
+        // detection and the frame schedule measure against it.
+        double streamFramesPerSecond = 60.0;
         // DLSS Frame Generation; it needs the optical flow and Reflex.
         core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
         // What to ask of HDR and what to do with the stream's PQ pictures.

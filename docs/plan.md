@@ -735,7 +735,8 @@ The DLSS-G header says "normalize", the guide says "pixels".
 - B. `1`.
 - C. `-1/W`, as Veyra does with current→previous pixel vectors.
 
-**Chosen: C**; the sign still needs a real pan to confirm. Changing it:
+**Chosen: C**; the docs say `+1/W`, so the sign still needs a real pan to
+confirm (see the comment at the constant). Changing it:
 `kMotionVectorScaleSign`.
 
 #### D55 – The 30 fps schedule holds the real frame for the repeat (2.5)

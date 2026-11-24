@@ -88,9 +88,23 @@ __declspec(noinline) NVSDK_NGX_Result callReleaseDlssg(NVSDK_NGX_Handle* handle)
 }
 
 constexpr float kConstantDepth = 0.9F;
-// Veyra's working convention for pixel-unit, current-to-previous vectors:
-// the runtime normalizes with the reciprocal and the sign reverses the
-// direction. The mission starts here and a wrong sign shows on a pan.
+// The sign of mvecScale, which turns pixel vectors into DLSS-G's normalized
+// ones (vector * mvecScale).
+//
+// The vectors here point from a pixel of the current picture to where it was
+// in the previous one: the optical flow runs with the new picture as
+// inputFrame and the one before it as referenceFrame, and NVIDIA's header
+// defines the forward flow as the position change from inputFrame to
+// referenceFrame; FlowDensify.hlsl keeps that direction and only rescales.
+//
+// NVIDIA's DLSS guide (3.6) asks for exactly that, current position plus
+// vector is the previous position, and Streamline's DLSS-G guide sets
+// mvecScale = {1/width, 1/height} for pixel vectors, which would make this
+// +1. The sign stays -1 because the reference app (Veyra) ships DLSS-G with
+// current-to-previous pixel vectors and -1/W, and the NGX header says only
+// "normalize". The sources disagree and nothing here has run on a pan, so
+// the sign is unconfirmed: a generated picture that doubles or rubber-bands
+// on a steady pan means it should be +1.
 constexpr float kMotionVectorScaleSign = -1.0F;
 
 std::filesystem::path executableDirectory()

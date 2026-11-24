@@ -416,6 +416,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
             .reflex = settings_.reflexMode(),
             .upscaling = settings_.upscalingMode(),
             .opticalFlow = settings_.opticalFlow(),
+            .streamFramesPerSecond = session_->framesPerSecond(),
             .frameGeneration = settings_.frameGenerationMode(),
             .hdr = settings_.hdrMode(),
             .rtxVideoHdrAvailable = settings_.rtxVideoHdrAvailable(),

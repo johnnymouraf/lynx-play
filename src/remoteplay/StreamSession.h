@@ -111,6 +111,10 @@ public:
     void setMicrophoneMuted(bool muted);
     void setVolumePercent(int percent);
 
+    // The frame rate the console streams at, as chiaki holds it after the
+    // console's answer. Valid once connected.
+    [[nodiscard]] double framesPerSecond() const;
+
 private:
     struct State;
 
