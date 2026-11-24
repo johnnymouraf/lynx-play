@@ -942,10 +942,11 @@ bool reflexBlock(const Fonts& fonts, const ReflexOverlayStats& reflex, core::Ref
 void drawPowerIcon(ImDrawList* drawList, ImVec2 center, float radius, ImU32 color)
 {
     constexpr float kPi = 3.14159265F;
-    constexpr float kGap = 0.55F;
+    constexpr float kArcGap = 0.55F;
     constexpr float kStroke = 1.8F;
 
-    drawList->PathArcTo(center, radius, -kPi / 2.0F + kGap, -kPi / 2.0F + 2.0F * kPi - kGap, 24);
+    drawList->PathArcTo(center, radius, -kPi / 2.0F + kArcGap,
+                         -kPi / 2.0F + 2.0F * kPi - kArcGap, 24);
     drawList->PathStroke(color, 0, kStroke);
     drawList->AddLine(ImVec2(center.x, center.y - radius - 1.5F),
                        ImVec2(center.x, center.y - 1.0F), color, kStroke);
