@@ -159,34 +159,36 @@ Item {
     RowLayout {
         id: listRow
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.leftMargin: Theme.space4
-        anchors.rightMargin: Theme.space4
-        implicitHeight: Theme.sizeControlLg + 2 * Theme.space4
+        anchors.fill: parent
+        anchors.margins: Theme.space4
         visible: card.listMode
         spacing: Theme.space4
-
-        Item {
-            Layout.preferredWidth: 120
-            Layout.preferredHeight: badge.implicitHeight
-            Layout.alignment: Qt.AlignVCenter
-
-            StateBadge {
-                id: badge
-
-                status: card.status
-            }
-        }
 
         ColumnLayout {
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignVCenter
             spacing: Theme.space1
 
-            ConsoleName {
+            Row {
+                id: titleRow
+
+                readonly property real nameWidth: Math.max(0, width - titleBadge.width - spacing)
+
                 Layout.fillWidth: true
-                text: card.name
+                spacing: Theme.space2
+
+                ConsoleName {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, titleRow.nameWidth)
+                    text: card.name
+                }
+
+                StateBadge {
+                    id: titleBadge
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    status: card.status
+                }
             }
 
             RowLayout {
@@ -194,11 +196,13 @@ Item {
                 spacing: Theme.space3
 
                 ConsoleAddress {
+                    Layout.alignment: Qt.AlignVCenter
                     text: card.address
                 }
 
                 AppText {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
                     text: card.activity
                     textStyle: "detail"
                     color: Theme.textSubtle

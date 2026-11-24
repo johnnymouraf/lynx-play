@@ -18,9 +18,35 @@ T.AbstractButton {
     Accessible.role: Accessible.Button
 
     contentItem: Item {
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: Theme.space4
+            visible: tile.listMode
+            spacing: Theme.space3
+
+            IconTile {
+                Layout.alignment: Qt.AlignVCenter
+                implicitWidth: 44
+                implicitHeight: 44
+                radius: Theme.radiusSm
+                color: tile.hovered ? Theme.surfaceHigh : Theme.surface
+                iconName: "plus"
+                iconSize: Theme.sizeIcon
+            }
+
+            AppText {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                text: tile.text
+                textStyle: "labelLarge"
+                color: tile.hovered ? Theme.text : Theme.textMuted
+            }
+        }
+
         Grid {
             anchors.centerIn: parent
-            columns: tile.listMode ? 2 : 1
+            visible: !tile.listMode
+            columns: 1
             spacing: 10
             horizontalItemAlignment: Grid.AlignHCenter
             verticalItemAlignment: Grid.AlignVCenter
