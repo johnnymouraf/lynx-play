@@ -12,6 +12,11 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Current: 3.1 Rename to MFPlay](#current-31-rename-to-mfplay)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
+  - [Shared by the redesign steps (3.2–3.5)](#shared-by-the-redesign-steps-3235)
+  - [3.2 Theme and shared components](#32-theme-and-shared-components)
+  - [3.3 Consoles and pairing](#33-consoles-and-pairing)
+  - [3.4 Settings, Sobre and connecting](#34-settings-sobre-and-connecting)
+  - [3.5 Stream overlay](#35-stream-overlay)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -66,17 +71,17 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         QML module, exe, workflow, docs), the vector icon and logo from the
         design, data moved from `MFPlay` to `MFPlay`, the repository renamed
         to `johnnymouraf/mfplay`.
-  - [ ] **3.2 Theme and shared components**: the new `Theme` tokens (blue
+  - [ ] **3.2 Theme and shared components** [auto]: the new `Theme` tokens (blue
         accent, radii, rail), buttons in the menu-button pattern, badges,
         fields, toggles, segmented controls, slider, dialogs, the rail with
         Sobre, the controller hint bar and the DualSense card.
-  - [ ] **3.3 Consoles and pairing**: cards with the new states, status
+  - [ ] **3.3 Consoles and pairing** [auto]: cards with the new states, status
         counters, grid/list toggle, empty state, Adicionar pelo IP,
         rename/forget, pairing with the PSN login in the new style.
-  - [ ] **3.4 Settings, Sobre and connecting**: Vídeo, Áudio, Controles (with
+  - [ ] **3.4 Settings, Sobre and connecting** [auto]: Vídeo, Áudio, Controles (with
         the DualSense battery), RTX, Rede (its internet rows disabled until
         phase 4), Sobre in the rail, Conectando and its error.
-  - [ ] **3.5 Stream overlay**: the design's statistics panel and Menu rápido
+  - [ ] **3.5 Stream overlay** [auto]: the design's statistics panel and Menu rápido
         in Dear ImGui, keeping every row the current overlay has.
   - Settled for the whole phase: where the design covers something, its layout
     and copy replace the code's; what exists only in the code stays, styled
@@ -164,14 +169,11 @@ Out of scope for now: capture card input (planned for the future).
 
 ## Auto mode
 
-Scope: up to 2.6 (extended from 2.2 at the owner's request, so DLSS
-and frame generation are included; internet play waits). Started on 2026-11-22 while
-the owner slept, and finished the same day: 1.1–1.5 and 2.1–2.6 are on
-main, green. Phase 4 remains for a later run (4.2 needs the owner's PSN
-login). Delivery: each step works on the branch
-`auto/<step>` (for example `auto/1.2`), commits and pushes each delivery there
-so CI builds it, and the orchestrator fast-forwards `main` to the branch once
-the step is done and green.
+Scope of the current run: 3.2–3.5, started on 2026-11-24 with the owner at the
+machine. The first run (2026-11-22) built 1.1–1.5 and 2.1–2.6. Delivery: each
+step works on the branch `auto/<step>` (for example `auto/3.2`), commits and
+pushes each delivery there so CI builds it, and the orchestrator fast-forwards
+`main` to the branch once the step is done and green.
 
 ### Shared by every step
 
@@ -197,9 +199,9 @@ the step is done and green.
   scratchpad, then read the PNG. Clicking: UI Automation (Qt Quick exposes
   accessible names) or keyboard input through `user32` `SendInput` after
   `SetForegroundWindow`. Always close the app when done.
-- **The owner is away:** the PS5 pairing PIN appears on the console's screen and
+- **The real console:** the PS5 pairing PIN appears on the console's screen and
   the Account ID belongs to the owner, so pairing, waking and streaming from the
-  real console can't be checked tonight. Those criteria are marked "owner
+  real console can't be checked unattended. Those criteria are marked "owner
   checks" and are reported as not checked. Everything else is checked here: CI,
   unit tests, the app's behavior, and the video path through the developer file
   source (1.3).
@@ -224,6 +226,179 @@ the step is done and green.
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
+
+### Shared by the redesign steps (3.2–3.5)
+
+- **Reading the design:** the Drafia app is open with the design file; use the
+  `mcp__drafia__*` tools (load them with ToolSearch). Read the Drafia skill's
+  `guide/design-to-code.md` first. Page "Design system" holds the components
+  and foundations; page "Screens" holds the screens in sections 1 Consoles,
+  2 Pareamento, 3 Conexão e stream, 4 Configurações. `Inspect` gives exact
+  sizes, paddings, gaps, fonts and the variables bound; `TakeScreenshot` the
+  visual reference. Never edit the design.
+- **Rule for content (settled with the owner):** where the design covers
+  something, its layout and copy replace the code's; what exists only in the
+  code stays, styled like the design's nearest equivalent (same row, block,
+  button and spacing patterns); where the design simplifies a behavior, the
+  real behavior stays with the design's look. Nothing working is removed.
+- **Owner's visual preferences:** labels start with a capital letter, never
+  all-lowercase; solid blocks, no shadows, no decorative filler, no accent
+  borders on blocks; every button follows the menu-button pattern (icon in a
+  32 px tile + label, 52 px tall), text links become secondary buttons;
+  status and error messages are plain colored text (no banner box, no icon);
+  no duplicate actions on a screen; status tags (EXPERIMENTAL, NÃO CONECTADA)
+  sit next to the row title; no console photos or product art.
+- **Checking the look:** run the app from the CI artifact at 1280×800 and
+  960×600, screenshot each screen built and compare it with the design frame
+  through `mcp__drafia__compare_image` (pass the screenshot's Windows path);
+  at most three rounds of fixes per screen, then report what still differs.
+- **Interface text** stays Brazilian Portuguese, with "MFPlay" as the name.
+
+### 3.2 Theme and shared components
+
+- **Goal:** the `Theme` singleton holds the design's variables and every shared
+  control in `src/app/qml/controls/` looks like its design component, with the
+  app shell (rail, hint bar, DualSense card) laid out as the design's screens.
+- **Guardrails:** shared controls and the shell only; screens get their own
+  layouts in 3.3 and 3.4 (they may only adapt to changed control APIs); no C++
+  behavior change beyond what a control needs to show (for example the battery
+  value the DualSense card shows).
+- **Success criteria:**
+  1. Every `Theme` value matches the design's `Theme` collection
+     (`GetVariables`), with the design's names; tokens the code needs and the
+     design lacks are kept and named for their role. Checked by reading both.
+  2. Each control matches its design component in each variant and state:
+     Button→`ActionButton`, IconButton, LinkButton (becomes a secondary
+     button), StateBadge, ControllerHint/`ControllerHintBar`,
+     TextField→`InputField`, Select, PinDigit/PinInput, Toggle,
+     SegmentItem/SegmentedControl, Slider→`ValueSlider`, NavItem, AppRail,
+     Spinner, ScanIndicator, SettingRow, DialogShell, StatusCount and
+     ViewToggle (new), ControllerStatus (new). Checked by screenshots of the
+     running app against the design system page.
+  3. The shell matches "Consoles — início": rail 232 px with the brand, the
+     "MENU" overline, Consoles and Configurações, and Sobre pinned at the
+     bottom; the hint bar and the DualSense card along the bottom of the
+     content. Sobre opens the existing About content (moved out of the
+     settings sections). Checked at 1280×800 and 960×600.
+  4. CI green; no QML warnings in the log at startup and while visiting each
+     screen.
+- **Deliveries:** (1) `Theme` tokens and typography; (2) buttons, badges and
+  inputs; (3) toggles, segmented controls, slider, select, PIN; (4) the shell:
+  rail with Sobre, hint bar, ControllerStatus, dialogs.
+- **Settled in planning:** Banner's tone boxes go away in favor of plain
+  colored text where messages appear (the preference above); the rail's
+  DualSense block moves into the ControllerStatus card.
+- **Changes:** `src/app/qml/Theme.qml`; `src/app/qml/controls/*.qml`; new
+  `StatusCount.qml`, `ViewToggle.qml`, `ControllerStatus.qml`;
+  `src/app/qml/Main.qml` for the shell; `src/app/CMakeLists.txt` for new QML
+  files and Lucide icons the design uses (copied from Lucide, ISC, as the
+  existing ones).
+- **Data and interfaces:** none beyond QML properties.
+- **Edge cases:** no controller connected (the card says so, as the current
+  rail does); 960×600 minimum window; keyboard and controller focus rings on
+  every focusable control.
+
+### 3.3 Consoles and pairing
+
+- **Goal:** the Consoles screen, its dialogs and the pairing flow match
+  sections "1 · Consoles" and "2 · Pareamento" of the design.
+- **Guardrails:** consoles and pairing screens only; discovery, wake, pairing
+  and store logic unchanged except what the new view mode needs.
+- **Success criteria:**
+  1. "Consoles — início", "Consoles — vazio", "Consoles — janela mínima",
+     "Card do console — estados", "Adicionar pelo IP" and its error match the
+     design (compare_image at 1280×800 and 960×600 with consoles added by IP
+     to reach each state the machine can produce).
+  2. The status counters show the real counts per state; the grid/list toggle
+     switches the view and is remembered across restarts (`settings.json`,
+     additive field, tested in `SettingsTests`).
+  3. Rename and Forget dialogs and the card's "…" menu follow the dialog and
+     button patterns.
+  4. Pairing steps (Account ID, PIN, pareando, sucesso, erro) match the
+     design; the PSN browser login (1.6) stays in step 1, styled like the
+     design (secondary button), with manual entry kept; "Ajuda" replaces the
+     "Como encontrar meu Account ID" link.
+  5. CI green, tests pass, no QML warnings.
+- **Deliveries:** (1) cards and grid; (2) counters and grid/list with the
+  setting; (3) empty state and Adicionar pelo IP, rename, forget; (4) pairing.
+- **Settled in planning:** counters and the grid/list toggle are built now;
+  the empty state takes the design's shorter copy and drops the checklist only
+  if the design has no place for it (the rule above keeps working hints).
+- **Changes:** `src/app/qml/consoles/*.qml`; `src/core/Settings.{h,cpp}` and
+  `SettingsController` for the view mode; tests in `tests/core/SettingsTests.cpp`.
+- **Data and interfaces:** `settings.json` gains `interface.consoleView`
+  (`grid` | `list`, default `grid`), version stays 1.
+- **Edge cases:** long console names; many consoles (scrolling keeps the
+  focused card visible); a pairing error with retry; the list view with each
+  card state.
+
+### 3.4 Settings, Sobre and connecting
+
+- **Goal:** Configurações (Vídeo, Áudio e microfone, Controles, RTX, Rede),
+  Sobre and the connecting screens match sections "3 · Conexão e stream"
+  (except the overlay) and "4 · Configurações".
+- **Guardrails:** these screens only; no streaming behavior change; the Rede
+  page's internet rows have no effect yet.
+- **Success criteria:**
+  1. Each settings page matches its design frame; rows only the code has
+     (window mode and size, HDR, upscaler choice, optical flow, controller
+     choice, keyboard as controller, mouse sensitivity, invert Y, video test)
+     stay, in the design's row style.
+  2. Controles shows the DualSense card with the real battery percent and
+     charging state from SDL (`SDL_GetGamepadPowerInfo`), and the connection
+     type; no controller shows the empty state.
+  3. Rede: "Bitrate na rede local" is the same setting as Vídeo's bitrate;
+     "Conta PSN" logs in through the existing PSN browser flow and shows the
+     state (NÃO CONECTADA tag or the account), its saved Account ID being the
+     one pairing fills in; "Bitrate pela internet" and "Endereço fora de casa"
+     are shown disabled with a description saying they arrive with internet
+     play.
+  4. Sobre matches its frame (mark, wordmark, tagline, version chips, the three
+     cards) and keeps the video test as an extra card.
+  5. "Conectando" and "Conectando — erro" match the design.
+  6. CI green, tests pass, no QML warnings.
+- **Deliveries:** (1) Vídeo and Áudio; (2) Controles with the battery; (3) RTX
+  and Rede; (4) Sobre and connecting.
+- **Settled in planning:** RTX keeps the real exclusive upscaler choice
+  (Shader / RTX VSR / DLSS SR) shown in the design's style instead of
+  independent toggles; Rede is built now with its internet rows disabled.
+- **Changes:** `src/app/qml/settings/*.qml` (new `NetworkSettings.qml`),
+  `src/app/qml/stream/*.qml`, `InputController` and `GamepadManager` for the
+  battery, `PsnLoginClient`/`SettingsController` for the account state.
+- **Data and interfaces:** battery as `controllerBatteryPercent` (-1 unknown)
+  and `controllerCharging` on `InputController`.
+- **Edge cases:** battery unknown (wired, or SDL can't tell); PSN login
+  cancelled or failed; no audio devices; no NVIDIA GPU (RTX rows disabled as
+  today).
+
+### 3.5 Stream overlay
+
+- **Goal:** the Dear ImGui overlay matches "Overlay no stream (ImGui)": the
+  statistics panel (F2) and the Menu rápido (F1) with the design's colors,
+  sizes, spacing and controls.
+- **Guardrails:** `src/render/Overlay.cpp` and its fonts/colors only; no change
+  to what the stats measure or to presentation; the overlay stays drawn by
+  Direct3D 12.
+- **Success criteria:**
+  1. The statistics panel matches the design's panel; every row the current
+     panel has stays (Reflex latency, cadence, GPU per stage, the gamepad
+     debug section), grouped under the design's overline headings.
+  2. Menu rápido matches the design: title with the console name and session
+     time, NVIDIA Reflex segmented control, toggles for RTX VSR, Frame
+     Generation, Mostrar estatísticas and Microfone, Desconectar as a danger
+     button, the close hint at the bottom; the current menu actions (window
+     mode row, everything else it has) stay in the same style.
+  3. Controller and keyboard navigation of the menu still work.
+  4. Checked through the developer file source (`--play-file`) with
+     screenshots compared to the design frame; CI green.
+- **Deliveries:** (1) shared ImGui style (colors from `Theme`'s values, radii,
+  fonts); (2) statistics panel; (3) Menu rápido.
+- **Settled in planning:** the Menu rápido is built now.
+- **Changes:** `src/render/Overlay.{h,cpp}`, `src/app/OverlayInput.h` if the
+  menu model changes.
+- **Data and interfaces:** none.
+- **Edge cases:** 1080p and 1440p+ outputs (the overlay scales as today);
+  HDR output (colors stay correct in HDR10); a game at 30 fps.
 
 ### Decisions to review
 
