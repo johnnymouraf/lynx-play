@@ -234,8 +234,19 @@ DialogShell {
             wrapMode: Text.WordWrap
         }
 
+        InputField {
+            id: accountField
+
+            Layout.fillWidth: true
+            label: "Account ID da PSN"
+            placeholderText: "Ex.: 1234567890123456789"
+            helperText: "Aceita o número (19 dígitos) ou o formato Base64, como Kx3fQ9aZ0bM=."
+            maximumLength: 24
+            onAccepted: dialog.continueToPin()
+        }
+
         // The browser sign-in keeps its own flow inside step 1, styled with the
-        // dialog's buttons; manual entry stays below it.
+        // dialog's buttons; manual entry stays above it.
         RowLayout {
             Layout.fillWidth: true
             visible: dialog.psnLogin.state === PsnLoginClient.Idle
@@ -409,23 +420,12 @@ DialogShell {
                 }
             }
         }
-
-        InputField {
-            id: accountField
-
-            Layout.fillWidth: true
-            label: "Account ID da PSN"
-            placeholderText: "Ex.: 1234567890123456789"
-            helperText: "Aceita o número (19 dígitos) ou o formato Base64, como Kx3fQ9aZ0bM=."
-            maximumLength: 24
-            onAccepted: dialog.continueToPin()
-        }
     }
 
     ColumnLayout {
         Layout.fillWidth: true
         visible: dialog.view === "pin"
-        spacing: Theme.space5
+        spacing: Theme.space4
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -565,17 +565,22 @@ DialogShell {
     ColumnLayout {
         Layout.fillWidth: true
         visible: dialog.view === "failure"
-        spacing: 10
+        spacing: Theme.space4
 
-        AppText {
-            text: "Código mostrado na TV"
-            textStyle: "labelMedium"
-        }
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 10
 
-        PinInput {
-            error: true
-            readOnly: true
-            text: pinInput.text
+            AppText {
+                text: "Código mostrado na TV"
+                textStyle: "labelMedium"
+            }
+
+            PinInput {
+                error: true
+                readOnly: true
+                text: pinInput.text
+            }
         }
 
         AppText {

@@ -170,6 +170,7 @@ Item {
         Item {
             Layout.preferredWidth: 120
             Layout.preferredHeight: badge.implicitHeight
+            Layout.alignment: Qt.AlignVCenter
 
             StateBadge {
                 id: badge
@@ -180,6 +181,7 @@ Item {
 
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
             spacing: Theme.space1
 
             ConsoleName {
@@ -207,6 +209,7 @@ Item {
         CardAction {
             Layout.preferredWidth: 220
             Layout.preferredHeight: Theme.sizeControlLg
+            Layout.alignment: Qt.AlignVCenter
             status: card.status
             searching: card.searching
             consoleName: card.name
@@ -217,6 +220,7 @@ Item {
         MoreButton {
             id: listMore
 
+            Layout.alignment: Qt.AlignVCenter
             text: `Opções de ${card.name}`
             onClicked: card.openMenu()
         }
