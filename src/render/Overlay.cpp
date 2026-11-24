@@ -759,7 +759,8 @@ bool toggleRow(const char* id, const Fonts& fonts, std::string_view label, std::
 
     ImGui::PushID(id);
     ImGui::SetCursorScreenPos(start);
-    const bool activated = ImGui::InvisibleButton("row", ImVec2(width, height));
+    const bool activated =
+        ImGui::InvisibleButton("row", ImVec2(width, height), ImGuiButtonFlags_EnableNav);
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
@@ -807,7 +808,8 @@ bool cycleRow(const char* id, const Fonts& fonts, std::string_view label, std::s
 
     ImGui::PushID(id);
     ImGui::SetCursorScreenPos(start);
-    const bool activated = ImGui::InvisibleButton("row", ImVec2(width, height));
+    const bool activated =
+        ImGui::InvisibleButton("row", ImVec2(width, height), ImGuiButtonFlags_EnableNav);
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
@@ -888,7 +890,8 @@ bool reflexBlock(const Fonts& fonts, const ReflexOverlayStats& reflex, core::Ref
         ImGui::SetCursorScreenPos(segmentTop);
         ImGui::PushID(static_cast<int>(index));
         const bool activated =
-            ImGui::InvisibleButton("segment", ImVec2(segmentWidth, kSegmentHeight));
+            ImGui::InvisibleButton("segment", ImVec2(segmentWidth, kSegmentHeight),
+                                   ImGuiButtonFlags_EnableNav);
         const bool hovered = ImGui::IsItemHovered();
         const bool focused = ImGui::IsItemFocused();
         ImGui::PopID();
@@ -949,7 +952,8 @@ bool disconnectButton(const Fonts& fonts)
     const float width = ImGui::GetContentRegionAvail().x;
 
     ImGui::PushID("disconnect");
-    const bool activated = ImGui::InvisibleButton("button", ImVec2(width, kHeight));
+    const bool activated =
+        ImGui::InvisibleButton("button", ImVec2(width, kHeight), ImGuiButtonFlags_EnableNav);
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
