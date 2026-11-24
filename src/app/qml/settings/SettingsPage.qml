@@ -18,6 +18,8 @@ Item {
     // The sections the StackLayout below holds, in order.
     readonly property var sectionIds: ["video", "audio", "controls", "rtx", "network"]
 
+    onSectionChanged: scroller.contentY = 0
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
