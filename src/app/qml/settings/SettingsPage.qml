@@ -11,12 +11,14 @@ Item {
     required property ConsolesController consoles
     required property SettingsController settings
     required property InputController input
-    // The page's right margin, set by the shell for the window's width.
-    property int sideMargin: Theme.space12
+    // The page's right margin, set by the shell.
+    property int sideMargin: Theme.space6
+    // Room the footer keeps free under the section content.
+    property int bottomInset: 0
 
-    property string section: "video"
+    property string section: "controls"
     // The sections the StackLayout below holds, in order.
-    readonly property var sectionIds: ["video", "audio", "controls", "rtx", "network"]
+    readonly property var sectionIds: ["controls", "video", "rtx", "audio", "network"]
 
     onSectionChanged: scroller.contentY = 0
 
@@ -32,7 +34,7 @@ Item {
                 anchors.fill: parent
                 anchors.topMargin: 26
                 anchors.leftMargin: Theme.space4
-                anchors.bottomMargin: Theme.space4
+                anchors.bottomMargin: Theme.space6
                 radius: Theme.radiusMd
                 color: Theme.surface
 
@@ -52,22 +54,6 @@ Item {
 
                     NavItem {
                         Layout.fillWidth: true
-                        text: "Vídeo"
-                        iconName: "monitor"
-                        selected: page.section === "video"
-                        onClicked: page.section = "video"
-                    }
-
-                    NavItem {
-                        Layout.fillWidth: true
-                        text: "Áudio e microfone"
-                        iconName: "volume-2"
-                        selected: page.section === "audio"
-                        onClicked: page.section = "audio"
-                    }
-
-                    NavItem {
-                        Layout.fillWidth: true
                         text: "Controles"
                         iconName: "gamepad-2"
                         selected: page.section === "controls"
@@ -76,10 +62,26 @@ Item {
 
                     NavItem {
                         Layout.fillWidth: true
+                        text: "Vídeo"
+                        iconName: "monitor"
+                        selected: page.section === "video"
+                        onClicked: page.section = "video"
+                    }
+
+                    NavItem {
+                        Layout.fillWidth: true
                         text: "RTX"
                         iconName: "sparkles"
                         selected: page.section === "rtx"
                         onClicked: page.section = "rtx"
+                    }
+
+                    NavItem {
+                        Layout.fillWidth: true
+                        text: "Áudio e microfone"
+                        iconName: "volume-2"
+                        selected: page.section === "audio"
+                        onClicked: page.section = "audio"
                     }
 
                     NavItem {
@@ -102,6 +104,7 @@ Item {
 
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.bottomMargin: page.bottomInset
             contentWidth: width
             contentHeight: sections.children[sections.currentIndex].implicitHeight + 42
             clip: true
@@ -117,22 +120,22 @@ Item {
                 width: scroller.width - Theme.space4 - page.sideMargin
                 currentIndex: Math.max(0, page.sectionIds.indexOf(page.section))
 
-                VideoSettings {
-                    settings: page.settings
-                }
-
-                AudioSettings {
-                    settings: page.settings
-                }
-
                 ControllerSettings {
                     settings: page.settings
                     input: page.input
                 }
 
+                VideoSettings {
+                    settings: page.settings
+                }
+
                 RtxSettings {
                     settings: page.settings
                     gpuName: page.controller.gpuName
+                }
+
+                AudioSettings {
+                    settings: page.settings
                 }
 
                 NetworkSettings {

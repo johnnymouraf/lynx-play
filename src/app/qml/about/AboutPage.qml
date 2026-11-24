@@ -9,8 +9,10 @@ Item {
     id: page
 
     required property AppController controller
-    // The page's side margins, set by the shell for the window's width.
-    property int sideMargin: Theme.space12
+    // The page's side margins, set by the shell.
+    property int sideMargin: Theme.space6
+    // Room the footer keeps free under the content.
+    property int bottomInset: 0
 
     property bool videoTestFailed: false
 
@@ -45,8 +47,9 @@ Item {
         id: scroller
 
         anchors.fill: parent
+        anchors.bottomMargin: page.bottomInset
         contentWidth: width
-        contentHeight: content.implicitHeight + 26 + Theme.space4
+        contentHeight: content.implicitHeight + 26 + Theme.space6
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -88,12 +91,16 @@ Item {
                     anchors.margins: 28
                     spacing: Theme.space6
 
-                    Image {
+                    Item {
                         Layout.preferredWidth: 88
                         Layout.preferredHeight: 88
-                        source: Theme.brandMark
-                        sourceSize.width: 88
-                        sourceSize.height: 88
+
+                        Image {
+                            anchors.fill: parent
+                            source: Theme.brandMark
+                            sourceSize.width: 88
+                            sourceSize.height: 88
+                        }
                     }
 
                     ColumnLayout {

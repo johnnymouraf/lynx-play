@@ -17,9 +17,10 @@ ApplicationWindow {
     property string section: "consoles"
     // The sections the StackLayout below holds, in order.
     readonly property var sectionIds: ["consoles", "settings", "about"]
-    // The side margins of the pages and the footer: the design's 48 px, or
-    // 32 px in a window narrower than 1280.
-    readonly property int pageMargin: window.width >= 1280 ? Theme.space12 : Theme.space8
+    // The margins of the pages and of the footer.
+    readonly property int pageMargin: Theme.space6
+    // What the pages keep free at the bottom for the footer.
+    readonly property int footerInset: Theme.sizeControlLg + Theme.space5 + window.pageMargin
     readonly property var hintsBySection: ({
         consoles: [
             { button: "cross", label: "Jogar" },
@@ -102,18 +103,16 @@ ApplicationWindow {
                 onSectionRequested: requested => window.section = requested
             }
 
-            ColumnLayout {
+            Item {
                 id: contentArea
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: Theme.space5
 
                 StackLayout {
                     id: sections
 
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    anchors.fill: parent
                     currentIndex: window.sectionIds.indexOf(window.section)
 
                     ConsolesPage {
@@ -122,6 +121,7 @@ ApplicationWindow {
                         consoles: window.consoles
                         settings: window.settings
                         sideMargin: window.pageMargin
+                        bottomInset: window.footerInset
                         onToastRequested: (tone, title, message) => toast.show(tone, title, message)
                     }
 
@@ -133,26 +133,37 @@ ApplicationWindow {
                         settings: window.settings
                         input: window.input
                         sideMargin: window.pageMargin
+                        bottomInset: window.footerInset
                     }
 
                     AboutPage {
                         controller: window.controller
                         sideMargin: window.pageMargin
+                        bottomInset: window.footerInset
                     }
                 }
 
                 RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: window.section === "settings"
+                    id: footer
+
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: window.section === "settings"
                                        ? 240 + Theme.space4 : window.pageMargin
-                    Layout.rightMargin: window.pageMargin
-                    Layout.bottomMargin: Theme.space4
+                    anchors.rightMargin: window.pageMargin
+                    anchors.bottomMargin: window.pageMargin
                     spacing: Theme.space4
 
                     ControllerHintBar {
                         Layout.fillWidth: true
-                        opacity: window.input.controllerConnected ? 1 : 0
+                        visible: window.input.controllerConnected
                         hints: window.hintsBySection[window.section]
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        visible: !window.input.controllerConnected
                     }
 
                     ControllerStatus {
@@ -189,7 +200,7 @@ ApplicationWindow {
         id: toast
 
         x: contentArea.x + (contentArea.width - width) / 2
-        y: window.height - height - Theme.sizeControlLg - Theme.space4 - Theme.space5
+        y: window.height - height - window.footerInset
         width: Math.min(400, contentArea.width - 2 * Theme.space8)
     }
 }
