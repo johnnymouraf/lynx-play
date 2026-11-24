@@ -8,7 +8,7 @@ Rectangle {
 
     property string iconName
     property string text
-    property color color: Theme.standby
+    property color textColor: Theme.standby
 
     implicitWidth: content.implicitWidth + 2 * Theme.space2
     implicitHeight: 22
@@ -29,14 +29,14 @@ Rectangle {
             name: tag.iconName
             size: 12
             bold: true
-            color: tag.color
+            color: tag.textColor
         }
 
         AppText {
             anchors.verticalCenter: parent.verticalCenter
             text: tag.text
             textStyle: "tag"
-            color: tag.color
+            color: tag.textColor
         }
     }
 }

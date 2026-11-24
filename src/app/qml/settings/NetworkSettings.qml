@@ -143,7 +143,7 @@ ColumnLayout {
                             Layout.alignment: Qt.AlignVCenter
                             iconName: section.signedIn ? "user-check" : "user-x"
                             text: section.signedIn ? "Conectada" : "Não conectada"
-                            color: section.signedIn ? Theme.ready : Theme.offline
+                            textColor: section.signedIn ? Theme.ready : Theme.offline
                         }
 
                         Item {

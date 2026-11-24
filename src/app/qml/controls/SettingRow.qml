@@ -52,7 +52,7 @@ Rectangle {
                     visible: row.tagLabel.length > 0
                     iconName: row.tagIcon
                     text: row.tagLabel
-                    color: row.tagColor
+                    textColor: row.tagColor
                 }
             }
 
