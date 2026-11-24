@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // Text in one of the design's text styles (Theme.typography).
 Text {

@@ -23,7 +23,7 @@
 struct ImGuiContext;
 struct ImFont;
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // What the overlay shows about NVIDIA Reflex.
@@ -261,4 +261,4 @@ private:
     std::chrono::steady_clock::time_point nextControllerLog_{};
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

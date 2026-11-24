@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's Toggle: an amber track with a dark thumb when on.
 T.Switch {

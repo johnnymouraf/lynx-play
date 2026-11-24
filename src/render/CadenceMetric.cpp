@@ -7,7 +7,7 @@
 #include <array>
 #include <cstring>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -491,4 +491,4 @@ void CadenceMetric::writeLumaView(UINT slot, bool current, const VideoFrame& fra
     device_->CreateShaderResourceView(frame.texture.Get(), &view, handle);
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

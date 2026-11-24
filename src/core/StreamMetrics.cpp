@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -173,4 +173,4 @@ StreamMetricsSnapshot StreamMetrics::snapshot(Clock::time_point now)
     return snapshot;
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

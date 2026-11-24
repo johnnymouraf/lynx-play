@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Gives a console the name its card shows.
 DialogShell {

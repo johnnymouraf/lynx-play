@@ -37,7 +37,7 @@
 #include <thread>
 #include <vector>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Shows the frames a video source publishes, from a thread of its own: each
@@ -409,4 +409,4 @@ private:
     std::jthread thread_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

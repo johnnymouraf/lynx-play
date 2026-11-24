@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // A pulsing dot with a label, shown while the app searches the network.
 Row {

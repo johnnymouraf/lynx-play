@@ -12,13 +12,13 @@
 #include <memory>
 #include <string>
 
-namespace lynx::input
+namespace mfplay::input
 {
 class GamepadManager;
 class KeyboardMouseInput;
 }
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Why a session ended, as the interface tells it.
@@ -119,4 +119,4 @@ private:
     std::unique_ptr<State> state_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

@@ -4,12 +4,12 @@
 
 - **Where:** console discovery (`src/remoteplay/ConsoleDiscovery.cpp`) on a
   network Windows marks as Public.
-- **Steps:** extract a build to a new folder, run `lynx-play.exe`, dismiss or
+- **Steps:** extract a build to a new folder, run `mfplay.exe`, dismiss or
   ignore the Windows Firewall prompt, wait on the Consoles screen with a PS5 on
   the LAN.
 - **Expected:** the PS5 appears, or the app explains that the firewall is
   blocking discovery and how to allow it.
-- **Actual:** Windows adds inbound block rules for that `lynx-play.exe` path
+- **Actual:** Windows adds inbound block rules for that `mfplay.exe` path
   (Public profile), broadcast answers never arrive and the list stays empty
   with no explanation. Direct queries to a typed IP still work. Each new
   extraction path triggers a new prompt.
@@ -55,19 +55,19 @@
 
 ## Parallel test runs share the owner's settings and logs
 
-- **Where:** any two `lynx-play.exe` instances started from different builds
+- **Where:** any two `mfplay.exe` instances started from different builds
   (the step agents' tests).
 - **Steps:** run two builds at the same time; change settings in one.
 - **Expected:** each run is isolated.
-- **Actual:** every build reads `%APPDATA%\LynxPlay\settings.json` and writes
-  `%LOCALAPPDATA%\LynxPlay\lynx-play.log`, so one run overwrites the other's
+- **Actual:** every build reads `%APPDATA%\MFPlay\settings.json` and writes
+  `%LOCALAPPDATA%\MFPlay\mfplay.log`, so one run overwrites the other's
   settings (fields disappear) and the log lines interleave. Reproducible; a
   verification hazard, not a runtime bug.
 
 ## Reflex reports no effective low-latency in --play-file
 
 - **Where:** `--play-file` playback with Reflex on.
-- **Steps:** run `lynx-play.exe --play-file <file> --fps 60`, open F2, read the
+- **Steps:** run `mfplay.exe --play-file <file> --fps 60`, open F2, read the
   Reflex section.
 - **Expected:** the driver reports the low-latency mode as effective, and
   `GetLatency` returns a valid report, as the "Teste de vídeo" window does.

@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's Slider: an accent track up to an amber-rimmed knob, with a
 // focus ring around the knob.

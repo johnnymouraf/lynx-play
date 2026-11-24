@@ -3,7 +3,7 @@
 #include <expected>
 #include <string>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Initializes chiaki-lib's process-wide state (randomness, FEC tables,
@@ -11,4 +11,4 @@ namespace lynx::remoteplay
 // has no matching shutdown.
 [[nodiscard]] std::expected<void, std::string> initializeChiaki();
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

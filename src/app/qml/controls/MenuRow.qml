@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // An entry of a PopupMenu, with an icon; `danger` paints it red.
 T.MenuItem {

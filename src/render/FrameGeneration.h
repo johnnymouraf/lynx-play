@@ -10,7 +10,7 @@
 
 #include <d3d12.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Why DLSS Frame Generation can't run here, for the RTX screen.
@@ -102,4 +102,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

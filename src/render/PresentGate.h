@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // What a present did with the picture.
@@ -43,4 +43,4 @@ private:
     std::uint32_t skippedSinceRetry_ = 0;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

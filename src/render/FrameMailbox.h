@@ -10,7 +10,7 @@
 #include <optional>
 #include <string>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Hands frames from a video source's thread to the renderer. Only the newest
@@ -47,4 +47,4 @@ private:
     core::UniqueHandle frameReady_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

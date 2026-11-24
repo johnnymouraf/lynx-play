@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -183,4 +183,4 @@ QString fromUtf8(const std::string& text)
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

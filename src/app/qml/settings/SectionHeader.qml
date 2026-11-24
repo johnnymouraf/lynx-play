@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // A settings section's title and what it covers.
 ColumnLayout {

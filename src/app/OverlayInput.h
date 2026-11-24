@@ -3,7 +3,7 @@
 #include "input/ControllerMapping.h"
 #include "render/Overlay.h"
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace overlay_input
@@ -64,4 +64,4 @@ namespace overlay_input
     };
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

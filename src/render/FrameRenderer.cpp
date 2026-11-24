@@ -11,7 +11,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -455,7 +455,7 @@ std::expected<void, std::string> FrameRenderer::createFrameResources()
 void FrameRenderer::run(const std::stop_token& stop)
 try
 {
-    SetThreadDescription(GetCurrentThread(), L"Lynx frame renderer");
+    SetThreadDescription(GetCurrentThread(), L"MFPlay frame renderer");
     const core::MmcssRegistration mmcss = core::MmcssRegistration::enable(L"Games");
 
     if (gpu_.dxgiDevice)
@@ -3023,4 +3023,4 @@ void FrameRenderer::waitForGpu()
     waitForFence(lastSignaledFence_);
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

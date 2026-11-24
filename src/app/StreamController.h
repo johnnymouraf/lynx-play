@@ -20,12 +20,12 @@
 
 #include <windows.h>
 
-namespace lynx::input
+namespace mfplay::input
 {
 class KeyboardMouseInput;
 }
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class InputController;
@@ -125,4 +125,4 @@ private:
     std::unique_ptr<render::StreamWindow> window_;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

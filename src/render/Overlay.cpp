@@ -24,7 +24,7 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam,
                                                               LPARAM lParam);
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -552,7 +552,7 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const Overlay
     ImGui::SetNextWindowPos(ImVec2(kPanelMargin, kPanelMargin), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(kStatsWidth, 0.0F), ImGuiCond_Always);
 
-    if (!ImGui::Begin("lynx-statistics", nullptr, kStatsFlags))
+    if (!ImGui::Begin("mfplay-statistics", nullptr, kStatsFlags))
     {
         ImGui::End();
         return;
@@ -811,7 +811,7 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
     MenuResult result;
     result.reflex = currentReflex;
 
-    if (!ImGui::Begin("lynx-menu", nullptr, kMenuFlags))
+    if (!ImGui::Begin("mfplay-menu", nullptr, kMenuFlags))
     {
         ImGui::End();
         return result;
@@ -1373,4 +1373,4 @@ void Overlay::freeView(D3D12_CPU_DESCRIPTOR_HANDLE cpu)
     }
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

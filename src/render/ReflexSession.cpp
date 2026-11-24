@@ -14,7 +14,7 @@
 #include <d3d12.h>
 #include <nvapi.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -731,4 +731,4 @@ void ReflexSession::disableAfterStall(std::uint32_t sleepUs, std::uint32_t gpuWo
                  SleepStallDetector::kWindow);
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -5,7 +5,7 @@
 #include <d3d11.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -197,4 +197,4 @@ void raiseCurrentThreadGpuPriority(IDXGIDevice& device)
                  GetCurrentThreadId());
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

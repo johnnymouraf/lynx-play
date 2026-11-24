@@ -1,6 +1,6 @@
 # Fetches the pinned chiaki-ng submodule and only the nested submodules its
 # protocol library needs (chiaki-ng also carries Android, Switch and Steam Deck
-# code that Lynx Play never builds).
+# code that MFPlay never builds).
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 

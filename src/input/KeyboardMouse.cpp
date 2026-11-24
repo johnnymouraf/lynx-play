@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 namespace
@@ -230,4 +230,4 @@ bool KeyboardMouseInput::pressed(const Binding& binding) const
     return false;
 }
 
-} // namespace lynx::input
+} // namespace mfplay::input

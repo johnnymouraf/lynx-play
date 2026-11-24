@@ -12,7 +12,7 @@
 
 #include <chiaki/regist.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -172,4 +172,4 @@ ConsoleRegistration::~ConsoleRegistration()
     chiaki_regist_fini(&state_->regist);
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

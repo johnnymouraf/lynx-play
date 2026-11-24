@@ -14,7 +14,7 @@
 
 #include <SDL3/SDL_audio.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 // The console expects 10 ms Opus frames: 480 stereo frames at 48 kHz.
@@ -69,4 +69,4 @@ private:
     std::jthread drainThread_;
 };
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

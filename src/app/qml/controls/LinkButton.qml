@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // An accent text button with a leading icon, for links and light actions.
 T.Button {

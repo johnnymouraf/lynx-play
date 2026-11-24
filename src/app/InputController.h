@@ -8,12 +8,12 @@
 
 #include <memory>
 
-namespace lynx::input
+namespace mfplay::input
 {
 class GamepadManager;
 }
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class SettingsController;
@@ -81,4 +81,4 @@ private:
     QVariantList controllers_;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

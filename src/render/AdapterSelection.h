@@ -6,7 +6,7 @@
 #include <span>
 #include <string>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 inline constexpr std::uint32_t kNvidiaVendorId = 0x10DE;
@@ -24,4 +24,4 @@ struct AdapterInfo
 // (Microsoft Basic Render Driver) are never picked.
 [[nodiscard]] std::optional<std::size_t> selectAdapter(std::span<const AdapterInfo> adapters);
 
-} // namespace lynx::render
+} // namespace mfplay::render

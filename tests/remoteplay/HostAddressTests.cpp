@@ -2,8 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::remoteplay::HostAddressError;
-using lynx::remoteplay::normalizeHostAddress;
+using mfplay::remoteplay::HostAddressError;
+using mfplay::remoteplay::normalizeHostAddress;
 
 TEST_CASE("normalizeHostAddress accepts IPv4 addresses and host names")
 {

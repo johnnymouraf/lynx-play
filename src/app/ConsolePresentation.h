@@ -5,7 +5,7 @@
 #include <QDateTime>
 #include <QString>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 // What a card needs to know about one console.
@@ -30,4 +30,4 @@ struct ConsoleFacts
 
 [[nodiscard]] QString fromUtf8(const std::string& text);
 
-} // namespace lynx::app
+} // namespace mfplay::app

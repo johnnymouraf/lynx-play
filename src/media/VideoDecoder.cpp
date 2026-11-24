@@ -31,7 +31,7 @@ extern "C"
 #include <libavutil/rational.h>
 }
 
-namespace lynx::media
+namespace mfplay::media
 {
 
 namespace
@@ -438,7 +438,7 @@ std::expected<void, std::string> VideoDecoder::decode(std::span<const std::uint8
     if (!latencySetup)
     {
         latencySetup = true;
-        SetThreadDescription(GetCurrentThread(), L"Lynx video decoder");
+        SetThreadDescription(GetCurrentThread(), L"MFPlay video decoder");
         mmcss.emplace(core::MmcssRegistration::enable(L"Games"));
 
         if (context_->dxgiDevice)
@@ -622,4 +622,4 @@ void VideoDecoder::Context::reportStatistics()
     errors = 0;
 }
 
-} // namespace lynx::media
+} // namespace mfplay::media

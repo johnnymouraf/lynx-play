@@ -5,8 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::media::splitAccessUnits;
-using lynx::core::VideoCodec;
+using mfplay::core::VideoCodec;
+using mfplay::media::splitAccessUnits;
 
 namespace
 {

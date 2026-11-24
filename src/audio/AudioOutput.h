@@ -11,7 +11,7 @@
 
 #include <SDL3/SDL_audio.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 // How much decoded audio may wait in SDL's queue before older audio is
@@ -72,4 +72,4 @@ private:
     std::function<void()> onLost_;
 };
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

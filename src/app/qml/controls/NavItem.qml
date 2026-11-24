@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // An entry of the app rail or of a section list.
 T.Button {

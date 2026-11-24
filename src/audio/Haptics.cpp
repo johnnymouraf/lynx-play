@@ -13,7 +13,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 namespace
@@ -402,4 +402,4 @@ void Haptics::scheduleRetryLocked()
     ++retryAttempt_;
 }
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

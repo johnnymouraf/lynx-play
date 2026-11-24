@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // The design's Select: a value with a chevron that opens the list of choices
 // below it. `options` lists {label, value}.

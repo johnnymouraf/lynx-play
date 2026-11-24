@@ -8,7 +8,7 @@
 #include <chiaki/orientation.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 namespace
@@ -883,4 +883,4 @@ GamepadManager::Device* GamepadManager::activeDevice()
     return findDevice(*activeId_);
 }
 
-} // namespace lynx::input
+} // namespace mfplay::input

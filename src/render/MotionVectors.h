@@ -10,7 +10,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // NVIDIA's coarse flow grid as a full-resolution current-to-previous vector
@@ -68,4 +68,4 @@ private:
     PixelRect fit_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

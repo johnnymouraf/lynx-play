@@ -7,7 +7,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // How a YUV picture's planes are laid out in its texture.
@@ -90,4 +90,4 @@ struct VideoFrame
     std::shared_ptr<const void> lease;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

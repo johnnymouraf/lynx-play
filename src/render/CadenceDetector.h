@@ -5,7 +5,7 @@
 #include <deque>
 #include <optional>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // One source frame's comparison against the picture before it, from the GPU
@@ -93,4 +93,4 @@ private:
     std::optional<Estimate> estimate_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -8,7 +8,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::render;
+using namespace mfplay::render;
 
 TEST_CASE("The pipeline's stage list keeps both upscalers and the flow")
 {

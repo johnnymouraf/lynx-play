@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The home screen: the consoles on the network and the saved ones.
 FocusScope {

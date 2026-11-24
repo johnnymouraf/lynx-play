@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 enum class HostAddressError
@@ -21,4 +21,4 @@ enum class HostAddressError
 [[nodiscard]] std::expected<std::string, HostAddressError> normalizeHostAddress(
     std::string_view text);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

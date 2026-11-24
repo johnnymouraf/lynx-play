@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <iterator>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 namespace
@@ -147,4 +147,4 @@ std::array<std::uint8_t, DualSenseEffects::kPacketSize> DualSenseEffects::serial
     return bytes_;
 }
 
-} // namespace lynx::input
+} // namespace mfplay::input

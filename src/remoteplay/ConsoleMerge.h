@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // One console of the home screen: saved, answering, or both.
@@ -44,4 +44,4 @@ struct MergeResult
 // The host ID, or "manual:<address>" for an address that hasn't answered yet.
 [[nodiscard]] std::string consoleKey(const SavedConsole& console);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

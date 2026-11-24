@@ -1,4 +1,4 @@
-# Lynx Play
+# MFPlay
 
 Windows Remote Play client for the PS5 (C++23, Qt 6 QML, Direct3D 12), built on
 chiaki-ng's protocol library, with NVIDIA RTX enhancements. Read `README.md` for
@@ -17,7 +17,7 @@ the layout and `docs/plan.md` for the plan in progress.
 - After pushing, follow the run with `gh run watch` and read failures with
   `gh run view --log-failed`.
 - To test a build, download its artifact into a fresh folder and run it:
-  `gh run download <run-id> --name lynx-play-windows-x64 --dir <folder>`.
+  `gh run download <run-id> --name mfplay-windows-x64 --dir <folder>`.
   Running the app on this machine is how features are checked: it is the target
   machine (RTX 4060 Laptop, NVIDIA driver, PS5 on the same network).
 - Compiler: `clang-cl` for everything, as chiaki-ng's own Windows build does

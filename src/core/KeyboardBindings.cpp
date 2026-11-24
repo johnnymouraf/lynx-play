@@ -4,7 +4,7 @@
 #include <array>
 #include <format>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -169,4 +169,4 @@ std::string keyboardBindingName(KeyboardBinding binding)
     return "VK_00";
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

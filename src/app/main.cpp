@@ -60,7 +60,7 @@ struct CommandLine
 
 void startLogging()
 {
-    const auto dataDir = lynx::core::localDataDir();
+    const auto dataDir = mfplay::core::localDataDir();
 
     if (!dataDir)
     {
@@ -68,7 +68,7 @@ void startLogging()
         return;
     }
 
-    if (const auto logging = lynx::core::initLogging(*dataDir / "logs"); !logging)
+    if (const auto logging = mfplay::core::initLogging(*dataDir / "logs"); !logging)
     {
         spdlog::error("No log file: {}", logging.error());
     }
@@ -76,7 +76,7 @@ void startLogging()
 
 bool startRemotePlay()
 {
-    const auto chiaki = lynx::remoteplay::initializeChiaki();
+    const auto chiaki = mfplay::remoteplay::initializeChiaki();
 
     if (!chiaki)
     {
@@ -88,9 +88,9 @@ bool startRemotePlay()
     return true;
 }
 
-std::optional<lynx::remoteplay::ConsoleStore> openConsoleStore()
+std::optional<mfplay::remoteplay::ConsoleStore> openConsoleStore()
 {
-    const auto dataDir = lynx::core::roamingDataDir();
+    const auto dataDir = mfplay::core::roamingDataDir();
 
     if (!dataDir)
     {
@@ -98,13 +98,13 @@ std::optional<lynx::remoteplay::ConsoleStore> openConsoleStore()
         return std::nullopt;
     }
 
-    return lynx::remoteplay::ConsoleStore(*dataDir / "consoles.json",
-                                          lynx::remoteplay::dpapiProtector());
+    return mfplay::remoteplay::ConsoleStore(*dataDir / "consoles.json",
+                                            mfplay::remoteplay::dpapiProtector());
 }
 
-std::optional<lynx::core::SettingsStore> openSettingsStore()
+std::optional<mfplay::core::SettingsStore> openSettingsStore()
 {
-    const auto dataDir = lynx::core::roamingDataDir();
+    const auto dataDir = mfplay::core::roamingDataDir();
 
     if (!dataDir)
     {
@@ -112,12 +112,12 @@ std::optional<lynx::core::SettingsStore> openSettingsStore()
         return std::nullopt;
     }
 
-    return lynx::core::SettingsStore(*dataDir / "settings.json");
+    return mfplay::core::SettingsStore(*dataDir / "settings.json");
 }
 
-std::optional<lynx::remoteplay::PsnTokenStore> openPsnTokenStore()
+std::optional<mfplay::remoteplay::PsnTokenStore> openPsnTokenStore()
 {
-    const auto dataDir = lynx::core::roamingDataDir();
+    const auto dataDir = mfplay::core::roamingDataDir();
 
     if (!dataDir)
     {
@@ -125,13 +125,13 @@ std::optional<lynx::remoteplay::PsnTokenStore> openPsnTokenStore()
         return std::nullopt;
     }
 
-    return lynx::remoteplay::PsnTokenStore(*dataDir / "psn.json",
-                                           lynx::remoteplay::dpapiProtector());
+    return mfplay::remoteplay::PsnTokenStore(*dataDir / "psn.json",
+                                             mfplay::remoteplay::dpapiProtector());
 }
 
 QString findStreamGpu()
 {
-    const auto adapters = lynx::render::listAdapters();
+    const auto adapters = mfplay::render::listAdapters();
 
     if (!adapters)
     {
@@ -144,7 +144,7 @@ QString findStreamGpu()
         spdlog::info("GPU found: {} (vendor 0x{:04X})", adapter.name, adapter.vendorId);
     }
 
-    const auto chosen = lynx::render::selectAdapter(*adapters);
+    const auto chosen = mfplay::render::selectAdapter(*adapters);
 
     if (!chosen)
     {
@@ -194,11 +194,18 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
 
 int main(int argc, char* argv[])
 {
+    const auto adoptionFailures = mfplay::core::adoptLegacyDataDirs();
     startLogging();
-    lynx::core::installTerminateLogging();
-    lynx::app::installQtLogBridge();
-    spdlog::info("Lynx Play {} starting", lynx::app::kVersion);
-    lynx::core::disableProcessPowerThrottling();
+
+    for (const auto& failure : adoptionFailures)
+    {
+        spdlog::error("Data from before the rename to MFPlay was not copied: {}", failure);
+    }
+
+    mfplay::core::installTerminateLogging();
+    mfplay::app::installQtLogBridge();
+    spdlog::info("MFPlay {} starting", mfplay::app::kVersion);
+    mfplay::core::disableProcessPowerThrottling();
 
     QGuiApplication application(argc, argv);
     const auto commandLine = parseCommandLine(application);
@@ -208,37 +215,38 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    lynx::app::SettingsController settings(openSettingsStore());
+    mfplay::app::SettingsController settings(openSettingsStore());
 
     if (commandLine->playFile)
     {
-        return lynx::app::playFile(*commandLine->playFile, commandLine->framesPerSecond, settings);
+        return mfplay::app::playFile(*commandLine->playFile, commandLine->framesPerSecond,
+                                     settings);
     }
 
-    lynx::app::loadBundledFonts();
+    mfplay::app::loadBundledFonts();
 
-    lynx::app::AppController controller(
+    mfplay::app::AppController controller(
         {
             .remotePlayReady = startRemotePlay(),
             .gpuName = findStreamGpu(),
         },
         settings);
-    QGuiApplication::setApplicationName(QStringLiteral("Lynx Play"));
+    QGuiApplication::setApplicationName(QStringLiteral("MFPlay"));
     QGuiApplication::setApplicationVersion(controller.version());
 
-    auto sdl = lynx::input::SdlRuntime::create();
+    auto sdl = mfplay::input::SdlRuntime::create();
 
     if (!sdl)
     {
         spdlog::error("Controllers and audio are unavailable: {}", sdl.error());
     }
 
-    std::unique_ptr<lynx::input::GamepadManager> gamepads;
+    std::unique_ptr<mfplay::input::GamepadManager> gamepads;
 
     if (sdl)
     {
-        auto created = lynx::input::GamepadManager::create(
-            settings.preferredController().toStdString());
+        auto created =
+            mfplay::input::GamepadManager::create(settings.preferredController().toStdString());
 
         if (created)
         {
@@ -250,14 +258,14 @@ int main(int argc, char* argv[])
         }
     }
 
-    lynx::app::InputController input(settings, std::move(gamepads), sdl.has_value());
-    lynx::app::StreamController stream(settings, input);
-    lynx::app::PsnLoginClient psnLogin(settings, openPsnTokenStore());
-    lynx::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore(),
-                                           stream, psnLogin);
+    mfplay::app::InputController input(settings, std::move(gamepads), sdl.has_value());
+    mfplay::app::StreamController stream(settings, input);
+    mfplay::app::PsnLoginClient psnLogin(settings, openPsnTokenStore());
+    mfplay::app::ConsolesController consoles(controller.remotePlayReady(), openConsoleStore(),
+                                             stream, psnLogin);
 
     QQmlApplicationEngine engine;
-    engine.addImageProvider(QStringLiteral("icon"), new lynx::app::IconProvider);
+    engine.addImageProvider(QStringLiteral("icon"), new mfplay::app::IconProvider);
     engine.setInitialProperties({
         {QStringLiteral("controller"), QVariant::fromValue(&controller)},
         {QStringLiteral("consoles"), QVariant::fromValue(&consoles)},
@@ -269,10 +277,10 @@ int main(int argc, char* argv[])
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &application,
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
-    engine.loadFromModule("LynxPlay", "Main");
+    engine.loadFromModule("MFPlay", "Main");
 
     const int exitCode = QGuiApplication::exec();
-    spdlog::info("Lynx Play exiting with code {}", exitCode);
+    spdlog::info("MFPlay exiting with code {}", exitCode);
 
     return exitCode;
 }

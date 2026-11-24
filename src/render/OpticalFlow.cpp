@@ -17,7 +17,7 @@
 #include <nvOpticalFlowD3D12.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -1006,4 +1006,4 @@ const std::string& OpticalFlow::description() const
     return impl_ != nullptr ? impl_->description : empty;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

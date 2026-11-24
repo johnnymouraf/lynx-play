@@ -12,7 +12,7 @@
 #include <thread>
 #include <vector>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // A video source that draws the animated test pattern into 1080p NV12 frames
@@ -55,4 +55,4 @@ private:
     std::jthread thread_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

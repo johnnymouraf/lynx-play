@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Pairs this PC with a console: Account ID, the code on the TV, then the
 // attempt and how it ended.

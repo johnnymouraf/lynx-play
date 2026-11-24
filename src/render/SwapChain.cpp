@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -266,4 +266,4 @@ UINT SwapChain::flags() const
     return result;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

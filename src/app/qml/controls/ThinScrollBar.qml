@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's 4 px scroll bar, shown only when the content overflows.
 T.ScrollBar {

@@ -12,7 +12,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // The 16 bytes the cadence compute shader writes back for one frame.
@@ -91,4 +91,4 @@ private:
     std::uint64_t nextFenceValue_ = 0;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

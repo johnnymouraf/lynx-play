@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // What a console reports about itself when it answers a search.
@@ -77,4 +77,4 @@ struct SavedConsole
     bool operator==(const SavedConsole&) const = default;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

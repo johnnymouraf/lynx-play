@@ -6,7 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::core;
+using namespace mfplay::core;
 
 namespace
 {

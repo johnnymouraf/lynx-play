@@ -9,7 +9,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 namespace
@@ -341,4 +341,4 @@ void Microphone::drain(std::stop_token stop)
     }
 }
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

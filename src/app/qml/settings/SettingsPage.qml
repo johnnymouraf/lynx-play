@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // Configurações: its sections in a column of their own, the chosen one beside.
 Item {

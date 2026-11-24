@@ -16,7 +16,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -731,4 +731,4 @@ D3D12_CPU_DESCRIPTOR_HANDLE FramePresenter::cpuFlowRenderTarget(UINT index) cons
     return handle;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

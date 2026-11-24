@@ -8,7 +8,7 @@
 #include <optional>
 #include <utility>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 inline constexpr std::size_t kDualSensePacketSize = 47;
@@ -173,4 +173,4 @@ private:
     std::array<std::uint8_t, kPacketSize> bytes_{};
 };
 
-} // namespace lynx::input
+} // namespace mfplay::input

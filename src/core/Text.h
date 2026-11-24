@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // The text without the ASCII whitespace at its ends.
@@ -17,4 +17,4 @@ namespace lynx::core
 // Uppercase hexadecimal, two digits per byte.
 [[nodiscard]] std::string toHex(std::span<const std::uint8_t> bytes);
 
-} // namespace lynx::core
+} // namespace mfplay::core

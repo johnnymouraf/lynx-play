@@ -12,7 +12,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -252,4 +252,4 @@ std::string_view primariesName(ColorPrimaries primaries)
     return "BT.709";
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

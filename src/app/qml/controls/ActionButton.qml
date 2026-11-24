@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's Button: primary, secondary, ghost or danger, with an optional
 // leading icon.

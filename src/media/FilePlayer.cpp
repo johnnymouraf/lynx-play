@@ -13,7 +13,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::media
+namespace mfplay::media
 {
 
 namespace
@@ -150,7 +150,7 @@ FilePlayer::~FilePlayer()
 
 void FilePlayer::run(const std::stop_token& stop)
 {
-    SetThreadDescription(GetCurrentThread(), L"Lynx file player");
+    SetThreadDescription(GetCurrentThread(), L"MFPlay file player");
 
     auto pacer = core::FramePacer::create(framesPerSecond_);
 
@@ -187,4 +187,4 @@ void FilePlayer::run(const std::stop_token& stop)
     }
 }
 
-} // namespace lynx::media
+} // namespace mfplay::media

@@ -13,7 +13,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 using Microsoft::WRL::ComPtr;
@@ -92,4 +92,4 @@ private:
     std::vector<bool> recorded_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

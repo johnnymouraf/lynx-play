@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 namespace
@@ -20,7 +20,7 @@ void setHints()
     // Skip Windows' audio effects on the game's sound. A driver that rejects
     // it logs and keeps working.
     SDL_SetHint(SDL_HINT_AUDIO_DEVICE_RAW_STREAM, "1");
-    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_STREAM_NAME, "Lynx Play");
+    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_STREAM_NAME, "MFPlay");
 }
 
 } // namespace
@@ -78,4 +78,4 @@ bool SdlRuntime::audioReady() const
     return audioReady_;
 }
 
-} // namespace lynx::input
+} // namespace mfplay::input

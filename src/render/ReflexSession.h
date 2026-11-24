@@ -11,7 +11,7 @@
 
 #include <d3d12.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 enum class ReflexUnavailable
@@ -195,4 +195,4 @@ private:
     std::chrono::steady_clock::time_point nextPoll_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

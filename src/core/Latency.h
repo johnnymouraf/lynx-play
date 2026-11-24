@@ -4,7 +4,7 @@
 
 #include <windows.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Registers the current thread with MMCSS (Windows' multimedia scheduler)
@@ -31,4 +31,4 @@ private:
 // is not in the foreground, as it does for background work.
 void disableProcessPowerThrottling();
 
-} // namespace lynx::core
+} // namespace mfplay::core

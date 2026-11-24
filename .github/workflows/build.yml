@@ -133,8 +133,8 @@ jobs:
           cmake --preset release
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
-          -DLYNX_NGX_ROOT="${{ github.workspace }}/.ngx"
-          -DLYNX_BUILD_NUMBER="${{ github.run_number }}"
+          -DMFPLAY_NGX_ROOT="${{ github.workspace }}/.ngx"
+          -DMFPLAY_BUILD_NUMBER="${{ github.run_number }}"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'
@@ -150,13 +150,13 @@ jobs:
         run: ctest --preset release
 
       - name: Package
-        run: cmake --install build/release --prefix "${{ github.workspace }}/dist/lynx-play"
+        run: cmake --install build/release --prefix "${{ github.workspace }}/dist/mfplay"
 
       - name: Upload the portable package
         uses: actions/upload-artifact@v7
         with:
-          name: lynx-play-windows-x64
-          path: dist/lynx-play
+          name: mfplay-windows-x64
+          path: dist/mfplay
           if-no-files-found: error
           retention-days: 1
 
@@ -168,14 +168,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = [regex]::Match((Get-Content CMakeLists.txt -Raw),
-            'project\(LynxPlay\s+VERSION\s+([0-9.]+)').Groups[1].Value
+            'project\(MFPlay\s+VERSION\s+([0-9.]+)').Groups[1].Value
           $full = "$version-build.${{ github.run_number }}"
-          Compress-Archive -Path dist/lynx-play/* -DestinationPath lynx-play-windows-x64.zip
+          Compress-Archive -Path dist/mfplay/* -DestinationPath mfplay-windows-x64.zip
           gh release create "v$full" `
-            --title "Lynx Play $full" `
+            --title "MFPlay $full" `
             --notes "Portable build of main at ``${{ github.sha }}``." `
             --latest `
-            lynx-play-windows-x64.zip
+            mfplay-windows-x64.zip
           # Keep the newest twelve releases; older assets would pile up.
           $old = gh release list --limit 100 --json tagName --jq ".[12:][] | .tagName"
           foreach ($name in $old) {

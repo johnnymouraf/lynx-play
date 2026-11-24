@@ -11,7 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -312,4 +312,4 @@ std::expected<AccountId, AccountIdError> accountIdFromUserId(std::string_view us
     return parseAccountId(userId);
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

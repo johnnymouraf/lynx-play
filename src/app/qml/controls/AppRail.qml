@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // The left rail: brand and the app's sections.
 Rectangle {

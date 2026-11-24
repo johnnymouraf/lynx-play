@@ -11,7 +11,7 @@
 
 #include <d3d12.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // The picture DLSS runs on: the render size of the 8-bit SDR frame it reads
@@ -77,4 +77,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <mutex>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 // The keyboard and mouse state the stream window records, turned into a
@@ -56,4 +56,4 @@ private:
     std::atomic<bool> overlayOpen_{false};
 };
 
-} // namespace lynx::input
+} // namespace mfplay::input

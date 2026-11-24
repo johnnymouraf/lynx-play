@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // A console's state as a pill: ready, standby, unpaired, offline, waking or
 // error.

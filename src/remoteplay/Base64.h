@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Standard Base64 (RFC 4648 alphabet), with padding.
@@ -17,4 +17,4 @@ namespace lynx::remoteplay
 // character or an impossible length.
 [[nodiscard]] std::optional<std::vector<std::uint8_t>> decodeBase64(std::string_view text);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

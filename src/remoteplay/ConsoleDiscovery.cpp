@@ -18,7 +18,7 @@
 #include <chiaki/discoveryservice.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -423,4 +423,4 @@ void ConsoleDiscovery::setManualHosts(const std::vector<std::string>& hosts)
     state_->publish();
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

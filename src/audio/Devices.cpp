@@ -6,7 +6,7 @@
 
 #include <SDL3/SDL.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 namespace
@@ -103,4 +103,4 @@ void dispatchAudioDeviceEvent(bool added, bool recording, std::uint32_t device)
     }
 }
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

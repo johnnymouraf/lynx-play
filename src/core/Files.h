@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Writes the file through a temporary one next to it, creating its folder
@@ -13,4 +13,4 @@ namespace lynx::core
 [[nodiscard]] std::expected<void, std::string> replaceFile(const std::filesystem::path& path,
                                                            std::string_view content);
 
-} // namespace lynx::core
+} // namespace mfplay::core

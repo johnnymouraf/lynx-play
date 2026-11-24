@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Configurações › RTX: the NVIDIA features applied to the stream.
 ColumnLayout {

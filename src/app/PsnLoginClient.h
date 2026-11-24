@@ -17,7 +17,7 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class SettingsController;
@@ -113,4 +113,4 @@ private:
     std::uint64_t attempt_ = 0;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

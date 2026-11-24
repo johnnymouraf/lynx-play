@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // The design's ConsoleCard: the console render, its state, address and last
 // activity, and the action its state allows.

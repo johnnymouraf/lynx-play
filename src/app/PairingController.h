@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class ConsolesController;
@@ -89,4 +89,4 @@ private:
     std::uint64_t attempt_ = 0;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

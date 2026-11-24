@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Configurações › Sobre: the version, the licenses, where the logs are, the
 // source code and the video test.
@@ -63,12 +63,12 @@ ColumnLayout {
 
                 AppText {
                     Layout.fillWidth: true
-                    text: `<b>Lynx</b> <font color="${Theme.accent}">Play</font>`
+                    text: `<b>MF</b><font color="${Theme.accent}">Play</font>`
                     textFormat: Text.StyledText
                     font.family: Theme.fontDisplay
                     font.pixelSize: 24
                     lineHeight: 32
-                    Accessible.name: "Lynx Play"
+                    Accessible.name: "MFPlay"
                 }
 
                 AppText {
@@ -86,13 +86,13 @@ ColumnLayout {
         visible: !section.controller.remotePlayReady
         tone: "danger"
         title: "O Remote Play não iniciou"
-        message: "Os consoles não podem ser encontrados nem pareados. Veja o log em %LOCALAPPDATA%\LynxPlay\logs."
+        message: "Os consoles não podem ser encontrados nem pareados. Veja o log em %LOCALAPPDATA%\MFPlay\logs."
     }
 
     SettingRow {
         Layout.fillWidth: true
         label: "Licença"
-        description: "Lynx Play é software livre sob a AGPL-3.0, baseado no chiaki-ng. "
+        description: "MFPlay é software livre sob a AGPL-3.0, baseado no chiaki-ng. "
                      + "NVIDIA, RTX, DLSS e Reflex são marcas da NVIDIA Corporation."
 
         LinkButton {
@@ -105,7 +105,7 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Registros (logs)"
-        description: "%LOCALAPPDATA%\LynxPlay\logs"
+        description: "%LOCALAPPDATA%\MFPlay\logs"
 
         ActionButton {
             iconName: "folder-open"
@@ -117,12 +117,12 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Código-fonte"
-        description: "github.com/johnnymouraf/lynx-play"
+        description: "github.com/johnnymouraf/mfplay"
 
         LinkButton {
             iconName: "external-link"
             text: "Abrir no navegador"
-            onClicked: Qt.openUrlExternally("https://github.com/johnnymouraf/lynx-play")
+            onClicked: Qt.openUrlExternally("https://github.com/johnnymouraf/mfplay")
         }
     }
 

@@ -19,12 +19,12 @@
 
 #include <d3d12.h>
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
 #include <nvsdk_ngx.h>
 #include <nvsdk_ngx_helpers.h>
 #endif
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -206,7 +206,7 @@ struct DlssSuperResolution::Impl
         return descriptor;
     }
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     NVSDK_NGX_Handle* handle = nullptr;
     NVSDK_NGX_Parameter* parameters = nullptr;
 
@@ -235,7 +235,7 @@ struct DlssSuperResolution::Impl
 namespace
 {
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
 
 // The SDK's NVSDK_NGX_FAILED macro compares an unsigned result with an enum
 // and trips -Wsign-compare.
@@ -253,7 +253,7 @@ std::string ngxResult(NVSDK_NGX_Result result)
 
 } // namespace
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
 
 std::expected<void, std::string> DlssSuperResolution::Impl::recordFeature(
     const DlssPicture& picture)
@@ -315,7 +315,7 @@ std::expected<void, std::string> DlssSuperResolution::Impl::recordFeature(
 std::expected<DlssSuperResolution, std::string> DlssSuperResolution::create(
     NgxHost& host, ID3D12CommandQueue& queue, UINT slotCount)
 {
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     if (slotCount == 0 || host.device() == nullptr)
     {
         return std::unexpected("DLSS needs a device and at least one back buffer");
@@ -409,7 +409,7 @@ DlssSuperResolution& DlssSuperResolution::operator=(DlssSuperResolution&&) noexc
 
 DlssSuperResolution::~DlssSuperResolution()
 {
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     if (impl_ != nullptr)
     {
         impl_->releaseFeature();
@@ -441,7 +441,7 @@ std::expected<void, std::string> DlssSuperResolution::configure(const DlssPictur
         return {};
     }
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     Impl& impl = *impl_;
     impl.releaseFeature();
     impl.configured.reset();
@@ -616,7 +616,7 @@ std::expected<void, std::string> DlssSuperResolution::record(
         return std::unexpected(std::format("DLSS slot {} of {}", slot, impl_->slots.size()));
     }
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     Impl& impl = *impl_;
     const DlssPicture& picture = *impl.configured;
     const SurfaceSize grid = flowGridExtent(picture.input);
@@ -744,4 +744,4 @@ const std::string& DlssSuperResolution::description() const
     return impl_ != nullptr ? impl_->description : empty;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

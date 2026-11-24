@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 using SecretBytes = std::vector<std::uint8_t>;
@@ -24,4 +24,4 @@ struct SecretProtector
 // decrypt what it encrypts.
 [[nodiscard]] SecretProtector dpapiProtector();
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

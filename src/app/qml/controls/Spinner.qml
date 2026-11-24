@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
-import LynxPlay
+import MFPlay
 
 // The design's Spinner: an accent arc turning over a ring.
 Item {

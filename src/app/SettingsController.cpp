@@ -13,7 +13,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -1300,8 +1300,8 @@ void SettingsController::save()
     {
         spdlog::error("Cannot save the settings: {}", saved.error());
         emit notice(u"danger"_s, u"Não foi possível salvar as configurações"_s,
-                    u"As mudanças valem até fechar o Lynx Play. Veja o log."_s);
+                    u"As mudanças valem até fechar o MFPlay. Veja o log."_s);
     }
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

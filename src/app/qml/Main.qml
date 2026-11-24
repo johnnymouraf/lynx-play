@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 ApplicationWindow {
     id: window
@@ -22,7 +22,7 @@ ApplicationWindow {
     minimumWidth: 960
     minimumHeight: 600
     visible: true
-    title: "Lynx Play"
+    title: "MFPlay"
     color: Theme.bg
     font.family: Theme.fontBody
     font.pixelSize: 14

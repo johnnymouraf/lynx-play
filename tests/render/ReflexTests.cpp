@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::render;
+using namespace mfplay::render;
 
 TEST_CASE("A sleep is a stall only once ten of the last sixteen exceed the GPU work")
 {

@@ -11,7 +11,7 @@
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 using Microsoft::WRL::ComPtr;
@@ -53,4 +53,4 @@ struct StreamAdapter
 // on the render and decode threads, once each.
 void raiseCurrentThreadGpuPriority(IDXGIDevice& device);
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -1,4 +1,4 @@
-# Lynx Play
+# MFPlay
 
 A Windows Remote Play client for the PS5, built for the best picture and the
 lowest input lag on NVIDIA RTX GPUs. It streams over the local network first and
@@ -31,22 +31,22 @@ The plan and its progress live in [docs/plan.md](docs/plan.md).
 
 Every green build of `main` publishes a versioned release
 (`v0.1.0-build.N`) with the portable package,
-`lynx-play-windows-x64.zip`: extract it anywhere and run `lynx-play.exe`.
+`mfplay-windows-x64.zip`: extract it anywhere and run `mfplay.exe`.
 There is no installer.
 
 Download the newest release with the GitHub CLI, or from the Releases page:
 
 ```powershell
-gh release download --repo johnnymouraf/lynx-play --pattern "lynx-play-windows-x64.zip"
+gh release download --repo johnnymouraf/mfplay --pattern "mfplay-windows-x64.zip"
 ```
 
-Logs are written to `%LOCALAPPDATA%\LynxPlay\logs`. The newest twelve
+Logs are written to `%LOCALAPPDATA%\MFPlay\logs`. The newest twelve
 releases are kept; older ones are removed by the build. The saved and paired consoles live in
-`%APPDATA%\LynxPlay\consoles.json`, with their keys and the PSN account ID
+`%APPDATA%\MFPlay\consoles.json`, with their keys and the PSN account ID
 encrypted for the current Windows user (DPAPI), and the video settings in
-`%APPDATA%\LynxPlay\settings.json`.
+`%APPDATA%\MFPlay\settings.json`.
 
-The first run asks Windows Firewall to let Lynx Play use the network: allow it,
+The first run asks Windows Firewall to let MFPlay use the network: allow it,
 or the consoles' answers to the network search never reach the app.
 
 ## Playing a test stream
@@ -55,7 +55,7 @@ To check the video path without a console, play an H.264 or H.265 elementary
 stream file (`.h264`, `.264`, `.h265`, `.265`, `.hevc`) in a loop:
 
 ```powershell
-.\lynx-play.exe --play-file test1080p60.h265 --fps 60
+.\mfplay.exe --play-file test1080p60.h265 --fps 60
 ```
 
 It opens only the stream window, decodes on the GPU and renders exactly as a

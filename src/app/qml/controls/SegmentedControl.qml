@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // The design's SegmentedControl: one choice among a few. `options` lists
 // {label, value}; choosing one emits `activated` with its value.

@@ -2,7 +2,7 @@ pragma Singleton
 
 import QtQuick
 
-// The design's "Theme" variables (design/lynx-play.drafia). Colors with alpha
+// The design's "Theme" variables (design file). Colors with alpha
 // are written #AARRGGBB, as QML reads them.
 QtObject {
     id: theme
@@ -130,7 +130,7 @@ QtObject {
         }
     })
 
-    readonly property url brandMark: "qrc:/qt/qml/LynxPlay/assets/images/brand-mark.png"
-    readonly property url consoleRender: "qrc:/qt/qml/LynxPlay/assets/images/console-render.png"
-    readonly property url consoleGlyph: "qrc:/qt/qml/LynxPlay/assets/images/console-glyph.svg"
+    readonly property url brandMark: "qrc:/qt/qml/MFPlay/assets/images/brand-mark.png"
+    readonly property url consoleRender: "qrc:/qt/qml/MFPlay/assets/images/console-render.png"
+    readonly property url consoleGlyph: "qrc:/qt/qml/MFPlay/assets/images/console-glyph.svg"
 }

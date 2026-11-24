@@ -14,7 +14,7 @@
 
 #include <d3d12.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // The grid NVIDIA's optical flow engine uses: one vector per 4x4 picture
@@ -169,4 +169,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

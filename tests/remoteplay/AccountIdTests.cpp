@@ -2,10 +2,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::remoteplay::AccountId;
-using lynx::remoteplay::AccountIdError;
-using lynx::remoteplay::formatAccountId;
-using lynx::remoteplay::parseAccountId;
+using mfplay::remoteplay::AccountId;
+using mfplay::remoteplay::AccountIdError;
+using mfplay::remoteplay::formatAccountId;
+using mfplay::remoteplay::parseAccountId;
 
 namespace
 {

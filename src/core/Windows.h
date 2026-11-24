@@ -6,7 +6,7 @@
 
 #include <windows.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 struct HandleCloser
@@ -25,4 +25,4 @@ using UniqueHandle = std::unique_ptr<void, HandleCloser>;
 // "<what> failed: 0x887A0005", for errors that come back as an HRESULT.
 [[nodiscard]] std::string describeFailure(std::string_view what, HRESULT result);
 
-} // namespace lynx::core
+} // namespace mfplay::core

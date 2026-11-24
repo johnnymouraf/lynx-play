@@ -7,7 +7,7 @@
 
 #include <chiaki/discovery.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -58,4 +58,4 @@ std::expected<void, std::string> sendWakeup(const std::string& address, std::uin
     return {};
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

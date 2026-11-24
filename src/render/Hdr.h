@@ -8,7 +8,7 @@
 
 #include <windows.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // What the monitor under a window can show, as DisplayConfig reports it.
@@ -69,4 +69,4 @@ struct ToneMapParameters
 [[nodiscard]] std::string_view transferName(TransferFunction transfer);
 [[nodiscard]] std::string_view primariesName(ColorPrimaries primaries);
 
-} // namespace lynx::render
+} // namespace mfplay::render

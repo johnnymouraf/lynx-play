@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 int ConsoleListModel::rowCount(const QModelIndex& parent) const
@@ -107,4 +107,4 @@ void ConsoleListModel::setRows(std::vector<ConsoleRow> rows)
     }
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

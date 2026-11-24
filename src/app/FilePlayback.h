@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class SettingsController;
@@ -13,4 +13,4 @@ class SettingsController;
 [[nodiscard]] int playFile(const std::filesystem::path& path, double framesPerSecond,
                            SettingsController& settings);
 
-} // namespace lynx::app
+} // namespace mfplay::app

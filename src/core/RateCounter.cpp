@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -57,4 +57,4 @@ std::optional<RateSummary> RateCounter::takeIfDue(Clock::time_point now)
     return summary;
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

@@ -6,13 +6,13 @@ find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Network Qml Quick Svg)
 qt_standard_project_setup(REQUIRES 6.10)
 
 # CI passes the run number, so a downloaded build says which one it is.
-set(LYNX_VERSION "${PROJECT_VERSION}")
-if(LYNX_BUILD_NUMBER)
-    string(APPEND LYNX_VERSION "-build.${LYNX_BUILD_NUMBER}")
+set(MFPLAY_VERSION "${PROJECT_VERSION}")
+if(MFPLAY_BUILD_NUMBER)
+    string(APPEND MFPLAY_VERSION "-build.${MFPLAY_BUILD_NUMBER}")
 endif()
 configure_file(Version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/app/Version.h" @ONLY)
 
-qt_add_executable(lynx-play WIN32
+qt_add_executable(mfplay WIN32
     AppController.cpp
     AppController.h
     ConsoleListModel.cpp
@@ -41,11 +41,11 @@ qt_add_executable(lynx-play WIN32
     StreamController.cpp
     StreamController.h
     main.cpp
-    lynx-play.rc)
+    mfplay.rc)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-set(lynx_fonts
+set(mfplay_fonts
     assets/fonts/Inter-Medium.ttf
     assets/fonts/Inter-Regular.ttf
     assets/fonts/Inter-SemiBold.ttf
@@ -55,14 +55,14 @@ set(lynx_fonts
     assets/fonts/Sora-Regular.ttf
     assets/fonts/Sora-SemiBold.ttf)
 
-set(lynx_licenses
+set(mfplay_licenses
     assets/fonts/Inter-OFL.txt
     assets/fonts/JetBrainsMono-OFL.txt
     assets/fonts/Sora-OFL.txt
     assets/icons/LICENSE-lucide.txt)
 
-qt_add_qml_module(lynx-play
-    URI LynxPlay
+qt_add_qml_module(mfplay
+    URI MFPlay
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
@@ -113,8 +113,8 @@ qt_add_qml_module(lynx-play
         qml/stream/ConnectingPage.qml
         qml/stream/ConnectionStep.qml
     RESOURCES
-        ${lynx_fonts}
-        ${lynx_licenses}
+        ${mfplay_fonts}
+        ${mfplay_licenses}
         assets/icons/check.svg
         assets/icons/chevron-down.svg
         assets/icons/chevron-right.svg
@@ -159,53 +159,53 @@ qt_add_qml_module(lynx-play
         assets/images/console-render.png)
 
 # Qt's generated type registration includes AppController.h by file name.
-target_include_directories(lynx-play PRIVATE
+target_include_directories(mfplay PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/generated")
-target_link_libraries(lynx-play PRIVATE
-    Lynx::audio
-    Lynx::core
-    Lynx::input
-    Lynx::media
-    Lynx::remoteplay
-    Lynx::render
+target_link_libraries(mfplay PRIVATE
+    MFPlay::audio
+    MFPlay::core
+    MFPlay::input
+    MFPlay::media
+    MFPlay::remoteplay
+    MFPlay::render
     Qt6::Gui
     Qt6::Network
     Qt6::Qml
     Qt6::Quick
     Qt6::Svg)
-lynx_set_warnings(lynx-play)
+mfplay_set_warnings(mfplay)
 
-install(TARGETS lynx-play RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES ${lynx_licenses} DESTINATION licenses)
+install(TARGETS mfplay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${mfplay_licenses} DESTINATION licenses)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
         DESTINATION licenses RENAME NVAPI-License.txt)
 install(FILES assets/NGX-Notices.txt DESTINATION licenses RENAME NGX-Notices.txt)
 
 # NVIDIA's DLSS runtimes ship next to the executable, with their license; the
 # loader imports nvsdk_ngx_d.lib and finds the DLLs in the application folder.
-if(EXISTS "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll")
+if(EXISTS "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll")
     install(FILES
-            "${LYNX_NGX_ROOT}/bin/nvngx_dlss.dll"
-            "${LYNX_NGX_ROOT}/bin/nvngx_dlssg.dll"
+            "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll"
+            "${MFPLAY_NGX_ROOT}/bin/nvngx_dlssg.dll"
             DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(FILES "${LYNX_NGX_ROOT}/LICENSE.txt"
+    install(FILES "${MFPLAY_NGX_ROOT}/LICENSE.txt"
             DESTINATION licenses RENAME NGX-License.txt)
 endif()
 
 # Dear ImGui is static inside the executable; its notice ships with it.
-find_file(LYNX_IMGUI_COPYRIGHT NAMES copyright
+find_file(MFPLAY_IMGUI_COPYRIGHT NAMES copyright
     PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/imgui"
     NO_DEFAULT_PATH)
-if(LYNX_IMGUI_COPYRIGHT)
-    install(FILES "${LYNX_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
+if(MFPLAY_IMGUI_COPYRIGHT)
+    install(FILES "${MFPLAY_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
 endif()
 
 # The software OpenGL fallback is 20 MB and Qt Quick uses Direct3D here.
 # The MSVC runtime DLLs come with the Qt deployment, so the redistributable
 # installer is not shipped.
 qt_generate_deploy_qml_app_script(
-    TARGET lynx-play
+    TARGET mfplay
     OUTPUT_SCRIPT deploy_script
     NO_TRANSLATIONS
     DEPLOY_TOOL_OPTIONS --no-opengl-sw)

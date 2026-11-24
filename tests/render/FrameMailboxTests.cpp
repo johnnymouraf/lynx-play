@@ -2,8 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::FrameMailbox;
-using lynx::render::VideoFrame;
+using mfplay::render::FrameMailbox;
+using mfplay::render::VideoFrame;
 
 namespace
 {

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(LynxPlay
+project(MFPlay
     VERSION 0.1.0
     DESCRIPTION "Remote Play client for the PS5 with NVIDIA RTX enhancements"
     LANGUAGES C CXX)
@@ -12,17 +12,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # No C++ modules here; skip CMake's dependency scan (and its build of std).
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-option(LYNX_BUILD_TESTS "Build the unit tests" ON)
+option(MFPLAY_BUILD_TESTS "Build the unit tests" ON)
 
-set(LYNX_BUILD_NUMBER "" CACHE STRING "Build number appended to the app version")
+set(MFPLAY_BUILD_NUMBER "" CACHE STRING "Build number appended to the app version")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(LynxWarnings)
+include(MFPlayWarnings)
 include(ChiakiLib)
 
 add_subdirectory(src)
 
-if(LYNX_BUILD_TESTS)
+if(MFPLAY_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

@@ -2,7 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::render;
+using namespace mfplay::render;
 using Decision = CadenceDetector::Decision;
 
 TEST_CASE("No published cadence keeps every frame real and generated off")

@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 std::optional<std::size_t> selectAdapter(std::span<const AdapterInfo> adapters)
@@ -26,4 +26,4 @@ std::optional<std::size_t> selectAdapter(std::span<const AdapterInfo> adapters)
     return static_cast<std::size_t>(std::ranges::distance(adapters.begin(), chosen));
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -1,4 +1,4 @@
-# Lynx Play plan
+# MFPlay plan
 
 A personal Windows Remote Play client for the PS5 with the best picture and the
 lowest input lag: local network first, internet when needed, and NVIDIA RTX
@@ -9,6 +9,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 
 - [Phases](#phases)
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
+- [Current: 3.1 Rename to MFPlay](#current-31-rename-to-mfplay)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Decisions to review](#decisions-to-review)
@@ -59,10 +60,35 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
     - Off by default: it adds about one source frame of latency.
   - [x] **2.6 DLSS Super Resolution (experimental)**, fed by optical-flow
         motion vectors and compared with VSR.
-- [ ] **3. Internet**: play away from home.
-  - [ ] **3.1 Manual address and network profiles**: VPN (Tailscale/ZeroTier) or
+- [ ] **3. MFPlay: name and redesign**: the app becomes MFPlay and every
+      screen follows the Drafia redesign (`design file`).
+  - [ ] **3.1 Rename to MFPlay**: name everywhere (code, namespace, CMake,
+        QML module, exe, workflow, docs), the vector icon and logo from the
+        design, data moved from `MFPlay` to `MFPlay`, the repository renamed
+        to `johnnymouraf/mfplay`.
+  - [ ] **3.2 Theme and shared components**: the new `Theme` tokens (blue
+        accent, radii, rail), buttons in the menu-button pattern, badges,
+        fields, toggles, segmented controls, slider, dialogs, the rail with
+        Sobre, the controller hint bar and the DualSense card.
+  - [ ] **3.3 Consoles and pairing**: cards with the new states, status
+        counters, grid/list toggle, empty state, Adicionar pelo IP,
+        rename/forget, pairing with the PSN login in the new style.
+  - [ ] **3.4 Settings, Sobre and connecting**: Vídeo, Áudio, Controles (with
+        the DualSense battery), RTX, Rede (its internet rows disabled until
+        phase 4), Sobre in the rail, Conectando and its error.
+  - [ ] **3.5 Stream overlay**: the design's statistics panel and Menu rápido
+        in Dear ImGui, keeping every row the current overlay has.
+  - Settled for the whole phase: where the design covers something, its layout
+    and copy replace the code's; what exists only in the code stays, styled
+    like the design; where the design simplifies a behavior (VSR and DLSS SR
+    as separate toggles, though exclusive), the real behavior stays with the
+    design's look. The Rede page's internet bitrate and remote address are
+    shown disabled, saying they arrive with internet play; its PSN account
+    login saves the Account ID that pairing then fills in.
+- [ ] **4. Internet**: play away from home.
+  - [ ] **4.1 Manual address and network profiles**: VPN (Tailscale/ZeroTier) or
         port forwarding; separate LAN and internet bitrates.
-  - [ ] **3.2 PSN remote connection**: PSN login, NAT traversal without router
+  - [ ] **4.2 PSN remote connection**: PSN login, NAT traversal without router
         setup, automatic LAN → PSN fallback.
 
 Out of scope for now: capture card input (planned for the future).
@@ -110,12 +136,38 @@ Out of scope for now: capture card input (planned for the future).
 - Builds only in GitHub Actions; the app is tested by running the downloaded
   artifact on the owner's machine.
 
+## Current: 3.1 Rename to MFPlay
+
+- **Goal:** the project, the app and the repository are called MFPlay;
+  "Lynx" remains only in the migration of the old data folders and in git
+  history.
+- **Guardrails:** no local build; nothing in `third_party/chiaki-ng`; no
+  force-push; commit and push to `main` after each delivery; screen layouts
+  don't change yet (only the logo and the icon); the repository is renamed
+  only once the renamed code is green.
+- **Success criteria:**
+  1. `git grep -i lynx` finds only the migration of the old folders and the
+     DPAPI entropy, which must keep its value for saved secrets to decrypt.
+  2. CI is green; the artifact `mfplay-windows-x64` holds `mfplay.exe` with the
+     MF icon.
+  3. With a `MFPlay` folder in `%APPDATA%` or `%LOCALAPPDATA%`, the first run
+     copies it to `MFPlay` and shows the paired consoles; the old folder stays
+     untouched (checked by running the app on this machine, which has real
+     `LynxPlay` data; the tests never touch the disk).
+  4. The window title, the rail and Sobre show MFPlay with the design's vector
+     logo (checked by running the app here).
+  5. The repository is `johnnymouraf/mfplay`, with `origin` and the README and
+     Sobre links updated.
+- **Deliveries:** (1) rename code, CMake, QML module, workflow and docs; (2)
+  data migration; (3) `.ico` and logo exported from the design;
+  (4) rename the repository and check the app running.
+
 ## Auto mode
 
 Scope: up to 2.6 (extended from 2.2 at the owner's request, so DLSS
-and frame generation are included; phase 3 waits). Started on 2026-11-22 while
+and frame generation are included; internet play waits). Started on 2026-11-22 while
 the owner slept, and finished the same day: 1.1–1.5 and 2.1–2.6 are on
-main, green. Phase 3 remains for a later run (3.2 needs the owner's PSN
+main, green. Phase 4 remains for a later run (4.2 needs the owner's PSN
 login). Delivery: each step works on the branch
 `auto/<step>` (for example `auto/1.2`), commits and pushes each delivery there
 so CI builds it, and the orchestrator fast-forwards `main` to the branch once
@@ -139,8 +191,8 @@ the step is done and green.
   driver 621.14, i9-14900HX, Windows 11; displays: Acer 1080p up to 75 Hz on
   the RTX, laptop panel 1920×1200 up to 240 Hz on the Intel GPU; Ethernet).
   Download the artifact into a new folder under the session scratchpad
-  (`gh run download <id> --name lynx-play-windows-x64 --dir <folder>`) and run
-  `lynx-play.exe`. The log is `%LOCALAPPDATA%\LynxPlay\logs\lynx-play.log`.
+  (`gh run download <id> --name mfplay-windows-x64 --dir <folder>`) and run
+  `mfplay.exe`. The log is `%LOCALAPPDATA%\MFPlay\logs\mfplay.log`.
   Screenshots: PowerShell with `System.Drawing` (`CopyFromScreen`) into the
   scratchpad, then read the PNG. Clicking: UI Automation (Qt Quick exposes
   accessible names) or keyboard input through `user32` `SendInput` after
@@ -179,12 +231,12 @@ the step is done and green.
 
 The owner asked for everything to be done overnight without interaction, but
 pairing and streaming from the real PS5 need the owner (the PIN appears on the
-console's screen), and the PSN login (3.2) needs their account.
+console's screen), and the PSN login (4.2) needs their account.
 
 - A. Up to 1.5 (all of local streaming): stops before the RTX work.
 - B. Up to 2.2 (local streaming, Reflex and VSR), every step verifiable here
   through the developer file source.
-- C. The whole plan: 3.2 can't be done without the owner's PSN login, and
+- C. The whole plan: 4.2 can't be done without the owner's PSN login, and
   2.3–2.6 depend on results not yet seen.
 
 **Chosen: B**, because it is the furthest every step can be built and checked
@@ -833,7 +885,7 @@ With the overlay open, frames redraw continuously.
 The console store already has the DPAPI scheme, but adding a second writer
 there (or in `settings.json`) would mix subjects.
 
-- A. A `psn.json` in `%APPDATA%\LynxPlay` sealed with the same
+- A. A `psn.json` in `%APPDATA%\MFPlay` sealed with the same
   `SecretProtector`, leaving `consoles.json` and `settings.json` untouched.
 - B. Extend `consoles.json`: two writers.
 - C. A sealed blob inside `settings.json`: violates "settings keeps only the

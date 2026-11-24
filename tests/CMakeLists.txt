@@ -1,6 +1,6 @@
 find_package(Catch2 3 CONFIG REQUIRED)
 
-add_executable(lynx_tests
+add_executable(mfplay_tests
     audio/AudioOutputTests.cpp
     audio/HapticsTests.cpp
     core/GuardedCallTests.cpp
@@ -40,14 +40,14 @@ add_executable(lynx_tests
     render/TestPatternTests.cpp
     render/VideoSuperResolutionTests.cpp)
 
-target_link_libraries(lynx_tests PRIVATE
-    Lynx::audio
-    Lynx::input
-    Lynx::media
-    Lynx::remoteplay
-    Lynx::render
+target_link_libraries(mfplay_tests PRIVATE
+    MFPlay::audio
+    MFPlay::input
+    MFPlay::media
+    MFPlay::remoteplay
+    MFPlay::render
     Catch2::Catch2WithMain)
-lynx_set_warnings(lynx_tests)
+mfplay_set_warnings(mfplay_tests)
 
 include(Catch)
-catch_discover_tests(lynx_tests DISCOVERY_MODE PRE_TEST)
+catch_discover_tests(mfplay_tests DISCOVERY_MODE PRE_TEST)

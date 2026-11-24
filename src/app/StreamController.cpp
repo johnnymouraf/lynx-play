@@ -16,7 +16,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -33,7 +33,7 @@ struct FailureText
 
 QString logsHint()
 {
-    return u"Veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."_s;
+    return u"Veja o log em %LOCALAPPDATA%\\MFPlay\\logs."_s;
 }
 
 FailureText notPairedText()
@@ -45,7 +45,7 @@ FailureText notPairedText()
 FailureText noGpuText()
 {
     return {u"Nenhuma GPU pode mostrar o vídeo"_s,
-            u"O Lynx Play precisa de uma GPU com Direct3D 12. "_s + logsHint()};
+            u"O MFPlay precisa de uma GPU com Direct3D 12. "_s + logsHint()};
 }
 
 FailureText startFailedText()
@@ -74,7 +74,7 @@ FailureText textFor(SessionEnd end)
         return {u"A Reprodução remota do PS5 falhou"_s, u"Reinicie o PS5 e tente de novo."_s};
     case SessionEnd::VersionMismatch:
         return {u"Versões incompatíveis"_s,
-                u"O PS5 pede uma versão da Reprodução remota que o Lynx Play ainda não tem."_s};
+                u"O PS5 pede uma versão da Reprodução remota que o MFPlay ainda não tem."_s};
     case SessionEnd::ConsoleNotFound:
         return {u"O console não respondeu"_s,
                 u"Confira se o PS5 está ligado e na mesma rede que este PC."_s};
@@ -83,7 +83,7 @@ FailureText textFor(SessionEnd end)
                 u"A conexão com o PS5 foi interrompida. Confira a rede e tente de novo."_s};
     case SessionEnd::LoginPinRequired:
         return {u"O PS5 pediu o PIN de login"_s,
-                u"Desative o PIN de login do usuário no PS5 para jogar pelo Lynx Play."_s};
+                u"Desative o PIN de login do usuário no PS5 para jogar pelo MFPlay."_s};
     case SessionEnd::VideoFailed:
         return {u"O vídeo não pôde ser decodificado"_s,
                 u"A GPU não decodifica esse vídeo. Tente o codec H.264 em "
@@ -396,76 +396,58 @@ void StreamController::onFirstPicture(std::uint64_t session)
         },
     };
 
-    auto window = render::StreamWindow::open(*gpu_, mailbox_,
-                                             {
-                                                 .title = L"Lynx Play — " +
-                                                          target_->name.toStdWString(),
-                                                 .timing = settings_.presentTiming(),
-                                                 .reflex = settings_.reflexMode(),
-                                                 .upscaling = settings_.upscalingMode(),
-                                                 .opticalFlow = settings_.opticalFlow(),
-                                                 .frameGeneration =
-                                                     settings_.frameGenerationMode(),
-                                                 .hdr = settings_.hdrMode(),
-                                                 .rtxVideoHdrAvailable =
-                                                     settings_.rtxVideoHdrAvailable(),
-                                                 .mode = settings_.video().windowMode,
-                                                 .windowedSize = settings_.video().windowSize,
-                                                 .monitorOf = mainWindow_,
-                                                 .overlayFonts = overlayFonts(),
-                                                 .overlay =
-                                                     {
-                                                         .statisticsVisible =
-                                                             settings_.overlayStatisticsVisible(),
-                                                         .reflex = settings_.reflexMode(),
-                                                         .microphoneMuted =
-                                                             settings_.microphoneMuted(),
-                                                         .microphoneDetail =
-                                                             input_.controllerConnected()
-                                                                 ? "DualSense"
-                                                                 : "Sem controle",
-                                                         .sessionName =
-                                                             target_->name.toStdString(),
-                                                         .windowMode =
-                                                             settings_.video().windowMode,
-                                                         .windowSize =
-                                                             settings_.video().windowSize,
-                                                     },
-                                                 .overlayActions = overlayActions,
-                                                 .metrics = metrics_,
-                                                 .keyboardMouse = keyboardMouse_,
-                                                 .gamepad = [this]
-                                                 {
-                                                     const input::GamepadManager* gamepads =
-                                                         input_.gamepads();
+    auto window = render::StreamWindow::open(
+        *gpu_, mailbox_,
+        {
+            .title = L"MFPlay — " + target_->name.toStdWString(),
+            .timing = settings_.presentTiming(),
+            .reflex = settings_.reflexMode(),
+            .upscaling = settings_.upscalingMode(),
+            .opticalFlow = settings_.opticalFlow(),
+            .frameGeneration = settings_.frameGenerationMode(),
+            .hdr = settings_.hdrMode(),
+            .rtxVideoHdrAvailable = settings_.rtxVideoHdrAvailable(),
+            .mode = settings_.video().windowMode,
+            .windowedSize = settings_.video().windowSize,
+            .monitorOf = mainWindow_,
+            .overlayFonts = overlayFonts(),
+            .overlay =
+                {
+                    .statisticsVisible = settings_.overlayStatisticsVisible(),
+                    .reflex = settings_.reflexMode(),
+                    .microphoneMuted = settings_.microphoneMuted(),
+                    .microphoneDetail = input_.controllerConnected() ? "DualSense" : "Sem controle",
+                    .sessionName = target_->name.toStdString(),
+                    .windowMode = settings_.video().windowMode,
+                    .windowSize = settings_.video().windowSize,
+                },
+            .overlayActions = overlayActions,
+            .metrics = metrics_,
+            .keyboardMouse = keyboardMouse_,
+            .gamepad =
+                [this]
+            {
+                const input::GamepadManager* gamepads = input_.gamepads();
 
-                                                     if (gamepads == nullptr)
-                                                     {
-                                                         return render::OverlayGamepad{};
-                                                     }
+                if (gamepads == nullptr)
+                {
+                    return render::OverlayGamepad{};
+                }
 
-                                                     const std::optional<ChiakiControllerState>
-                                                         state = gamepads->gamepadState();
+                const std::optional<ChiakiControllerState> state = gamepads->gamepadState();
 
-                                                     return state ? overlayGamepad(*state)
-                                                                  : render::OverlayGamepad{};
-                                                 },
-                                                 .onClosed = closed,
-                                                 .onWindowModeChanged =
-                                                     [this](core::WindowMode mode)
-                                                 {
-                                                     const QString name = QString::fromLatin1(
-                                                         core::windowModeName(mode).data());
-                                                     post([this, name]
-                                                          { settings_.setWindowMode(name); });
-                                                 },
-                                                 .onWindowedSizeChanged =
-                                                     [this](core::WindowSize size)
-                                                 {
-                                                     post([this, size]
-                                                          { settings_.setWindowedSize(size); });
-                                                 },
-                                             });
+                return state ? overlayGamepad(*state) : render::OverlayGamepad{};
+            },
+            .onClosed = closed,
+            .onWindowModeChanged =
+                [this](core::WindowMode mode)
+            {
+                const QString name = QString::fromLatin1(core::windowModeName(mode).data());
+                post([this, name] { settings_.setWindowMode(name); });
+            },
+            .onWindowedSizeChanged = [this](core::WindowSize size)
+            { post([this, size] { settings_.setWindowedSize(size); }); },
+        });
 
     if (!window)
     {
@@ -567,4 +549,4 @@ void StreamController::setPhase(Phase phase)
     emit changed();
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

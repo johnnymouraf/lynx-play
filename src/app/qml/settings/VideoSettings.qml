@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // Configurações › Vídeo: what the PS5 is asked to stream and how it is shown.
 ColumnLayout {
@@ -20,7 +20,7 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Modo da janela"
-        description: "Tela cheia sem bordas no monitor do Lynx Play, ou uma janela ajustável. F11 alterna durante a transmissão."
+        description: "Tela cheia sem bordas no monitor do MFPlay, ou uma janela ajustável. F11 alterna durante a transmissão."
 
         SegmentedControl {
             name: "Modo da janela"

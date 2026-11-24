@@ -19,7 +19,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -65,7 +65,7 @@ FailureText failureText(PsnLoginClient::Failure failure)
     case PsnLoginClient::Failure::Storage:
         return {u"Não foi possível salvar o login"_s,
                 u"Os tokens não foram gravados no disco. Veja o log em "
-                u"%LOCALAPPDATA%\\LynxPlay\\logs."_s};
+                u"%LOCALAPPDATA%\\MFPlay\\logs."_s};
     case PsnLoginClient::Failure::Browser:
         return {u"Não foi possível abrir o navegador"_s,
                 u"O endereço da PSN está no log. Você também pode informar o Account ID "
@@ -563,4 +563,4 @@ QString PsnLoginClient::formatExpiry(remoteplay::Clock::time_point time)
     return locale.toString(dateTime, QStringLiteral("dd/MM/yyyy 'às' HH:mm"));
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

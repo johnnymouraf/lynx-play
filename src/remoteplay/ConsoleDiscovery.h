@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Finds PlayStation consoles: a broadcast search on every IPv4 network the PC
@@ -44,4 +44,4 @@ private:
     std::unique_ptr<State> state_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

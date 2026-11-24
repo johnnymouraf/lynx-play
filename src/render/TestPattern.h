@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <span>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // An animated picture for checking presentation by eye: a background that
@@ -36,4 +36,4 @@ struct PlaneView
 void writeNv12(const TestPattern& pattern, SurfaceSize picture, PlaneView luma,
                PlaneView chroma);
 
-} // namespace lynx::render
+} // namespace mfplay::render

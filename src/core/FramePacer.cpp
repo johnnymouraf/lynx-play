@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -89,4 +89,4 @@ bool FramePacer::waitForNextTick(const std::stop_token& stop)
     return !stop.stop_requested();
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

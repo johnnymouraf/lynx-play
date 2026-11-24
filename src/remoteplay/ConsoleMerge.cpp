@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -175,4 +175,4 @@ std::string consoleKey(const SavedConsole& console)
     return std::string(kManualKeyPrefix) + console.manualHost;
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

@@ -18,7 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -130,7 +130,7 @@ std::expected<PsnTokens, std::string> tokensFromJson(const Json& root,
     if (!root.is_object() || !root.contains("version") || !root.contains("accessToken") ||
         !root.contains("refreshToken"))
     {
-        return std::unexpected(std::string("not a Lynx Play token file"));
+        return std::unexpected(std::string("not a MFPlay token file"));
     }
 
     const int version = root.at("version").get<int>();
@@ -293,4 +293,4 @@ std::expected<void, std::string> PsnTokenStore::save(const PsnTokens& tokens) co
     return core::replaceFile(path_, buffer.str());
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

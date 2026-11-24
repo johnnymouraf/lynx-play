@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // The eight-digit pairing code: digit boxes over a hidden input that takes
 // what is typed or pasted.

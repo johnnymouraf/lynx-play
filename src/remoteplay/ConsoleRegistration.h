@@ -11,7 +11,7 @@
 #include <span>
 #include <string>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Why pairing failed, as far as chiaki's log tells.
@@ -79,4 +79,4 @@ private:
     std::unique_ptr<State> state_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

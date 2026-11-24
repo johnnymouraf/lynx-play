@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -144,4 +144,4 @@ Ycbcr8 rgbToYcbcr8(ColorMatrix matrix, std::array<float, 3> rgb)
     };
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -2,9 +2,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::fitPicture;
-using lynx::render::PixelRect;
-using lynx::render::SurfaceSize;
+using mfplay::render::fitPicture;
+using mfplay::render::PixelRect;
+using mfplay::render::SurfaceSize;
 
 TEST_CASE("fitPicture fills a surface of the picture's shape")
 {

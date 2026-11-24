@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <string>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 // One bit per control, in the same positions SDL reports them; the names are
@@ -131,4 +131,4 @@ void applyTouch(GamepadSample& sample, int finger, TouchPhase phase, float x, fl
 [[nodiscard]] ChiakiControllerState mergeControllerStates(ChiakiControllerState first,
                                                           ChiakiControllerState second);
 
-} // namespace lynx::input
+} // namespace mfplay::input

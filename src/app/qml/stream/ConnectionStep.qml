@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // One step of connecting to a console: done, under way or still to come.
 Row {

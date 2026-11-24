@@ -18,7 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -628,4 +628,4 @@ std::expected<void, std::string> SettingsStore::save(const Settings& settings) c
     return replaceFile(path_, buffer.str());
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 inline constexpr std::size_t kAccountIdSize = 8;
@@ -30,4 +30,4 @@ enum class AccountIdError
 // The Base64 form, which is how it is saved and shown again.
 [[nodiscard]] std::string formatAccountId(const AccountId& accountId);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

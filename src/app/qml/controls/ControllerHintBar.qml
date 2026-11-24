@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // The design's controller hints: the buttons and what they do on this
 // screen. Shown only while a controller is detected.

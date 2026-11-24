@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // A keycap in the Controles screen; clicking it starts capturing the key or
 // mouse button that should replace the binding.

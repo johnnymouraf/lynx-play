@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <format>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -388,4 +388,4 @@ D3D12_GPU_DESCRIPTOR_HANDLE MotionVectors::gpuDescriptor(UINT index) const
     return handle;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

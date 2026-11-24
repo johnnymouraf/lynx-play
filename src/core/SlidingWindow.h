@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <deque>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Counts events and sums the values they carry over a moving time window:
@@ -47,4 +47,4 @@ private:
     std::deque<Sample> samples_;
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

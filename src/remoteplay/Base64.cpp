@@ -1,6 +1,6 @@
 #include "remoteplay/Base64.h"
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -102,4 +102,4 @@ std::optional<std::vector<std::uint8_t>> decodeBase64(std::string_view text)
     return bytes;
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

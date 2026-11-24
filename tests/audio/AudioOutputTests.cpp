@@ -2,7 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::audio;
+using namespace mfplay::audio;
 
 TEST_CASE("The audio queue holds at most 60 ms at 48 kHz stereo")
 {

@@ -7,7 +7,7 @@
 #include <expected>
 #include <string>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // The credential a wake-up packet carries: the registration key, which holds
@@ -19,4 +19,4 @@ namespace lynx::remoteplay
 [[nodiscard]] std::expected<void, std::string> sendWakeup(const std::string& address,
                                                          std::uint64_t credential, bool ps5);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

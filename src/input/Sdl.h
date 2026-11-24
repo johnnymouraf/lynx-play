@@ -3,7 +3,7 @@
 #include <expected>
 #include <string>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 // SDL's gamepad and audio subsystems for the app's lifetime. Create it
@@ -32,4 +32,4 @@ private:
     bool active_ = true;
 };
 
-} // namespace lynx::input
+} // namespace mfplay::input

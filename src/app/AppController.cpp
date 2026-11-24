@@ -17,7 +17,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -25,7 +25,7 @@ namespace
 
 using namespace Qt::StringLiterals;
 
-constexpr auto kVideoTestTitle = L"Lynx Play — Teste de vídeo";
+constexpr auto kVideoTestTitle = L"MFPlay — Teste de vídeo";
 
 } // namespace
 
@@ -229,4 +229,4 @@ void AppController::closeVideoTest()
     videoTestSource_.reset();
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

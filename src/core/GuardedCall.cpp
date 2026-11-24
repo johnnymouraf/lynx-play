@@ -2,7 +2,7 @@
 
 #include "core/Windows.h"
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // The function holds no objects that need unwinding, which SEH requires.
@@ -23,4 +23,4 @@ __declspec(noinline) bool callGuarded(const std::function<void()>& call, std::ui
     return completed;
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

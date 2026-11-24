@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <array>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 namespace
@@ -234,4 +234,4 @@ ChiakiControllerState mergeControllerStates(ChiakiControllerState first,
     return first;
 }
 
-} // namespace lynx::input
+} // namespace mfplay::input

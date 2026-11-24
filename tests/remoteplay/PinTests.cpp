@@ -2,7 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::remoteplay::parsePin;
+using mfplay::remoteplay::parsePin;
 
 TEST_CASE("parsePin accepts exactly 8 digits")
 {

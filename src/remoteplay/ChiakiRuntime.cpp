@@ -2,7 +2,7 @@
 
 #include <chiaki/common.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 std::expected<void, std::string> initializeChiaki()
@@ -18,4 +18,4 @@ std::expected<void, std::string> initializeChiaki()
     return {};
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

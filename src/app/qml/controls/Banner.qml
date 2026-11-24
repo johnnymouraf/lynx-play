@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // A message with a tone (info, ready, standby or danger), an optional detail
 // line and an optional action at its end.

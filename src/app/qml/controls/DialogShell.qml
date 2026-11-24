@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's DialogShell: a modal over a scrim, with an optional eyebrow,
 // a title, a close button, the body and a footer for the actions.

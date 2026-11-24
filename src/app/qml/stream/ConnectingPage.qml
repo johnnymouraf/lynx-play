@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
-import LynxPlay
+import MFPlay
 
 // The immersive screen while connecting to a console, and when that fails.
 FocusScope {

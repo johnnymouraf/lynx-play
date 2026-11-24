@@ -1,6 +1,6 @@
 find_package(nlohmann_json CONFIG REQUIRED)
 
-add_library(lynx_remoteplay STATIC
+add_library(mfplay_remoteplay STATIC
     AccountId.cpp
     AccountId.h
     Base64.cpp
@@ -32,10 +32,10 @@ add_library(lynx_remoteplay STATIC
     SecretProtector.h
     StreamSession.cpp
     StreamSession.h)
-add_library(Lynx::remoteplay ALIAS lynx_remoteplay)
+add_library(MFPlay::remoteplay ALIAS mfplay_remoteplay)
 
-target_link_libraries(lynx_remoteplay
-    PUBLIC Lynx::core Lynx::render
-    PRIVATE Lynx::audio Lynx::input Lynx::media chiaki-lib nlohmann_json::nlohmann_json
+target_link_libraries(mfplay_remoteplay
+    PUBLIC MFPlay::core MFPlay::render
+    PRIVATE MFPlay::audio MFPlay::input MFPlay::media chiaki-lib nlohmann_json::nlohmann_json
             crypt32 iphlpapi ws2_32)
-lynx_set_warnings(lynx_remoteplay)
+mfplay_set_warnings(mfplay_remoteplay)

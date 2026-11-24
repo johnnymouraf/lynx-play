@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 enum class VideoCodec
@@ -16,4 +16,4 @@ enum class VideoCodec
     return codec == VideoCodec::H265 ? "H.265" : "H.264";
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

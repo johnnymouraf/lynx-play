@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 inline constexpr int kConsoleFileVersion = 1;
@@ -57,4 +57,4 @@ private:
     SecretProtector protector_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

@@ -2,9 +2,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::PresentGate;
-using lynx::render::PresentOutcome;
-using lynx::render::SurfaceSize;
+using mfplay::render::PresentGate;
+using mfplay::render::PresentOutcome;
+using mfplay::render::SurfaceSize;
 
 namespace
 {

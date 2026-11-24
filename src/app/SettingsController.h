@@ -17,7 +17,7 @@
 
 #include <optional>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 // The Configurações options (Vídeo, Áudio e microfone, Controles and RTX),
@@ -254,4 +254,4 @@ private:
     bool devicesLogged_ = false;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

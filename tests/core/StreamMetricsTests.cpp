@@ -3,8 +3,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::core::StreamMetrics;
-using lynx::core::StreamMetricsSnapshot;
+using mfplay::core::StreamMetrics;
+using mfplay::core::StreamMetricsSnapshot;
 using namespace std::chrono_literals;
 
 namespace
@@ -189,7 +189,7 @@ TEST_CASE("StreamMetrics drops the rates of frames outside the window")
 TEST_CASE("StreamMetrics carries the codec and the decoded size")
 {
     StreamMetrics metrics(kStart);
-    metrics.setCodec(lynx::core::VideoCodec::H265);
+    metrics.setCodec(mfplay::core::VideoCodec::H265);
     metrics.setFormat(1920, 1080);
 
     const StreamMetricsSnapshot snapshot = atOneSecond(metrics);

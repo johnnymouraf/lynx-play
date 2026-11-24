@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // What one accepted source frame does to the presented pictures.
@@ -69,4 +69,4 @@ private:
     bool resetPending_ = false;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

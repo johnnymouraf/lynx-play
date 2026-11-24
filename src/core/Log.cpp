@@ -7,13 +7,13 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
 {
 
-constexpr auto kLogFileName = "lynx-play.log";
+constexpr auto kLogFileName = "mfplay.log";
 constexpr std::size_t kMaxLogFileBytes = 8 * 1024 * 1024;
 constexpr std::size_t kMaxRotatedFiles = 3;
 
@@ -38,7 +38,7 @@ std::expected<void, std::string> initLogging(const std::filesystem::path& direct
             std::make_shared<spdlog::sinks::msvc_sink_mt>(),
         };
 
-        auto logger = std::make_shared<spdlog::logger>("lynx", sinks.begin(), sinks.end());
+        auto logger = std::make_shared<spdlog::logger>("mfplay", sinks.begin(), sinks.end());
         logger->set_level(spdlog::level::debug);
         logger->flush_on(spdlog::level::info);
         logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] [%t] %v");
@@ -52,4 +52,4 @@ std::expected<void, std::string> initLogging(const std::filesystem::path& direct
     return {};
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

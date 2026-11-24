@@ -6,7 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -940,4 +940,4 @@ const std::string& VideoSuperResolution::description() const
     return description_;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

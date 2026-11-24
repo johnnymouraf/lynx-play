@@ -2,8 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::remoteplay::kRegistKeySize;
-using lynx::remoteplay::wakeCredential;
+using mfplay::remoteplay::kRegistKeySize;
+using mfplay::remoteplay::wakeCredential;
 
 namespace
 {

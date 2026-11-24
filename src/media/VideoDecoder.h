@@ -11,7 +11,7 @@
 #include <span>
 #include <string>
 
-namespace lynx::media
+namespace mfplay::media
 {
 
 // Decodes H.264 or H.265 on the GPU with FFmpeg's D3D12VA, straight into
@@ -48,4 +48,4 @@ private:
     std::unique_ptr<Context> context_;
 };
 
-} // namespace lynx::media
+} // namespace mfplay::media

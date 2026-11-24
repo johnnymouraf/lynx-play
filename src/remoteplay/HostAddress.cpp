@@ -8,7 +8,7 @@
 #include <ranges>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -131,4 +131,4 @@ std::expected<std::string, HostAddressError> normalizeHostAddress(std::string_vi
     return lowercase(address);
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

@@ -1,11 +1,11 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
-// The lynx mark and the "Lynx Play" wordmark.
+// The app mark and the "MFPlay" wordmark.
 Row {
     spacing: Theme.space3
     Accessible.role: Accessible.StaticText
-    Accessible.name: "Lynx Play"
+    Accessible.name: "MFPlay"
 
     RoundedImage {
         anchors.verticalCenter: parent.verticalCenter
@@ -23,7 +23,7 @@ Row {
         anchors.verticalCenter: parent.verticalCenter
 
         Text {
-            text: "Lynx"
+            text: "MF"
             color: Theme.text
             font.family: Theme.fontDisplay
             font.pixelSize: 20
@@ -32,7 +32,7 @@ Row {
         }
 
         Text {
-            text: " Play"
+            text: "Play"
             color: Theme.accent
             font.family: Theme.fontDisplay
             font.pixelSize: 20

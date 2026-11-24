@@ -10,14 +10,14 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
 {
 
-constexpr auto kFontDirectory = ":/qt/qml/LynxPlay/assets/fonts";
-constexpr auto kOverlayFontDirectory = ":/qt/qml/LynxPlay/assets/fonts";
+constexpr auto kFontDirectory = ":/qt/qml/MFPlay/assets/fonts";
+constexpr auto kOverlayFontDirectory = ":/qt/qml/MFPlay/assets/fonts";
 constexpr auto kDefaultFamily = "Inter";
 constexpr int kDefaultPixelSize = 14;
 
@@ -75,4 +75,4 @@ render::OverlayFonts overlayFonts()
     };
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

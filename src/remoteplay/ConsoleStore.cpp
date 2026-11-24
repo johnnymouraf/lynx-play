@@ -18,7 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -215,7 +215,7 @@ std::expected<ConsoleFile, std::string> fileFromJson(const Json& root,
 {
     if (!root.is_object() || !root.contains("version") || !root.contains("consoles"))
     {
-        return std::unexpected(std::string("not a Lynx Play console list"));
+        return std::unexpected(std::string("not a MFPlay console list"));
     }
 
     const int version = root.at("version").get<int>();
@@ -379,4 +379,4 @@ void ConsoleStore::moveAside(const std::string& reason) const
                   path_.string(), reason, backup.string());
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

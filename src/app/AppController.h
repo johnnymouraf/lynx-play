@@ -9,13 +9,13 @@
 #include <memory>
 #include <string>
 
-namespace lynx::render
+namespace mfplay::render
 {
 class StreamWindow;
 class TestPatternSource;
 }
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class SettingsController;
@@ -66,4 +66,4 @@ private:
     std::unique_ptr<render::StreamWindow> videoTestWindow_;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Shown while no console has been found or saved: what to check, and the way
 // to add one by its address.

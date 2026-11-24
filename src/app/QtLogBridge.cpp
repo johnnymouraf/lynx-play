@@ -5,7 +5,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -43,4 +43,4 @@ void installQtLogBridge()
     qInstallMessageHandler(forwardToSpdlog);
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

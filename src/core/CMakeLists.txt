@@ -1,7 +1,7 @@
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
-add_library(lynx_core STATIC
+add_library(mfplay_core STATIC
     Files.cpp
     Files.h
     FramePacer.cpp
@@ -31,11 +31,11 @@ add_library(lynx_core STATIC
     VideoCodec.h
     Windows.cpp
     Windows.h)
-add_library(Lynx::core ALIAS lynx_core)
+add_library(MFPlay::core ALIAS mfplay_core)
 
-target_include_directories(lynx_core PUBLIC "${PROJECT_SOURCE_DIR}/src")
-target_compile_definitions(lynx_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-target_link_libraries(lynx_core
+target_include_directories(mfplay_core PUBLIC "${PROJECT_SOURCE_DIR}/src")
+target_compile_definitions(mfplay_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+target_link_libraries(mfplay_core
     PUBLIC spdlog::spdlog
     PRIVATE nlohmann_json::nlohmann_json shell32 ole32 avrt)
-lynx_set_warnings(lynx_core)
+mfplay_set_warnings(mfplay_core)

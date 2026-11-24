@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // Confirms removing a console and its pairing from this PC.
 DialogShell {
@@ -22,7 +22,7 @@ DialogShell {
 
     AppText {
         Layout.fillWidth: true
-        text: "O Lynx Play apaga deste PC o pareamento e o nome desse console. Para jogar nele de novo, será preciso parear outra vez."
+        text: "O MFPlay apaga deste PC o pareamento e o nome desse console. Para jogar nele de novo, será preciso parear outra vez."
         textStyle: "bodyMedium"
         color: Theme.textMuted
         wrapMode: Text.WordWrap

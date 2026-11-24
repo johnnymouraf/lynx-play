@@ -4,11 +4,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::fitPicture;
-using lynx::render::kNvidiaVendorId;
-using lynx::render::PixelRect;
-using lynx::render::SurfaceSize;
-using lynx::render::videoSuperResolutionEligible;
+using mfplay::render::fitPicture;
+using mfplay::render::kNvidiaVendorId;
+using mfplay::render::PixelRect;
+using mfplay::render::SurfaceSize;
+using mfplay::render::videoSuperResolutionEligible;
 
 namespace
 {

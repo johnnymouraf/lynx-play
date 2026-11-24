@@ -2,9 +2,9 @@
 
 #include <string_view>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
-inline constexpr std::string_view kVersion = "@LYNX_VERSION@";
+inline constexpr std::string_view kVersion = "@MFPLAY_VERSION@";
 
-} // namespace lynx::app
+} // namespace mfplay::app

@@ -4,8 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::AdapterInfo;
-using lynx::render::selectAdapter;
+using mfplay::render::AdapterInfo;
+using mfplay::render::selectAdapter;
 
 namespace
 {
@@ -15,7 +15,7 @@ constexpr std::uint32_t kAmdVendorId = 0x1002;
 constexpr std::uint32_t kMicrosoftVendorId = 0x1414;
 
 const AdapterInfo kIntelIntegrated{"Intel(R) UHD Graphics", kIntelVendorId, false};
-const AdapterInfo kRtx4060{"NVIDIA GeForce RTX 4060 Laptop GPU", lynx::render::kNvidiaVendorId,
+const AdapterInfo kRtx4060{"NVIDIA GeForce RTX 4060 Laptop GPU", mfplay::render::kNvidiaVendorId,
                            false};
 const AdapterInfo kRadeon{"AMD Radeon RX 7600", kAmdVendorId, false};
 const AdapterInfo kBasicRender{"Microsoft Basic Render Driver", kMicrosoftVendorId, true};

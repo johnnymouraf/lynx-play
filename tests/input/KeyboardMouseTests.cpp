@@ -3,8 +3,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::input;
-using lynx::core::KeyboardMouseSettings;
+using namespace mfplay::input;
+using mfplay::core::KeyboardMouseSettings;
 
 namespace
 {
@@ -47,8 +47,8 @@ TEST_CASE("Mouse buttons press the triggers and the buttons they are bound to")
 {
     KeyboardMouseInput input{KeyboardMouseSettings{}};
 
-    input.mouseButton(lynx::core::kMouseRight, true);
-    input.mouseButton(lynx::core::kMouseLeft, true);
+    input.mouseButton(mfplay::core::kMouseRight, true);
+    input.mouseButton(mfplay::core::kMouseLeft, true);
 
     const GamepadSample sample = input.sample();
 
@@ -103,7 +103,7 @@ TEST_CASE("Losing the window's focus releases every key")
     KeyboardMouseInput input{KeyboardMouseSettings{}};
     input.keyDown('W');
     input.keyDown('Q');
-    input.mouseButton(lynx::core::kMouseLeft, true);
+    input.mouseButton(mfplay::core::kMouseLeft, true);
     input.mouseMoved(10, 10);
 
     input.releaseAll();
@@ -122,7 +122,7 @@ TEST_CASE("A disabled keyboard plays nothing")
     KeyboardMouseInput input{settings};
 
     input.keyDown('W');
-    input.mouseButton(lynx::core::kMouseLeft, true);
+    input.mouseButton(mfplay::core::kMouseLeft, true);
     input.mouseMoved(50, 0);
 
     const GamepadSample sample = input.sample();

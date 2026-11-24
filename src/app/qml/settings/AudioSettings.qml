@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // Configurações › Áudio e microfone: where the game's sound plays, what the
 // console hears and how loud the game is.

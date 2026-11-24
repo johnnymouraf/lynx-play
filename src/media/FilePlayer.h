@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-namespace lynx::media
+namespace mfplay::media
 {
 
 // The codec of an elementary stream file, from its extension (.h264, .264,
@@ -56,4 +56,4 @@ private:
     std::jthread thread_;
 };
 
-} // namespace lynx::media
+} // namespace mfplay::media

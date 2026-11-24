@@ -6,9 +6,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::remoteplay::classifyPairingFailure;
-using lynx::remoteplay::hostIdFromMac;
-using lynx::remoteplay::PairingFailure;
+using mfplay::remoteplay::classifyPairingFailure;
+using mfplay::remoteplay::hostIdFromMac;
+using mfplay::remoteplay::PairingFailure;
 
 namespace
 {

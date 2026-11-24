@@ -1,6 +1,6 @@
 #include "render/Layout.h"
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -51,4 +51,4 @@ PixelRect fitPicture(SurfaceSize surface, SurfaceSize picture)
     };
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // A Lucide icon from assets/icons, drawn in any color by the "icon" image
 // provider. `bold` matches the design's icon weight 600.

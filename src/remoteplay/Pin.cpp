@@ -4,7 +4,7 @@
 
 #include <charconv>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 std::optional<std::uint32_t> parsePin(std::string_view text)
@@ -25,4 +25,4 @@ std::optional<std::uint32_t> parsePin(std::string_view text)
     return pin;
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

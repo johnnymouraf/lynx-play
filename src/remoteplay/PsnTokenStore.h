@@ -9,7 +9,7 @@
 #include <optional>
 #include <string>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 inline constexpr int kPsnTokenFileVersion = 1;
@@ -52,4 +52,4 @@ private:
     SecretProtector protector_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

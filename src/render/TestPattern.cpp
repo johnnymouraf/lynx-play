@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -113,4 +113,4 @@ void writeNv12(const TestPattern& pattern, SurfaceSize picture, PlaneView luma,
     }
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

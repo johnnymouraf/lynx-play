@@ -7,7 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -54,7 +54,7 @@ FailureText failureText(PairingFailure failure)
     }
 
     return {u"Algo deu errado no pareamento"_s,
-            u"Tente de novo. Se continuar, veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."_s};
+            u"Tente de novo. Se continuar, veja o log em %LOCALAPPDATA%\\MFPlay\\logs."_s};
 }
 
 std::string_view failureName(PairingFailure failure)
@@ -282,4 +282,4 @@ void PairingController::setState(State state)
     emit stateChanged();
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

@@ -12,7 +12,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -206,7 +206,7 @@ std::expected<std::shared_ptr<TestPatternSource::Slot>, std::string> TestPattern
 
 void TestPatternSource::run(const std::stop_token& stop)
 {
-    SetThreadDescription(GetCurrentThread(), L"Lynx test pattern");
+    SetThreadDescription(GetCurrentThread(), L"MFPlay test pattern");
 
     auto pacer = core::FramePacer::create(kFramesPerSecond);
 
@@ -317,4 +317,4 @@ void TestPatternSource::waitForCopy(std::uint64_t value)
     WaitForSingleObject(fenceEvent_.get(), INFINITE);
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

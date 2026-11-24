@@ -20,12 +20,12 @@
 #include <string>
 #include <vector>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 class ConsoleDiscovery;
 }
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 class StreamController;
@@ -152,4 +152,4 @@ private:
     bool remotePlayReady_ = false;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

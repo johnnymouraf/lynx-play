@@ -1,6 +1,6 @@
 #pragma once
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Installs a std::terminate handler that logs the active exception (its type
@@ -12,4 +12,4 @@ void installTerminateLogging();
 // message and the current thread's stack, for a handler that rethrows.
 void logUnhandledException(const char* context);
 
-} // namespace lynx::core
+} // namespace mfplay::core

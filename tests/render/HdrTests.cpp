@@ -3,8 +3,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx;
-using namespace lynx::render;
+using namespace mfplay;
+using namespace mfplay::render;
 
 namespace
 {

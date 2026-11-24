@@ -12,7 +12,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 inline constexpr int kSettingsVersion = 1;
@@ -358,4 +358,4 @@ private:
     std::filesystem::path path_;
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

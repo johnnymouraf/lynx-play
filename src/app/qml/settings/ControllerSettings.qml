@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // Configurações › Controles: the controller in use, which one to prefer and
 // the keyboard/mouse mapping.

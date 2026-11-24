@@ -14,7 +14,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -321,4 +321,4 @@ void InputController::refreshStatus()
     }
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

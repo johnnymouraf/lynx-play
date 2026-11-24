@@ -10,14 +10,14 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
 {
 
 constexpr int kDefaultIconSize = 24;
-constexpr auto kIconDirectory = ":/qt/qml/LynxPlay/assets/icons/";
+constexpr auto kIconDirectory = ":/qt/qml/MFPlay/assets/icons/";
 
 struct IconRequest
 {
@@ -102,4 +102,4 @@ QImage IconProvider::requestImage(const QString& id, QSize* size, const QSize& r
     return image;
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

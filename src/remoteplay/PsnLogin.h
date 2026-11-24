@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // Sony's PSN OAuth client, as chiaki-ng registers it: the same client,
@@ -96,4 +96,4 @@ enum class UserInfoError
 [[nodiscard]] std::expected<AccountId, AccountIdError> accountIdFromUserId(
     std::string_view userId);
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

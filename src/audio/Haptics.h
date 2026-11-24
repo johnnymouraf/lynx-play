@@ -11,7 +11,7 @@
 
 #include <SDL3/SDL_audio.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 enum class HapticsRoute
@@ -93,4 +93,4 @@ private:
     RumbleCallback onRumble_;
 };
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

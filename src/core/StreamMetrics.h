@@ -11,7 +11,7 @@
 #include <optional>
 #include <string>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 inline constexpr std::size_t kFrameTimeHistory = 120;
@@ -108,4 +108,4 @@ private:
     std::size_t frameTimeNext_ = 0;
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

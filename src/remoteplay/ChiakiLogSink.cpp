@@ -4,7 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -88,4 +88,4 @@ bool ChiakiLogSink::isRepeat(const std::string& message)
     return false;
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

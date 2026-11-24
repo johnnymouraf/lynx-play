@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <charconv>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -70,4 +70,4 @@ std::string formatAccountId(const AccountId& accountId)
     return encodeBase64(accountId);
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

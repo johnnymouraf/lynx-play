@@ -1,6 +1,6 @@
 find_package(SDL3 CONFIG REQUIRED)
 
-add_library(lynx_audio STATIC
+add_library(mfplay_audio STATIC
     AudioOutput.cpp
     AudioOutput.h
     Devices.cpp
@@ -9,8 +9,8 @@ add_library(lynx_audio STATIC
     Haptics.h
     Microphone.cpp
     Microphone.h)
-add_library(Lynx::audio ALIAS lynx_audio)
+add_library(MFPlay::audio ALIAS mfplay_audio)
 
-target_link_libraries(lynx_audio
-    PUBLIC Lynx::core SDL3::SDL3)
-lynx_set_warnings(lynx_audio)
+target_link_libraries(mfplay_audio
+    PUBLIC MFPlay::core SDL3::SDL3)
+mfplay_set_warnings(mfplay_audio)

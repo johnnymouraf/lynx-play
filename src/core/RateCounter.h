@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // What happened during one reporting period.
@@ -40,4 +40,4 @@ private:
     Clock::duration longest_ = Clock::duration::zero();
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

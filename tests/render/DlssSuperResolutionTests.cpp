@@ -2,10 +2,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::render::dlssArchitectureSupported;
-using lynx::render::dlssSuperResolutionEligible;
-using lynx::render::kAdaArchitecture;
-using lynx::render::SurfaceSize;
+using mfplay::render::dlssArchitectureSupported;
+using mfplay::render::dlssSuperResolutionEligible;
+using mfplay::render::kAdaArchitecture;
+using mfplay::render::SurfaceSize;
 
 TEST_CASE("DLSS SR takes the 1.33x and 2x upscales the window asks for")
 {

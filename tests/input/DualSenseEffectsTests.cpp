@@ -2,7 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::input;
+using namespace mfplay::input;
 
 namespace
 {

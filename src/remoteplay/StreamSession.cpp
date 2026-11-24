@@ -28,7 +28,7 @@
 #include <chiaki/session.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 namespace
@@ -795,4 +795,4 @@ void StreamSession::setVolumePercent(int percent)
     }
 }
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

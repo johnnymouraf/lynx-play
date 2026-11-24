@@ -22,7 +22,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -153,7 +153,7 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
     auto window = render::StreamWindow::open(
         *gpu, std::move(*mailbox),
         {
-            .title = L"Lynx Play — " + path.filename().wstring(),
+            .title = L"MFPlay — " + path.filename().wstring(),
             .timing = settings.presentTiming(),
             .reflex = settings.reflexMode(),
             .upscaling = settings.upscalingMode(),
@@ -170,15 +170,16 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                     .reflex = settings.reflexMode(),
                     .microphoneMuted = settings.microphoneMuted(),
                     .microphoneDetail = gamepads != nullptr && gamepads->activeName().has_value()
-                                             ? "DualSense"
-                                             : "Sem controle",
+                                            ? "DualSense"
+                                            : "Sem controle",
                     .sessionName = "Arquivo de teste",
                     .windowMode = settings.video().windowMode,
                     .windowSize = settings.video().windowSize,
                 },
             .overlayActions = overlayActions,
             .metrics = metrics,
-            .gamepad = [&gamepads]
+            .gamepad =
+                [&gamepads]
             {
                 if (gamepads == nullptr)
                 {
@@ -190,7 +191,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                 return state ? overlayGamepad(*state) : render::OverlayGamepad{};
             },
             .onClosed = quit,
-            .onWindowModeChanged = [&settings](core::WindowMode mode)
+            .onWindowModeChanged =
+                [&settings](core::WindowMode mode)
             {
                 const QString name =
                     QString::fromLatin1(core::windowModeName(mode).data());
@@ -198,7 +200,8 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                     &settings, [&settings, name] { settings.setWindowMode(name); },
                     Qt::QueuedConnection);
             },
-            .onWindowedSizeChanged = [&settings](core::WindowSize size)
+            .onWindowedSizeChanged =
+                [&settings](core::WindowSize size)
             {
                 QMetaObject::invokeMethod(
                     &settings, [&settings, size] { settings.setWindowedSize(size); },
@@ -226,4 +229,4 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
     return QCoreApplication::exec();
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

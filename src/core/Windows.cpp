@@ -2,7 +2,7 @@
 
 #include <format>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 std::string toUtf8(std::wstring_view text)
@@ -28,4 +28,4 @@ std::string describeFailure(std::string_view what, HRESULT result)
     return std::format("{} failed: 0x{:08X}", what, static_cast<unsigned long>(result));
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

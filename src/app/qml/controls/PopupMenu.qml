@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // A menu of MenuRow entries, styled as the design's open Select.
 T.Menu {

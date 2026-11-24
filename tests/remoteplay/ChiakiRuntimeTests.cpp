@@ -4,7 +4,7 @@
 
 TEST_CASE("initializeChiaki brings up chiaki-lib and its dependencies")
 {
-    const auto result = lynx::remoteplay::initializeChiaki();
+    const auto result = mfplay::remoteplay::initializeChiaki();
 
     if (!result)
     {

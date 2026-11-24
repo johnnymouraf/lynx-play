@@ -4,7 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::audio;
+using namespace mfplay::audio;
 
 TEST_CASE("Haptics route to audio on USB, to rumble on Bluetooth and off without a controller")
 {

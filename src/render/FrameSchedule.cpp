@@ -1,6 +1,6 @@
 #include "render/FrameSchedule.h"
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 FrameSchedule::FrameSchedule(Options options) : options_(options)
@@ -68,4 +68,4 @@ bool FrameSchedule::repeatedSource() const
     return cadence_ && *cadence_ <= options_.repeatedSourceFramesPerSecond;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

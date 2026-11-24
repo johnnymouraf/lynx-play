@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -53,4 +53,4 @@ std::string toHex(std::span<const std::uint8_t> bytes)
     return text;
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

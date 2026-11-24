@@ -7,7 +7,7 @@
 #include <stop_token>
 #include <string>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Wakes a thread at a steady frame rate, to within a fraction of a
@@ -34,4 +34,4 @@ private:
     Clock::time_point nextTick_;
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

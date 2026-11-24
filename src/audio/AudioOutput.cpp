@@ -7,7 +7,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 namespace
@@ -259,4 +259,4 @@ void AudioOutput::destroyLocked()
     deviceId_ = 0;
 }
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

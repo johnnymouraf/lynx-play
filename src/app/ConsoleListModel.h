@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 // One console card as the home screen shows it.
@@ -68,4 +68,4 @@ private:
     std::vector<ConsoleRow> rows_;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

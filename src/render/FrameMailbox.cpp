@@ -4,7 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 std::expected<std::shared_ptr<FrameMailbox>, std::string> FrameMailbox::create()
@@ -63,4 +63,4 @@ std::uint64_t FrameMailbox::takeDroppedCount()
     return std::exchange(dropped_, 0);
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

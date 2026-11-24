@@ -10,13 +10,13 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
 {
 
-constexpr auto kWindowClassName = L"LynxPlayStreamWindow";
+constexpr auto kWindowClassName = L"MFPlayStreamWindow";
 constexpr DWORD kWindowedStyle = WS_OVERLAPPEDWINDOW;
 constexpr DWORD kFullscreenStyle = WS_POPUP;
 
@@ -883,4 +883,4 @@ void StreamWindow::close(CloseReason reason)
     }
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

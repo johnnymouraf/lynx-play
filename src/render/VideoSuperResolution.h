@@ -17,7 +17,7 @@
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Why RTX Video Super Resolution can't run here, for the RTX screen.
@@ -163,4 +163,4 @@ private:
     UINT64 nextFenceValue_ = 0;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // Why the network search isn't running, with a way to start it again.
 Banner {
@@ -34,7 +34,7 @@ Banner {
                 target: banner
                 visible: true
                 title: "Não foi possível procurar consoles"
-                message: "A busca na rede não começou. Veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."
+                message: "A busca na rede não começou. Veja o log em %LOCALAPPDATA%\\MFPlay\\logs."
                 actionText: "Tentar de novo"
             }
         },
@@ -46,7 +46,7 @@ Banner {
                 target: banner
                 visible: true
                 title: "O Remote Play não iniciou"
-                message: "Feche e abra o Lynx Play de novo. Se continuar, veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."
+                message: "Feche e abra o MFPlay de novo. Se continuar, veja o log em %LOCALAPPDATA%\\MFPlay\\logs."
             }
         }
     ]

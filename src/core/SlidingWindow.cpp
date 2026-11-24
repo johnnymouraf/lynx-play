@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <utility>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 SlidingWindow::SlidingWindow(Clock::duration window, Clock::time_point start)
@@ -58,4 +58,4 @@ void SlidingWindow::dropExpired(Clock::time_point now)
     }
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

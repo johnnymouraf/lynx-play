@@ -10,7 +10,7 @@
 #include <expected>
 #include <string>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 enum class PresentTiming
@@ -75,4 +75,4 @@ private:
     bool tearing_ = false;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

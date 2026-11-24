@@ -3,7 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::core::RateCounter;
+using mfplay::core::RateCounter;
 using namespace std::chrono_literals;
 
 namespace

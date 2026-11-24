@@ -3,14 +3,20 @@
 #include <expected>
 #include <filesystem>
 #include <string>
+#include <vector>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
-// %LOCALAPPDATA%\LynxPlay: logs and caches that belong to this machine.
+// %LOCALAPPDATA%\MFPlay: logs and caches that belong to this machine.
 [[nodiscard]] std::expected<std::filesystem::path, std::string> localDataDir();
 
-// %APPDATA%\LynxPlay: what the user keeps, such as the paired consoles.
+// %APPDATA%\MFPlay: what the user keeps, such as the paired consoles.
 [[nodiscard]] std::expected<std::filesystem::path, std::string> roamingDataDir();
 
-} // namespace lynx::core
+// Copies the LynxPlay folders the app used before its rename into the MFPlay
+// folders that don't exist yet, leaving the old ones untouched. Must run before
+// anything writes to the MFPlay folders. Returns what failed, for the log.
+[[nodiscard]] std::vector<std::string> adoptLegacyDataDirs();
+
+} // namespace mfplay::core

@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -212,4 +212,4 @@ void GpuTimer::stamp(ID3D12GraphicsCommandList& commandList, UINT bufferIndex, s
                          slot(bufferIndex, offset));
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

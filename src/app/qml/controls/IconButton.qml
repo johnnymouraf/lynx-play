@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // A square button with only an icon. `text` is not shown; it names the button
 // for screen readers and UI Automation.

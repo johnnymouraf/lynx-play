@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // Runs a call into a driver so an access violation in it is reported in
@@ -12,4 +12,4 @@ namespace lynx::core
 // C++ unwinding of its own.
 [[nodiscard]] bool callGuarded(const std::function<void()>& call, std::uint32_t& fault);
 
-} // namespace lynx::core
+} // namespace mfplay::core

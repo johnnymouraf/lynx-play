@@ -5,7 +5,7 @@
 #include <array>
 #include <cstdint>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Rows that turn the normalized samples a shader reads from a YUV texture,
@@ -30,4 +30,4 @@ struct Ycbcr8
 // Gamma-encoded RGB from 0 to 1 as 8-bit limited-range YCbCr with `matrix`.
 [[nodiscard]] Ycbcr8 rgbToYcbcr8(ColorMatrix matrix, std::array<float, 3> rgb);
 
-} // namespace lynx::render
+} // namespace mfplay::render

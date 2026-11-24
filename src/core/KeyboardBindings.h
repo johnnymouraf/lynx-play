@@ -7,7 +7,7 @@
 
 #include <windows.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 enum class KeyboardBindingKind
@@ -35,4 +35,4 @@ struct KeyboardBinding
 [[nodiscard]] std::optional<KeyboardBinding> keyboardBindingFromName(std::string_view name);
 [[nodiscard]] std::string keyboardBindingName(KeyboardBinding binding);
 
-} // namespace lynx::core
+} // namespace mfplay::core

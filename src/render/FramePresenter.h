@@ -12,7 +12,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Which RGB picture the scaling pass draws: the shader's YUV-to-RGB
@@ -119,4 +119,4 @@ private:
     SurfaceSize pictureSize_;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

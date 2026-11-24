@@ -2,8 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using lynx::media::codecOfFile;
-using lynx::core::VideoCodec;
+using mfplay::core::VideoCodec;
+using mfplay::media::codecOfFile;
 
 TEST_CASE("codecOfFile reads the codec from the extension, in any case")
 {

@@ -15,7 +15,7 @@
 
 #include <spdlog/spdlog.h>
 
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
 #pragma warning(push, 0)
 #include <nvsdk_ngx.h>
 #include <nvsdk_ngx_defs_dlssg.h>
@@ -24,7 +24,7 @@
 #pragma warning(pop)
 #endif
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -33,7 +33,7 @@ namespace
 using core::describeFailure;
 using Microsoft::WRL::ComPtr;
 
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
 __declspec(noinline) NVSDK_NGX_Result callCreateDlssg(
     ID3D12GraphicsCommandList* commandList, NVSDK_NGX_Handle** handle,
     NVSDK_NGX_Parameter* parameters, NVSDK_NGX_DLSSG_Create_Params* createParameters)
@@ -135,7 +135,7 @@ std::optional<DWORD> hagsMode()
     return value;
 }
 
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
 D3D12_RESOURCE_DESC textureDescription(SurfaceSize extent, DXGI_FORMAT format,
                                        D3D12_RESOURCE_FLAGS flags)
 {
@@ -282,7 +282,7 @@ struct FrameGeneration::Impl
 
     void release()
     {
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
         if (handle != nullptr)
         {
             const NVSDK_NGX_Result result = callReleaseDlssg(handle);
@@ -337,7 +337,7 @@ FrameGenerationAvailability computeProbe()
     // capability below is the final word.
     availability.hagsOn = !hags || *hags != 1;
 
-#if !defined(LYNX_HAVE_NGX)
+#if !defined(MFPLAY_HAVE_NGX)
     availability.reason = FrameGenerationUnavailable::RuntimeMissing;
     availability.detail = "the build has no NVIDIA NGX SDK";
     return availability;
@@ -489,7 +489,7 @@ std::expected<FrameGeneration, std::string> FrameGeneration::create(
         return std::unexpected("the back buffer has no size");
     }
 
-#if !defined(LYNX_HAVE_NGX)
+#if !defined(MFPLAY_HAVE_NGX)
     return std::unexpected("the build has no NVIDIA NGX SDK");
 #else
     auto impl = std::make_unique<Impl>();
@@ -642,7 +642,7 @@ std::expected<void, std::string> FrameGeneration::evaluate(
     ID3D12GraphicsCommandList& commandList, ID3D12Resource& backbuffer,
     ID3D12Resource& motionVectors, bool reset, std::uint64_t frameId)
 {
-#if !defined(LYNX_HAVE_NGX)
+#if !defined(MFPLAY_HAVE_NGX)
     (void)commandList;
     (void)backbuffer;
     (void)motionVectors;
@@ -733,4 +733,4 @@ void FrameGeneration::release()
     }
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

@@ -2,7 +2,7 @@
 
 #include <QQuickImageProvider>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 // Serves the bundled Lucide icons as `image://icon/<name>/<rrggbb>/<stroke width>`,
@@ -15,4 +15,4 @@ public:
     QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override;
 };
 
-} // namespace lynx::app
+} // namespace mfplay::app

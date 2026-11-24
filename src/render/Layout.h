@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 struct SurfaceSize
@@ -28,4 +28,4 @@ struct PixelRect
 // surface: black bars fill the rest. Empty when either size is.
 [[nodiscard]] PixelRect fitPicture(SurfaceSize surface, SurfaceSize picture);
 
-} // namespace lynx::render
+} // namespace mfplay::render

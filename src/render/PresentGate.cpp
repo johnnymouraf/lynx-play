@@ -1,6 +1,6 @@
 #include "render/PresentGate.h"
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
@@ -56,4 +56,4 @@ bool PresentGate::mayPresent()
     return true;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

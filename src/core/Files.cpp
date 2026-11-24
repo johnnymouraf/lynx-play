@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 std::expected<void, std::string> replaceFile(const std::filesystem::path& path,
@@ -39,4 +39,4 @@ std::expected<void, std::string> replaceFile(const std::filesystem::path& path,
     return {};
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

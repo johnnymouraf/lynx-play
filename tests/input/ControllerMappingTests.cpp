@@ -6,7 +6,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::input;
+using namespace mfplay::input;
 
 TEST_CASE("Every SDL button maps to the control chiaki-ng reads")
 {

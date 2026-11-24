@@ -1,6 +1,6 @@
 #include "media/AnnexB.h"
 
-namespace lynx::media
+namespace mfplay::media
 {
 
 namespace
@@ -160,4 +160,4 @@ std::vector<std::span<const std::uint8_t>> splitAccessUnits(std::span<const std:
     return accessUnits;
 }
 
-} // namespace lynx::media
+} // namespace mfplay::media

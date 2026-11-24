@@ -1,6 +1,6 @@
 #pragma once
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 // NVIDIA Reflex's modes, as settings.json stores them.
@@ -13,4 +13,4 @@ enum class ReflexMode
     Boost,
 };
 
-} // namespace lynx::core
+} // namespace mfplay::core

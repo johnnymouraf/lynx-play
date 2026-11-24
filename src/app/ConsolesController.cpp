@@ -11,7 +11,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 namespace
@@ -334,7 +334,7 @@ void ConsolesController::wake(const QString& key)
     {
         spdlog::error("Cannot wake {}: {}", key.toStdString(), sent.error());
         emit notice(u"danger"_s, u"Não foi possível ligar o %1"_s.arg(name),
-                    u"Veja o log em %LOCALAPPDATA%\\LynxPlay\\logs."_s);
+                    u"Veja o log em %LOCALAPPDATA%\\MFPlay\\logs."_s);
         return;
     }
 
@@ -694,8 +694,8 @@ void ConsolesController::saveFile()
     if (!persist())
     {
         emit notice(u"danger"_s, u"Não foi possível salvar os consoles"_s,
-                    u"As mudanças valem até fechar o Lynx Play. Veja o log."_s);
+                    u"As mudanças valem até fechar o MFPlay. Veja o log."_s);
     }
 }
 
-} // namespace lynx::app
+} // namespace mfplay::app

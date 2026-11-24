@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Effects
-import LynxPlay
+import MFPlay
 
 // A Banner that floats over the screen for a few seconds.
 Item {

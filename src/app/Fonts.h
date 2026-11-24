@@ -2,7 +2,7 @@
 
 #include "render/Overlay.h"
 
-namespace lynx::app
+namespace mfplay::app
 {
 
 // Registers the fonts bundled as resources (Sora, Inter and JetBrains Mono)
@@ -13,4 +13,4 @@ void loadBundledFonts();
 // fonts; empty when a resource is missing.
 [[nodiscard]] render::OverlayFonts overlayFonts();
 
-} // namespace lynx::app
+} // namespace mfplay::app

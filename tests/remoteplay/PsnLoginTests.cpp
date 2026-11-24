@@ -5,7 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using namespace lynx::remoteplay;
+using namespace mfplay::remoteplay;
 
 namespace
 {

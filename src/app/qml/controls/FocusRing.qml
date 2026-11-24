@@ -1,5 +1,5 @@
 import QtQuick
-import LynxPlay
+import MFPlay
 
 // The keyboard and controller focus ring, drawn around its parent. Set
 // `targetRadius` to the parent's corner radius.

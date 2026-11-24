@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace lynx::audio
+namespace mfplay::audio
 {
 
 struct AudioDeviceInfo
@@ -47,4 +47,4 @@ void removeAudioDeviceListener(AudioDeviceListener* listener);
 // Called by the app's SDL event pump for each audio device event.
 void dispatchAudioDeviceEvent(bool added, bool recording, std::uint32_t device);
 
-} // namespace lynx::audio
+} // namespace mfplay::audio

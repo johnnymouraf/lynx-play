@@ -17,7 +17,7 @@
 
 #include <SDL3/SDL_events.h>
 
-namespace lynx::input
+namespace mfplay::input
 {
 
 enum class GamepadConnection
@@ -133,4 +133,4 @@ private:
     bool resetMotionRequested_ = false;
 };
 
-} // namespace lynx::input
+} // namespace mfplay::input

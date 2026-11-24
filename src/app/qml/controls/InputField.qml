@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Templates as T
-import LynxPlay
+import MFPlay
 
 // The design's TextField: label, input, and a helper line that turns into the
 // error message when `errorText` is set.

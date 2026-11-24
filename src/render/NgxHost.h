@@ -11,7 +11,7 @@
 
 struct NVSDK_NGX_Parameter;
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 // Why DLSS Super Resolution can't run on this machine.
@@ -95,4 +95,4 @@ private:
     bool initialized_ = false;
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

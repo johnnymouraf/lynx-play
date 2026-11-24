@@ -4,7 +4,7 @@
 #include <cmath>
 #include <utility>
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 CadenceDetector::CadenceDetector() : CadenceDetector(Options{})
@@ -116,4 +116,4 @@ void CadenceDetector::finishWindow()
     flagsInBlock_ = 0;
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

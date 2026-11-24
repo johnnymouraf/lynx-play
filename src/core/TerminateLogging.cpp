@@ -13,7 +13,7 @@
 
 #include <windows.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 namespace
@@ -143,4 +143,4 @@ void logUnhandledException(const char* context)
     }
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core

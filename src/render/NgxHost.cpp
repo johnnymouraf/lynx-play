@@ -17,19 +17,19 @@
 #include <d3d12.h>
 #include <nvapi.h>
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
 #pragma warning(push, 0)
 #include <nvsdk_ngx.h>
 #pragma warning(pop)
 #endif
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 namespace
 {
 
-// A GUID-shaped id, which the NGX loader requires; Lynx Play has no
+// A GUID-shaped id, which the NGX loader requires; MFPlay has no
 // NVIDIA-issued application id and uses the custom-project path.
 constexpr const char* kProjectId = "cbd9a4b0-3c4f-4a3d-9d9f-7b2a5e6f1c88";
 constexpr const char* kEngineVersion = "0.1.0";
@@ -209,7 +209,7 @@ bool fileExists(const std::filesystem::path& path)
     return std::filesystem::is_regular_file(path, error);
 }
 
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
 
 bool ngxFailed(NVSDK_NGX_Result result)
 {
@@ -284,7 +284,7 @@ __declspec(noinline) NVSDK_NGX_Result callShutdown(ID3D12Device* device)
 
 std::string ngxResultText(std::uint32_t result)
 {
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     const wchar_t* const text = GetNGXResultAsString(static_cast<NVSDK_NGX_Result>(result));
 
     if (text != nullptr)
@@ -388,7 +388,7 @@ DlssAvailability probeDlss()
 
 std::expected<NgxHost, std::string> NgxHost::create(ID3D12Device& device)
 {
-#ifdef LYNX_HAVE_NGX
+#ifdef MFPLAY_HAVE_NGX
     const std::filesystem::path dataPath = applicationDataPath();
     const std::filesystem::path executable = executableDirectory();
 
@@ -458,7 +458,7 @@ NgxHost::~NgxHost()
 
 void NgxHost::shutdown()
 {
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
     if (!initialized_ || !device_)
     {
         return;
@@ -493,7 +493,7 @@ const std::string& NgxHost::description() const
 
 std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::allocateParameters() const
 {
-#if !defined(LYNX_HAVE_NGX)
+#if !defined(MFPLAY_HAVE_NGX)
     return std::unexpected("the NGX SDK wasn't fetched (scripts/fetch-ngx.ps1)");
 #else
     if (!initialized_)
@@ -516,7 +516,7 @@ std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::allocateParameters() c
 
 std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::capabilityParameters() const
 {
-#if !defined(LYNX_HAVE_NGX)
+#if !defined(MFPLAY_HAVE_NGX)
     return std::unexpected("the NGX SDK wasn't fetched (scripts/fetch-ngx.ps1)");
 #else
     if (!initialized_)
@@ -539,7 +539,7 @@ std::expected<NVSDK_NGX_Parameter*, std::string> NgxHost::capabilityParameters()
 
 void NgxHost::destroyParameters(NVSDK_NGX_Parameter* parameters)
 {
-#if defined(LYNX_HAVE_NGX)
+#if defined(MFPLAY_HAVE_NGX)
     if (parameters != nullptr)
     {
         NVSDK_NGX_D3D12_DestroyParameters(parameters);
@@ -549,4 +549,4 @@ void NgxHost::destroyParameters(NVSDK_NGX_Parameter* parameters)
 #endif
 }
 
-} // namespace lynx::render
+} // namespace mfplay::render

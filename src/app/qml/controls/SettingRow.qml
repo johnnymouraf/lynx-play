@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import LynxPlay
+import MFPlay
 
 // The design's SettingRow: a label, an optional description and the row's
 // control at its end, over a divider.

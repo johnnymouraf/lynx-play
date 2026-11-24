@@ -9,7 +9,7 @@
 
 #include <chiaki/log.h>
 
-namespace lynx::remoteplay
+namespace mfplay::remoteplay
 {
 
 // A ChiakiLog that sends chiaki-lib's info, warnings and errors to spdlog,
@@ -41,4 +41,4 @@ private:
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> lastLogged_;
 };
 
-} // namespace lynx::remoteplay
+} // namespace mfplay::remoteplay

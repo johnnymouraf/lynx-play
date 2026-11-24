@@ -17,12 +17,12 @@
 
 #include <windows.h>
 
-namespace lynx::input
+namespace mfplay::input
 {
 class KeyboardMouseInput;
 }
 
-namespace lynx::render
+namespace mfplay::render
 {
 
 enum class CloseReason
@@ -152,4 +152,4 @@ private:
     WINDOWPLACEMENT windowedPlacement_{.length = sizeof(WINDOWPLACEMENT)};
 };
 
-} // namespace lynx::render
+} // namespace mfplay::render

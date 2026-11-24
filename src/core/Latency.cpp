@@ -7,7 +7,7 @@
 #include <avrt.h>
 #include <spdlog/spdlog.h>
 
-namespace lynx::core
+namespace mfplay::core
 {
 
 MmcssRegistration::MmcssRegistration(HANDLE handle, DWORD taskIndex)
@@ -66,4 +66,4 @@ void disableProcessPowerThrottling()
     spdlog::info("Process power throttling: execution speed stays high in the background");
 }
 
-} // namespace lynx::core
+} // namespace mfplay::core
