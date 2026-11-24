@@ -944,6 +944,29 @@ void SettingsController::setOverlayStatisticsVisible(bool visible)
     applyOverlay(overlay);
 }
 
+QString SettingsController::consoleView() const
+{
+    const std::string_view name = core::consoleViewName(settings_.interfaceSettings.consoleView);
+
+    return QString::fromLatin1(name.data(), static_cast<qsizetype>(name.size()));
+}
+
+void SettingsController::setConsoleView(const QString& name)
+{
+    const core::ConsoleView view =
+        name == u"list"_s ? core::ConsoleView::List : core::ConsoleView::Grid;
+
+    if (view == settings_.interfaceSettings.consoleView)
+    {
+        return;
+    }
+
+    settings_.interfaceSettings.consoleView = view;
+    spdlog::info("Console view: {}", core::consoleViewName(view));
+    emit interfaceChanged();
+    save();
+}
+
 const core::KeyboardMouseSettings& SettingsController::keyboardMouse() const
 {
     return settings_.keyboardMouse;

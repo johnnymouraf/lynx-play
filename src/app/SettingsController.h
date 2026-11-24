@@ -73,6 +73,8 @@ class SettingsController : public QObject
                    rtxChanged)
     Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
                    setOverlayStatisticsVisible NOTIFY overlayChanged)
+    Q_PROPERTY(
+        QString consoleView READ consoleView WRITE setConsoleView NOTIFY interfaceChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
     Q_PROPERTY(bool keyboardMouseEnabled READ keyboardMouseEnabled WRITE setKeyboardMouseEnabled
                    NOTIFY keyboardMouseChanged)
@@ -203,6 +205,10 @@ public:
     [[nodiscard]] bool overlayStatisticsVisible() const;
     void setOverlayStatisticsVisible(bool visible);
 
+    // "grid" or "list", the Consoles screen's view.
+    [[nodiscard]] QString consoleView() const;
+    void setConsoleView(const QString& name);
+
     [[nodiscard]] QVariantMap keyboardBindings() const;
     [[nodiscard]] bool keyboardMouseEnabled() const;
     void setKeyboardMouseEnabled(bool enabled);
@@ -228,6 +234,7 @@ signals:
     void rtxChanged();
     void overlayChanged();
     void keyboardMouseChanged();
+    void interfaceChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 

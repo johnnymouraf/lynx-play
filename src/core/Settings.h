@@ -271,6 +271,34 @@ struct OverlaySettings
     bool operator==(const OverlaySettings&) const = default;
 };
 
+// How the Consoles screen lists the consoles.
+enum class ConsoleView
+{
+    Grid,
+    List,
+};
+
+[[nodiscard]] constexpr std::string_view consoleViewName(ConsoleView view)
+{
+    switch (view)
+    {
+    case ConsoleView::Grid:
+        return "grid";
+    case ConsoleView::List:
+        return "list";
+    }
+
+    return "grid";
+}
+
+// What the interface itself remembers between runs.
+struct InterfaceSettings
+{
+    ConsoleView consoleView = ConsoleView::Grid;
+
+    bool operator==(const InterfaceSettings&) const = default;
+};
+
 // How the stream is scaled to the window.
 enum class Upscaling
 {
@@ -331,6 +359,7 @@ struct Settings
     OverlaySettings overlay;
     KeyboardMouseSettings keyboardMouse;
     PsnSettings psn;
+    InterfaceSettings interfaceSettings;
 
     bool operator==(const Settings&) const = default;
 };

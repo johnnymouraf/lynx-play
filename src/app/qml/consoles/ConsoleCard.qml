@@ -98,16 +98,16 @@ Item {
     ColumnLayout {
         id: gridColumn
 
-        anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.fill: parent
         visible: !card.listMode
-        spacing: Theme.space4
+        spacing: 0
 
         RowLayout {
             Layout.fillWidth: true
             Layout.topMargin: Theme.space4
             Layout.leftMargin: Theme.space4
             Layout.rightMargin: Theme.space4
+            Layout.preferredHeight: 24
 
             StateBadge {
                 status: card.status
@@ -127,6 +127,8 @@ Item {
 
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.topMargin: Theme.space4
             Layout.leftMargin: Theme.space4
             Layout.rightMargin: Theme.space4
             Layout.bottomMargin: Theme.space4
@@ -144,6 +146,7 @@ Item {
 
             CardAction {
                 Layout.fillWidth: true
+                Layout.preferredHeight: Theme.sizeControl
                 status: card.status
                 searching: card.searching
                 consoleName: card.name

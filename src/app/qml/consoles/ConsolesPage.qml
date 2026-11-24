@@ -8,18 +8,21 @@ FocusScope {
     id: page
 
     required property ConsolesController consoles
+    required property SettingsController settings
     // The page's side margins, set by the shell for the window's width.
     property int sideMargin: Theme.space12
     property int currentIndex: 0
 
     readonly property bool hasConsoles: page.consoles.model.count > 0
-    readonly property bool listMode: false
+    readonly property bool listMode: page.settings.consoleView === "list"
     // The design narrows the gaps along with the margins in a small window.
     readonly property int cardGap: page.sideMargin < Theme.space12 ? Theme.space3 : Theme.space4
     readonly property int minimumCardWidth: 220
-    // The grid's card: badge row, name, address and the 52 px action; the
-    // list's row: the action and its padding.
-    readonly property int cardHeight: page.listMode ? Theme.sizeControlLg + 2 * Theme.space4 : 190
+    // The grid's card: the badge row over the body; the list's row: the
+    // action and its padding.
+    readonly property int cardHeight: page.listMode
+                                      ? Theme.sizeControlLg + 2 * Theme.space4
+                                      : 182
     // Room around the cards for the focus ring, which the scroller would clip.
     readonly property int ringRoom: Theme.sizeFocusRing + 1
     readonly property int topMargin: 26
@@ -215,7 +218,54 @@ FocusScope {
                 onRetryRequested: page.consoles.retryDiscovery()
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: page.cardGap
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    status: "ready"
+                    label: "Pronto"
+                    count: page.consoles.model.readyCount
+                }
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    status: "standby"
+                    label: "Em repouso"
+                    count: page.consoles.model.standbyCount
+                }
+
+                StatusCount {
+                    Layout.fillWidth: true
+                    status: "unpaired"
+                    label: "Não pareado"
+                    count: page.consoles.model.unpairedCount
+                }
+
+                // The design gives the toggle a whole cell beside the counters
+                // in a wide window, and only its own width in a small one.
+                Item {
+                    Layout.fillWidth: page.sideMargin >= Theme.space12
+                    Layout.preferredWidth: page.sideMargin >= Theme.space12
+                                                ? -1
+                                                : viewToggle.implicitWidth
+                    Layout.preferredHeight: Theme.space10
+
+                    ViewToggle {
+                        id: viewToggle
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        mode: page.settings.consoleView
+                        onActivated: mode => page.settings.consoleView = mode
+                    }
+                }
+            }
+
             AppText {
+                Layout.topMargin: 22
+                Layout.bottomMargin: Theme.space4
                 Layout.leftMargin: 2
                 text: "Lista de consoles"
                 textStyle: "overline"
@@ -230,7 +280,6 @@ FocusScope {
                     (width - page.cardGap * (grid.columns - 1)) / grid.columns
 
                 Layout.fillWidth: true
-                Layout.topMargin: Theme.space4
                 implicitHeight: grid.implicitHeight
                 activeFocusOnTab: true
                 Accessible.role: Accessible.List

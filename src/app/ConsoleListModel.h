@@ -34,6 +34,10 @@ class ConsoleListModel : public QAbstractListModel
     QML_UNCREATABLE("Owned by ConsolesController")
 
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    // How many cards show each of the states the summary counts.
+    Q_PROPERTY(int readyCount READ readyCount NOTIFY countsChanged)
+    Q_PROPERTY(int standbyCount READ standbyCount NOTIFY countsChanged)
+    Q_PROPERTY(int unpairedCount READ unpairedCount NOTIFY countsChanged)
 
 public:
     enum Role
@@ -55,6 +59,9 @@ public:
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 
     [[nodiscard]] int count() const;
+    [[nodiscard]] int readyCount() const;
+    [[nodiscard]] int standbyCount() const;
+    [[nodiscard]] int unpairedCount() const;
     [[nodiscard]] const ConsoleRow* find(const QString& key) const;
 
     // Replaces the rows, updating in place when the same consoles are listed
@@ -63,8 +70,20 @@ public:
 
 signals:
     void countChanged();
+    void countsChanged();
 
 private:
+    struct StatusCounts
+    {
+        int ready = 0;
+        int standby = 0;
+        int unpaired = 0;
+
+        bool operator==(const StatusCounts&) const = default;
+    };
+
+    [[nodiscard]] StatusCounts statusCounts() const;
+
     std::vector<ConsoleRow> rows_;
 };
 

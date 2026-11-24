@@ -76,6 +76,11 @@ constexpr Names<FrameGenerationMode, 2> kFrameGenerationNames{{
     {"2x", FrameGenerationMode::X2},
 }};
 
+constexpr Names<ConsoleView, 2> kConsoleViewNames{{
+    {"grid", ConsoleView::Grid},
+    {"list", ConsoleView::List},
+}};
+
 template <typename Value, std::size_t Size>
 std::string nameOf(const Names<Value, Size>& names, Value value)
 {
@@ -355,6 +360,21 @@ PsnSettings readPsn(const Json& psn)
     return settings;
 }
 
+InterfaceSettings readInterface(const Json& interfaceSettings)
+{
+    InterfaceSettings settings;
+
+    if (!interfaceSettings.is_object())
+    {
+        return settings;
+    }
+
+    settings.consoleView =
+        namedValue(kConsoleViewNames, interfaceSettings, "consoleView", settings.consoleView);
+
+    return settings;
+}
+
 } // namespace
 
 std::array<std::string, kKeyboardControlCount> defaultKeyboardBindings()
@@ -514,6 +534,12 @@ std::expected<Settings, std::string> readSettings(std::istream& input)
         settings.psn = readPsn(*psn);
     }
 
+    if (const auto interfaceSettings = root.find("interface");
+        interfaceSettings != root.end())
+    {
+        settings.interfaceSettings = readInterface(*interfaceSettings);
+    }
+
     return settings;
 }
 
@@ -526,6 +552,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
     const OverlaySettings& overlay = settings.overlay;
     const KeyboardMouseSettings& keyboardMouse = settings.keyboardMouse;
     const PsnSettings& psn = settings.psn;
+    const InterfaceSettings& interfaceSettings = settings.interfaceSettings;
 
     Json bindings = Json::object();
 
@@ -590,6 +617,10 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"invertY", keyboardMouse.invertY},
          }},
         {"psn", psnEntry},
+        {"interface",
+         {
+             {"consoleView", nameOf(kConsoleViewNames, interfaceSettings.consoleView)},
+         }},
     };
 
     output << root.dump(kJsonIndent) << '\n';

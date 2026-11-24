@@ -48,6 +48,7 @@ TEST_CASE("Settings survive a write and a read")
     settings.keyboardMouse.enabled = false;
     settings.psn.signedIn = true;
     settings.psn.tokenExpiry = 1'792'000'000;
+    settings.interfaceSettings.consoleView = ConsoleView::List;
     std::ostringstream output;
 
     writeSettings(settings, output);
@@ -70,6 +71,8 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->keyboardMouse == settings.keyboardMouse);
     CHECK_FALSE(readBack->keyboardMouse.enabled);
     CHECK(readBack->psn == settings.psn);
+    CHECK(readBack->interfaceSettings == settings.interfaceSettings);
+    CHECK(readBack->interfaceSettings.consoleView == ConsoleView::List);
 }
 
 TEST_CASE("A settings file without the PSN sign-in starts signed out")
@@ -79,6 +82,17 @@ TEST_CASE("A settings file without the PSN sign-in starts signed out")
     REQUIRE(readBack.has_value());
     CHECK_FALSE(readBack->psn.signedIn);
     CHECK_FALSE(readBack->psn.tokenExpiry.has_value());
+}
+
+TEST_CASE("A missing or unknown console view falls back to the grid")
+{
+    const auto missing = read(R"({"version":1})");
+    const auto unknown = read(R"({"version":1,"interface":{"consoleView":"carousel"}})");
+
+    REQUIRE(missing.has_value());
+    REQUIRE(unknown.has_value());
+    CHECK(missing->interfaceSettings.consoleView == ConsoleView::Grid);
+    CHECK(unknown->interfaceSettings.consoleView == ConsoleView::Grid);
 }
 
 TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and Reflex")

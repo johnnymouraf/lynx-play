@@ -31,7 +31,7 @@ Item {
         }
     }
 
-    implicitHeight: Theme.sizeControlLg
+    implicitHeight: Theme.sizeControl
     onStatusChanged: action.restartWakeProgress()
     Component.onCompleted: action.restartWakeProgress()
 
@@ -49,7 +49,9 @@ Item {
     }
 
     ActionButton {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
         visible: !action.waking
         enabled: !action.searching
         variant: action.button.variant

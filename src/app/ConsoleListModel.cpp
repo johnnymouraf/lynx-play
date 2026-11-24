@@ -67,6 +67,44 @@ int ConsoleListModel::count() const
     return static_cast<int>(rows_.size());
 }
 
+int ConsoleListModel::readyCount() const
+{
+    return statusCounts().ready;
+}
+
+int ConsoleListModel::standbyCount() const
+{
+    return statusCounts().standby;
+}
+
+int ConsoleListModel::unpairedCount() const
+{
+    return statusCounts().unpaired;
+}
+
+ConsoleListModel::StatusCounts ConsoleListModel::statusCounts() const
+{
+    StatusCounts counts;
+
+    for (const ConsoleRow& row : rows_)
+    {
+        if (row.status == QLatin1String("ready"))
+        {
+            ++counts.ready;
+        }
+        else if (row.status == QLatin1String("standby"))
+        {
+            ++counts.standby;
+        }
+        else if (row.status == QLatin1String("unpaired"))
+        {
+            ++counts.unpaired;
+        }
+    }
+
+    return counts;
+}
+
 const ConsoleRow* ConsoleListModel::find(const QString& key) const
 {
     const auto row = std::ranges::find(rows_, key, &ConsoleRow::key);
@@ -75,6 +113,7 @@ const ConsoleRow* ConsoleListModel::find(const QString& key) const
 
 void ConsoleListModel::setRows(std::vector<ConsoleRow> rows)
 {
+    const StatusCounts previousCounts = statusCounts();
     const bool sameConsoles = std::ranges::equal(rows_, rows, {}, &ConsoleRow::key,
                                                  &ConsoleRow::key);
 
@@ -91,6 +130,11 @@ void ConsoleListModel::setRows(std::vector<ConsoleRow> rows)
             emit countChanged();
         }
 
+        if (statusCounts() != previousCounts)
+        {
+            emit countsChanged();
+        }
+
         return;
     }
 
@@ -104,6 +148,11 @@ void ConsoleListModel::setRows(std::vector<ConsoleRow> rows)
         rows_[i] = std::move(rows[i]);
         const QModelIndex changed = index(static_cast<int>(i));
         emit dataChanged(changed, changed);
+    }
+
+    if (statusCounts() != previousCounts)
+    {
+        emit countsChanged();
     }
 }
 

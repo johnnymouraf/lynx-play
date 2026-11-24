@@ -122,6 +122,7 @@ ApplicationWindow {
                         id: consolesPage
 
                         consoles: window.consoles
+                        settings: window.settings
                         sideMargin: window.pageMargin
                         onToastRequested: (tone, title, message) => toast.show(tone, title, message)
                     }
