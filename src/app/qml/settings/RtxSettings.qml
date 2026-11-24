@@ -43,6 +43,8 @@ ColumnLayout {
         Layout.fillWidth: true
         label: "Upscaling"
         description: section.upscalingDescription()
+        tagLabel: "Experimental"
+        tagIcon: "flask-conical"
 
         SegmentedControl {
             name: "Upscaling"
@@ -54,38 +56,6 @@ ColumnLayout {
             ]
             currentValue: section.settings.upscaling
             onActivated: value => section.settings.upscaling = value
-        }
-
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: experimentalRow.implicitWidth + 2 * Theme.space2
-            implicitHeight: 28
-            radius: Theme.radiusFull
-            color: Theme.standbySubtle
-            Accessible.role: Accessible.StaticText
-            Accessible.name: "Experimental"
-
-            Row {
-                id: experimentalRow
-
-                anchors.centerIn: parent
-                spacing: Theme.space1
-
-                Icon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "flask-conical"
-                    size: 14
-                    bold: true
-                    color: Theme.standby
-                }
-
-                AppText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Experimental"
-                    textStyle: "caption"
-                    color: Theme.standby
-                }
-            }
         }
     }
 

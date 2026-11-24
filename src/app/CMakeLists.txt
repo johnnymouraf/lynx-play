@@ -107,6 +107,7 @@ qt_add_qml_module(mfplay
         qml/controls/Spinner.qml
         qml/controls/StateBadge.qml
         qml/controls/StatusCount.qml
+        qml/controls/StatusTag.qml
         qml/controls/ThinScrollBar.qml
         qml/controls/Toast.qml
         qml/controls/Toggle.qml

@@ -139,35 +139,11 @@ ColumnLayout {
                             textStyle: "labelLarge"
                         }
 
-                        Rectangle {
-                            implicitWidth: badgeRow.implicitWidth + 2 * Theme.space2
-                            implicitHeight: 22
-                            radius: 3
-                            color: Theme.menu
-                            Accessible.role: Accessible.StaticText
-                            Accessible.name: section.signedIn ? "Conectada" : "Não conectada"
-
-                            Row {
-                                id: badgeRow
-
-                                anchors.centerIn: parent
-                                spacing: 6
-
-                                Icon {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    name: section.signedIn ? "user-check" : "user-x"
-                                    size: 12
-                                    bold: true
-                                    color: section.signedIn ? Theme.ready : Theme.offline
-                                }
-
-                                AppText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: section.signedIn ? "Conectada" : "Não conectada"
-                                    textStyle: "tag"
-                                    color: section.signedIn ? Theme.ready : Theme.offline
-                                }
-                            }
+                        StatusTag {
+                            Layout.alignment: Qt.AlignVCenter
+                            iconName: section.signedIn ? "user-check" : "user-x"
+                            text: section.signedIn ? "Conectada" : "Não conectada"
+                            color: section.signedIn ? Theme.ready : Theme.offline
                         }
 
                         Item {

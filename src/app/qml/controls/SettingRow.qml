@@ -10,6 +10,10 @@ Rectangle {
 
     property string label
     property string description
+    // Optional state tag, shown right after the label.
+    property string tagLabel
+    property string tagIcon
+    property color tagColor: Theme.standby
     default property alias control: controlSlot.data
 
     readonly property bool stacked: row.width < 560
@@ -34,11 +38,22 @@ Rectangle {
             Layout.fillWidth: true
             spacing: Theme.space1
 
-            AppText {
-                Layout.fillWidth: true
-                text: row.label
-                textStyle: "labelLarge"
-                wrapMode: Text.WordWrap
+            RowLayout {
+                spacing: Theme.space2
+
+                AppText {
+                    text: row.label
+                    textStyle: "labelLarge"
+                    wrapMode: Text.WordWrap
+                }
+
+                StatusTag {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: row.tagLabel.length > 0
+                    iconName: row.tagIcon
+                    text: row.tagLabel
+                    color: row.tagColor
+                }
             }
 
             AppText {

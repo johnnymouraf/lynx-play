@@ -173,23 +173,11 @@ ColumnLayout {
                 Layout.alignment: Qt.AlignTop
                 spacing: 2
 
-                RowLayout {
+                AppText {
                     Layout.fillWidth: true
-                    spacing: Theme.space2
-
-                    AppText {
-                        Layout.fillWidth: true
-                        text: section.cardTitle
-                        textStyle: "labelLarge"
-                        wrapMode: Text.WordWrap
-                    }
-
-                    StateBadge {
-                        Layout.alignment: Qt.AlignVCenter
-                        visible: !section.input.controllerConnected
-                        status: "offline"
-                        label: "Desconectado"
-                    }
+                    text: section.cardTitle
+                    textStyle: "labelLarge"
+                    wrapMode: Text.WordWrap
                 }
 
                 AppText {
