@@ -155,7 +155,9 @@ ApplicationWindow {
 
                     ControllerStatus {
                         Layout.preferredWidth: 240
-                        visible: window.section !== "settings" || settingsPage.section !== "controls"
+                        visible: window.section !== "settings"
+                                 || (settingsPage.section !== "controls"
+                                     && window.width >= 1180)
                         connected: window.input.controllerConnected
                         name: window.input.controllerTitle
                         status: window.controllerStatusText()
