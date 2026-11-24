@@ -147,21 +147,6 @@ const char* stageLabel(EffectStage stage)
     return "?";
 }
 
-const char* reflexModeLabel(core::ReflexMode mode)
-{
-    switch (mode)
-    {
-    case core::ReflexMode::Off:
-        return "Desligado";
-    case core::ReflexMode::On:
-        return "Ligado";
-    case core::ReflexMode::Boost:
-        return "Ligado + Boost";
-    }
-
-    return "Desligado";
-}
-
 // The segmented control's labels, as short as the design's three columns.
 const char* reflexSegmentLabel(core::ReflexMode mode)
 {
