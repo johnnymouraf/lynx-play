@@ -11,10 +11,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
-  - [Shared by the redesign steps (3.2–3.5)](#shared-by-the-redesign-steps-3235)
-  - [3.3 Consoles and pairing](#33-consoles-and-pairing)
-  - [3.4 Settings, Sobre and connecting](#34-settings-sobre-and-connecting)
-  - [3.5 Stream overlay](#35-stream-overlay)
   - [Decisions to review](#decisions-to-review)
 
 ## Phases
@@ -63,23 +59,23 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
     - Off by default: it adds about one source frame of latency.
   - [x] **2.6 DLSS Super Resolution (experimental)**, fed by optical-flow
         motion vectors and compared with VSR.
-- [ ] **3. MFPlay: name and redesign**: the app becomes MFPlay and every
+- [x] **3. MFPlay: name and redesign**: the app becomes MFPlay and every
       screen follows the Drafia redesign (`design file`).
   - [x] **3.1 Rename to MFPlay**: name everywhere (code, namespace, CMake,
         QML module, exe, workflow, docs), the vector icon and logo from the
         design, data moved from `MFPlay` to `MFPlay`, the repository renamed
         to `johnnymouraf/mfplay`.
-  - [x] **3.2 Theme and shared components** [auto]: the new `Theme` tokens (blue
+  - [x] **3.2 Theme and shared components**: the new `Theme` tokens (blue
         accent, radii, rail), buttons in the menu-button pattern, badges,
         fields, toggles, segmented controls, slider, dialogs, the rail with
         Sobre, the controller hint bar and the DualSense card.
-  - [ ] **3.3 Consoles and pairing** [auto]: cards with the new states, status
+  - [x] **3.3 Consoles and pairing**: cards with the new states, status
         counters, grid/list toggle, empty state, Adicionar pelo IP,
         rename/forget, pairing with the PSN login in the new style.
-  - [ ] **3.4 Settings, Sobre and connecting** [auto]: Vídeo, Áudio, Controles (with
+  - [x] **3.4 Settings, Sobre and connecting**: Vídeo, Áudio, Controles (with
         the DualSense battery), RTX, Rede (its internet rows disabled until
         phase 4), Sobre in the rail, Conectando and its error.
-  - [ ] **3.5 Stream overlay** [auto]: the design's statistics panel and Menu rápido
+  - [x] **3.5 Stream overlay**: the design's statistics panel and Menu rápido
         in Dear ImGui, keeping every row the current overlay has.
   - Settled for the whole phase: where the design covers something, its layout
     and copy replace the code's; what exists only in the code stays, styled
@@ -141,11 +137,11 @@ Out of scope for now: capture card input (planned for the future).
 
 ## Auto mode
 
-Scope of the current run: 3.2–3.5, started on 2026-11-24 with the owner at the
-machine. The first run (2026-11-22) built 1.1–1.5 and 2.1–2.6. Delivery: each
-step works on the branch `auto/<step>` (for example `auto/3.2`), commits and
-pushes each delivery there so CI builds it, and the orchestrator fast-forwards
-`main` to the branch once the step is done and green.
+Scope of the last run: 3.2–3.5, started and closed on 2026-11-24 with the
+owner at the machine. The first run (2026-11-22) built 1.1–1.5 and 2.1–2.6.
+Delivery: each step works on the branch `auto/<step>` (for example `auto/3.2`),
+commits and pushes each delivery there so CI builds it, and the orchestrator
+fast-forwards `main` to the branch once the step is done and green.
 
 ### Shared by every step
 
@@ -198,145 +194,6 @@ pushes each delivery there so CI builds it, and the orchestrator fast-forwards
 - **Stuck:** after three CI attempts at the same failure with no progress, or
   when the step can't fit its run, finish the current delivery, stop and
   report what is left.
-
-### Shared by the redesign steps (3.2–3.5)
-
-- **Reading the design:** the Drafia app is open with the design file; use the
-  `mcp__drafia__*` tools (load them with ToolSearch). Read the Drafia skill's
-  `guide/design-to-code.md` first. Page "Design system" holds the components
-  and foundations; page "Screens" holds the screens in sections 1 Consoles,
-  2 Pareamento, 3 Conexão e stream, 4 Configurações. `Inspect` gives exact
-  sizes, paddings, gaps, fonts and the variables bound; `TakeScreenshot` the
-  visual reference. Never edit the design.
-- **Rule for content (settled with the owner):** where the design covers
-  something, its layout and copy replace the code's; what exists only in the
-  code stays, styled like the design's nearest equivalent (same row, block,
-  button and spacing patterns); where the design simplifies a behavior, the
-  real behavior stays with the design's look. Nothing working is removed.
-- **Owner's visual preferences:** labels start with a capital letter, never
-  all-lowercase; solid blocks, no shadows, no decorative filler, no accent
-  borders on blocks; every button follows the menu-button pattern (icon in a
-  32 px tile + label, 52 px tall), text links become secondary buttons;
-  status and error messages are plain colored text (no banner box, no icon);
-  no duplicate actions on a screen; status tags (EXPERIMENTAL, NÃO CONECTADA)
-  sit next to the row title; no console photos or product art.
-- **Checking the look:** run the app from the CI artifact at 1280×800 and
-  960×600, screenshot each screen built and compare it with the design frame
-  through `mcp__drafia__compare_image` (pass the screenshot's Windows path);
-  at most three rounds of fixes per screen, then report what still differs.
-- **Interface text** stays Brazilian Portuguese, with "MFPlay" as the name.
-
-### 3.3 Consoles and pairing
-
-- **Goal:** the Consoles screen, its dialogs and the pairing flow match
-  sections "1 · Consoles" and "2 · Pareamento" of the design.
-- **Guardrails:** consoles and pairing screens only; discovery, wake, pairing
-  and store logic unchanged except what the new view mode needs.
-- **Success criteria:**
-  1. "Consoles — início", "Consoles — vazio", "Consoles — janela mínima",
-     "Card do console — estados", "Adicionar pelo IP" and its error match the
-     design (compare_image at 1280×800 and 960×600 with consoles added by IP
-     to reach each state the machine can produce).
-  2. The status counters show the real counts per state; the grid/list toggle
-     switches the view and is remembered across restarts (`settings.json`,
-     additive field, tested in `SettingsTests`).
-  3. Rename and Forget dialogs and the card's "…" menu follow the dialog and
-     button patterns.
-  4. Pairing steps (Account ID, PIN, pareando, sucesso, erro) match the
-     design; the PSN browser login (1.6) stays in step 1, styled like the
-     design (secondary button), with manual entry kept; "Ajuda" replaces the
-     "Como encontrar meu Account ID" link.
-  5. CI green, tests pass, no QML warnings.
-- **Deliveries:** (1) cards and grid; (2) counters and grid/list with the
-  setting; (3) empty state and Adicionar pelo IP, rename, forget; (4) pairing.
-- **Settled in planning:** counters and the grid/list toggle are built now;
-  the empty state takes the design's shorter copy and drops the checklist only
-  if the design has no place for it (the rule above keeps working hints).
-- **Changes:** `src/app/qml/consoles/*.qml`; `src/core/Settings.{h,cpp}` and
-  `SettingsController` for the view mode; tests in `tests/core/SettingsTests.cpp`.
-- **Data and interfaces:** `settings.json` gains `interface.consoleView`
-  (`grid` | `list`, default `grid`), version stays 1.
-- **Edge cases:** long console names; many consoles (scrolling keeps the
-  focused card visible); a pairing error with retry; the list view with each
-  card state.
-
-### 3.4 Settings, Sobre and connecting
-
-- **Goal:** Configurações (Vídeo, Áudio e microfone, Controles, RTX, Rede),
-  Sobre and the connecting screens match sections "3 · Conexão e stream"
-  (except the overlay) and "4 · Configurações".
-- **Guardrails:** these screens only; no streaming behavior change; the Rede
-  page's internet rows have no effect yet.
-- **Success criteria:**
-  1. Each settings page matches its design frame; rows only the code has
-     (window mode and size, HDR, upscaler choice, optical flow, controller
-     choice, keyboard as controller, mouse sensitivity, invert Y, video test)
-     stay, in the design's row style.
-  2. Controles shows the DualSense card with the real battery percent and
-     charging state from SDL (`SDL_GetGamepadPowerInfo`), and the connection
-     type; no controller shows the empty state.
-  3. Rede: "Bitrate na rede local" is the same setting as Vídeo's bitrate;
-     "Conta PSN" logs in through the existing PSN browser flow and shows the
-     state (NÃO CONECTADA tag or the account), its saved Account ID being the
-     one pairing fills in; "Bitrate pela internet" and "Endereço fora de casa"
-     are shown disabled with a description saying they arrive with internet
-     play.
-  4. Sobre matches its frame (mark, wordmark, tagline, version chips, the three
-     cards) and keeps the video test as an extra card.
-  5. "Conectando" and "Conectando — erro" match the design.
-  6. CI green, tests pass, no QML warnings.
-- **Deliveries:** (1) Vídeo and Áudio; (2) Controles with the battery; (3) RTX
-  and Rede; (4) Sobre and connecting.
-- **Settled in planning:** RTX keeps the real exclusive upscaler choice
-  (Shader / RTX VSR / DLSS SR) shown in the design's style instead of
-  independent toggles; Rede is built now with its internet rows disabled.
-- **Changes:** `src/app/qml/settings/*.qml` (new `NetworkSettings.qml`),
-  `src/app/qml/stream/*.qml`, `InputController` and `GamepadManager` for the
-  battery, `PsnLoginClient`/`SettingsController` for the account state.
-- **Data and interfaces:** battery as `controllerBatteryPercent` (-1 unknown)
-  and `controllerCharging` on `InputController`.
-- **Edge cases:** battery unknown (wired, or SDL can't tell); PSN login
-  cancelled or failed; no audio devices; no NVIDIA GPU (RTX rows disabled as
-  today).
-
-### 3.5 Stream overlay
-
-- **Goal:** the Dear ImGui overlay matches "Overlay no stream (ImGui)": the
-  statistics panel (F2) and the Menu rápido (F1) with the design's colors,
-  sizes, spacing and controls.
-- **Guardrails:** `src/render/Overlay.cpp` and its fonts/colors only; no change
-  to what the stats measure or to presentation; the overlay stays drawn by
-  Direct3D 12.
-- **Success criteria:**
-  1. The statistics panel matches the design's panel; every row the current
-     panel has stays (Reflex latency, cadence, GPU per stage, the gamepad
-     debug section), grouped under the design's overline headings.
-  2. Menu rápido matches the design: title with the console name and session
-     time, NVIDIA Reflex segmented control, toggles for RTX VSR, Frame
-     Generation, Mostrar estatísticas and Microfone, Desconectar as a danger
-     button, the close hint at the bottom; the current menu actions (window
-     mode row, everything else it has) stay in the same style.
-  3. Controller and keyboard navigation of the menu still work.
-  4. Checked through the developer file source (`--play-file`) with
-     screenshots compared to the design frame; CI green.
-- **Deliveries:** (1) shared ImGui style (colors from `Theme`'s values, radii,
-  fonts); (2) statistics panel; (3) Menu rápido.
-- **Settled in planning:** the Menu rápido is built now.
-- **Changes:** `src/render/Overlay.{h,cpp}`, `src/app/OverlayInput.h` if the
-  menu model changes.
-- **Data and interfaces:** none.
-- **Edge cases:** 1080p and 1440p+ outputs (the overlay scales as today);
-  HDR output (colors stay correct in HDR10); a game at 30 fps.
-
-### Run stopped (3.3–3.5)
-
-The owner stopped the run on 2026-11-24 to save tokens. 3.2 is on `main`, CI
-green, not yet compared with the design in the app (the `--gallery` flag shows
-every control). Partial work, unchecked: `auto/3.3` (one delivery), `auto/3.4`
-and `auto/3.5` (a `wip:` commit each, before their first delivery). Next
-session: resume each from its branch, with no CI wait per delivery (owner's
-rule): one CI run and one design comparison at the end, then rename the project
-folder and the design file to `mfplay`.
 
 ### Decisions to review
 
@@ -1237,3 +1094,55 @@ Some controls and states appear on no screen until 3.3.
 - B. Each page owns its footer.
 
 **Chosen: A**. Changing it: the footer `RowLayout` in `Main.qml`.
+
+#### D97 – VSR and Frame Generation act for real (3.5)
+
+The design's toggles would otherwise be inert.
+
+- A. Wire `upscalingChanged` and `frameGenerationChanged` to the renderer,
+  persisted by `StreamController` and `FilePlayback` through
+  `SettingsController`, with the modes travelling in `OverlayStats`: the
+  toggles change the stream and show the renderer's state.
+- B. Draw the toggles without an action: dead controls on the design's rows.
+
+**Chosen: A**, because a control that does nothing is worse than its absence.
+Changing it: drop the actions from `OverlayActions` and the persist calls.
+
+#### D98 – The VSR toggle reads `upscaling == Vsr` (3.5)
+
+- A. On when the upscaler is VSR; turning it on selects VSR and turning it
+  off returns to the shader.
+- B. A separate boolean that can disagree with DLSS SR selected.
+
+**Chosen: A**. Changing it: the toggle's state in `Overlay.cpp`.
+
+#### D99 – The menu's settings tile is omitted (3.5)
+
+No in-stream action opens Configurações, and the criterion does not list the
+tile.
+
+- A. Omit the gear: nothing dead.
+- B. Draw it inert, or end the stream to open the settings.
+
+**Chosen: A**. Changing it: add an action that opens Configurações during a
+stream.
+
+#### D100 – The statistics follow the design's order (3.5)
+
+The controller debug section moves from first to last; every old row stays,
+so the panel is taller than the design's.
+
+- A. The design's order with every row: complete content, and below a 1440p
+  display the REFLEX and CONTROLE sections fall outside the window.
+- B. Drop rows to match the design's height: loses 2.1's latency reports.
+
+**Chosen: A**; the controller still logs its values once a second. Changing
+it: remove rows in `Overlay.cpp`.
+
+#### D101 – Stage labels use the design's copy (3.5)
+
+- A. `RTX VSR` and `Composição`, plus a Frame Generation state row in the
+  GPU section, as the design labels them.
+- B. Keep the old labels where the design covers the row.
+
+**Chosen: A**. Changing it: the label strings in `Overlay.cpp`.
