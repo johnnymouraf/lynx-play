@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Templates as T
 import MFPlay
 
 // Configurações › Vídeo: what the PS5 is asked to stream and how it is shown.
@@ -108,35 +107,6 @@ ColumnLayout {
             ]
             currentValue: section.settings.codec
             onActivated: value => section.settings.codec = value
-        }
-    }
-
-    SettingRow {
-        Layout.fillWidth: true
-        label: "Bitrate"
-        description: "Na rede local, o máximo que o PS5 aceita costuma ser o melhor."
-
-        Row {
-            spacing: Theme.space3
-
-            ValueSlider {
-                anchors.verticalCenter: parent.verticalCenter
-                from: section.settings.minBitrateMbps
-                to: section.settings.maxBitrateMbps
-                stepSize: 1
-                snapMode: T.Slider.SnapAlways
-                value: section.settings.bitrateMbps
-                Accessible.name: "Bitrate"
-                onMoved: section.settings.bitrateMbps = Math.round(value)
-            }
-
-            AppText {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 76
-                text: `${section.settings.bitrateMbps} Mbps`
-                textStyle: "monoMedium"
-                horizontalAlignment: Text.AlignRight
-            }
         }
     }
 
