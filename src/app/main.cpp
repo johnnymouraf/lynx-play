@@ -25,6 +25,7 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QVariantMap>
 
@@ -232,6 +233,8 @@ int main(int argc, char* argv[])
         },
         settings);
     QGuiApplication::setApplicationName(QStringLiteral("MFPlay"));
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(":/qt/qml/MFPlay/assets/images/app-icon.svg")));
     QGuiApplication::setApplicationVersion(controller.version());
 
     auto sdl = mfplay::input::SdlRuntime::create();
