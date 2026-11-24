@@ -42,7 +42,7 @@ ColumnLayout {
         selectedTextColor: Theme.onAccent
         placeholderTextColor: Theme.textSubtle
         font.family: Theme.fontBody
-        font.pixelSize: 16
+        font.pixelSize: Theme.typeBodyLg
         verticalAlignment: TextInput.AlignVCenter
         selectByMouse: true
         Accessible.name: field.label
@@ -59,7 +59,7 @@ ColumnLayout {
 
             FocusRing {
                 targetRadius: box.radius
-                visible: input.activeFocus && !field.hasError
+                visible: input.activeFocus
             }
 
             states: [
@@ -78,7 +78,7 @@ ColumnLayout {
 
                     PropertyChanges {
                         target: box
-                        border.color: Theme.accent
+                        border.width: 0
                     }
                 }
             ]
@@ -95,26 +95,12 @@ ColumnLayout {
         }
     }
 
-    RowLayout {
+    AppText {
         Layout.fillWidth: true
         visible: field.hasError || field.helperText.length > 0
-        spacing: Theme.space1
-
-        Icon {
-            Layout.alignment: Qt.AlignTop
-            Layout.topMargin: 2
-            visible: field.hasError
-            name: "circle-exclamation-point"
-            size: 16
-            color: Theme.danger
-        }
-
-        AppText {
-            Layout.fillWidth: true
-            text: field.hasError ? field.errorText : field.helperText
-            textStyle: "bodyMedium"
-            color: field.hasError ? Theme.danger : Theme.textMuted
-            wrapMode: Text.WordWrap
-        }
+        text: field.hasError ? field.errorText : field.helperText
+        textStyle: "bodyMedium"
+        color: field.hasError ? Theme.danger : Theme.textMuted
+        wrapMode: Text.WordWrap
     }
 }

@@ -2,8 +2,8 @@ import QtQuick
 import QtQuick.Templates as T
 import MFPlay
 
-// The design's Button: primary, secondary, ghost or danger, with an optional
-// leading icon.
+// The design's Button: primary, secondary, ghost or danger, 52 px tall, with
+// the icon in a tile before the label.
 T.Button {
     id: control
 
@@ -15,59 +15,47 @@ T.Button {
             fill: Theme.accent,
             hoverFill: Theme.accentHover,
             pressedFill: Theme.accentPressed,
-            focusFill: Theme.accent,
             disabledFill: Theme.surfaceHigh,
             content: Theme.onAccent,
             hoverContent: Theme.onAccent,
-            border: "transparent",
-            pressedBorder: "transparent",
-            disabledBorder: "transparent"
+            tile: Theme.tileOnAccent
         },
         secondary: {
             fill: Theme.surfaceHigh,
             hoverFill: Theme.surfaceHover,
             pressedFill: Theme.surfaceHover,
-            focusFill: Theme.surfaceHigh,
             disabledFill: Theme.surfaceRaised,
             content: Theme.text,
             hoverContent: Theme.text,
-            border: Theme.borderStrong,
-            pressedBorder: Theme.accentPressed,
-            disabledBorder: Theme.border
+            tile: Theme.tileOnSurface
         },
         ghost: {
             fill: "transparent",
             hoverFill: Theme.surfaceHigh,
             pressedFill: Theme.surfaceHover,
-            focusFill: Theme.surfaceHigh,
             disabledFill: "transparent",
             content: Theme.text,
             hoverContent: Theme.text,
-            border: "transparent",
-            pressedBorder: "transparent",
-            disabledBorder: "transparent"
+            tile: Theme.tileOnSurface
         },
         danger: {
             fill: Theme.dangerSubtle,
             hoverFill: Theme.danger,
             pressedFill: Theme.danger,
-            focusFill: Theme.dangerSubtle,
             disabledFill: Theme.surfaceRaised,
             content: Theme.danger,
             hoverContent: Theme.onDanger,
-            border: "transparent",
-            pressedBorder: "transparent",
-            disabledBorder: "transparent"
+            tile: Theme.tileOnAccent
         }
     })
     readonly property var tone: tones[variant]
 
     implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
                             implicitContentWidth + leftPadding + rightPadding)
-    implicitHeight: Theme.sizeControl
-    leftPadding: Theme.space5
-    rightPadding: Theme.space5
-    spacing: Theme.space2
+    implicitHeight: Theme.sizeControlLg
+    leftPadding: Theme.space4
+    rightPadding: Theme.space4
+    spacing: Theme.space3
     focusPolicy: Qt.StrongFocus
     hoverEnabled: true
 
@@ -81,11 +69,12 @@ T.Button {
             anchors.centerIn: parent
             spacing: control.spacing
 
-            Icon {
+            IconTile {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: control.iconName.length > 0
-                name: control.iconName
-                color: label.color
+                iconName: control.iconName
+                iconColor: label.color
+                color: control.tone.tile
             }
 
             AppText {
@@ -102,11 +91,9 @@ T.Button {
     background: Rectangle {
         id: fill
 
-        implicitHeight: Theme.sizeControl
+        implicitHeight: Theme.sizeControlLg
         radius: Theme.radiusMd
         color: control.tone.fill
-        border.width: control.variant === "secondary" ? 1 : 0
-        border.color: control.tone.border
 
         FocusRing {
             targetRadius: fill.radius
@@ -122,7 +109,6 @@ T.Button {
             PropertyChanges {
                 target: fill
                 color: control.tone.disabledFill
-                border.color: control.tone.disabledBorder
             }
 
             PropertyChanges {
@@ -137,7 +123,6 @@ T.Button {
             PropertyChanges {
                 target: fill
                 color: control.tone.pressedFill
-                border.color: control.tone.pressedBorder
             }
 
             PropertyChanges {
@@ -161,11 +146,11 @@ T.Button {
         },
         State {
             name: "focused"
-            when: control.visualFocus
+            when: control.visualFocus && control.variant === "ghost"
 
             PropertyChanges {
                 target: fill
-                color: control.tone.focusFill
+                color: Theme.surfaceHigh
             }
         }
     ]

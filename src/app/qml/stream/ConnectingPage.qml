@@ -253,7 +253,7 @@ FocusScope {
                         message: page.stream.failureMessage
                     }
 
-                    LinkButton {
+                    ActionButton {
                         Layout.alignment: Qt.AlignHCenter
                         iconName: "folder-open"
                         text: "Abrir pasta de logs"

@@ -86,9 +86,9 @@ qt_add_qml_module(mfplay
         qml/controls/FocusRing.qml
         qml/controls/Icon.qml
         qml/controls/IconButton.qml
+        qml/controls/IconTile.qml
         qml/controls/InputField.qml
         qml/controls/Keycap.qml
-        qml/controls/LinkButton.qml
         qml/controls/MenuRow.qml
         qml/controls/NavItem.qml
         qml/controls/PinInput.qml

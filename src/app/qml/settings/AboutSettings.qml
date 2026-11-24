@@ -92,7 +92,7 @@ ColumnLayout {
         description: "MFPlay é software livre sob a AGPL-3.0, baseado no chiaki-ng. "
                      + "NVIDIA, RTX, DLSS e Reflex são marcas da NVIDIA Corporation."
 
-        LinkButton {
+        ActionButton {
             iconName: "scroll-text"
             text: "Ver licenças de terceiros"
             onClicked: Qt.openUrlExternally(section.controller.licensesUrl)
@@ -116,7 +116,7 @@ ColumnLayout {
         label: "Código-fonte"
         description: "github.com/johnnymouraf/mfplay"
 
-        LinkButton {
+        ActionButton {
             iconName: "external-link"
             text: "Abrir no navegador"
             onClicked: Qt.openUrlExternally("https://github.com/johnnymouraf/mfplay")

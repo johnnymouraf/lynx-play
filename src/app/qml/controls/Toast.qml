@@ -1,8 +1,8 @@
 import QtQuick
 import MFPlay
 
-// A Banner that floats over the screen for a few seconds.
-Item {
+// A Banner on a solid block that floats over the screen for a few seconds.
+Rectangle {
     id: toast
 
     property int duration: 5000
@@ -16,7 +16,11 @@ Item {
     }
 
     implicitWidth: 400
-    implicitHeight: banner.implicitHeight
+    implicitHeight: banner.implicitHeight + 2 * Theme.space4
+    radius: Theme.radiusMd
+    color: Theme.surfaceRaised
+    border.width: 1
+    border.color: Theme.borderStrong
     opacity: 0
     visible: opacity > 0
 
@@ -29,7 +33,8 @@ Item {
     Banner {
         id: banner
 
-        width: toast.width
+        anchors.fill: parent
+        anchors.margins: Theme.space4
     }
 
     Timer {

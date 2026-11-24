@@ -306,14 +306,14 @@ DialogShell {
                             onClicked: dialog.submitRedirect()
                         }
 
-                        LinkButton {
+                        ActionButton {
                             iconName: "external-link"
                             text: "Abrir o navegador de novo"
                             onClicked: dialog.psnLogin.start()
                         }
                     }
 
-                    LinkButton {
+                    ActionButton {
                         iconName: "pencil"
                         text: "Prefiro informar manualmente"
                         onClicked: dialog.resetPsn()
@@ -360,7 +360,7 @@ DialogShell {
                             onClicked: dialog.psnLogin.start()
                         }
 
-                        LinkButton {
+                        ActionButton {
                             iconName: "pencil"
                             text: "Informar manualmente"
                             onClicked: dialog.resetPsn()
@@ -429,7 +429,7 @@ DialogShell {
                         onClicked: dialog.usePsnAccount()
                     }
 
-                    LinkButton {
+                    ActionButton {
                         text: "Usar outro Account ID"
                         onClicked: dialog.resetPsn()
                     }
@@ -476,7 +476,7 @@ DialogShell {
                 onAccepted: dialog.continueToPin()
             }
 
-            LinkButton {
+            ActionButton {
                 iconName: "circle-question-mark"
                 text: "Como encontrar meu Account ID"
                 onClicked: Qt.openUrlExternally("https://chiaki-ng.github.io/chiaki-ng/setup/configuration/#registering-your-playstation")
