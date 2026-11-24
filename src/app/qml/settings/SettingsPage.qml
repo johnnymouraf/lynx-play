@@ -40,6 +40,9 @@ Item {
                     spacing: 6
 
                     AppText {
+                        Layout.leftMargin: Theme.space2
+                        Layout.topMargin: Theme.space2
+                        Layout.bottomMargin: 9
                         text: "Configurações"
                         textStyle: "overline"
                         color: Theme.textSubtle

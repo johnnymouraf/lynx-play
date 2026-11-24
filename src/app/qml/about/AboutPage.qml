@@ -77,7 +77,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: appCard.implicitHeight + 2 * 28
+                implicitHeight: Math.max(152, appCard.implicitHeight + 2 * 28)
                 radius: Theme.radiusMd
                 color: Theme.surface
 

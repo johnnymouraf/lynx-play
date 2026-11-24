@@ -120,9 +120,11 @@ ColumnLayout {
             anchors.rightMargin: Theme.space5
             spacing: Theme.space2
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
-                spacing: Theme.space6
+                columns: accountColumn.width < 520 ? 1 : 2
+                columnSpacing: Theme.space6
+                rowSpacing: Theme.space2
 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -194,7 +196,8 @@ ColumnLayout {
                 }
 
                 ActionButton {
-                    Layout.alignment: Qt.AlignTop
+                    Layout.alignment: accountColumn.width < 520
+                                      ? Qt.AlignLeft | Qt.AlignTop : Qt.AlignRight | Qt.AlignTop
                     visible: !section.loggingIn
                     variant: "secondary"
                     iconName: "log-in"

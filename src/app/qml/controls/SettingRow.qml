@@ -3,7 +3,8 @@ import QtQuick.Layouts
 import MFPlay
 
 // The design's SettingRow: a solid block with a label, an optional
-// description and the row's control at its end.
+// description and the row's control at its end. A narrow row puts the control
+// under the text.
 Rectangle {
     id: row
 
@@ -11,11 +12,13 @@ Rectangle {
     property string description
     default property alias control: controlSlot.data
 
+    readonly property bool stacked: row.width < 560
+
     implicitHeight: content.implicitHeight + 2 * Theme.space4
     radius: Theme.radiusMd
     color: Theme.surface
 
-    RowLayout {
+    GridLayout {
         id: content
 
         anchors.left: parent.left
@@ -23,7 +26,9 @@ Rectangle {
         anchors.leftMargin: Theme.space5
         anchors.rightMargin: Theme.space5
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Theme.space6
+        columns: row.stacked ? 1 : 2
+        columnSpacing: Theme.space6
+        rowSpacing: Theme.space2
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -49,7 +54,9 @@ Rectangle {
         Row {
             id: controlSlot
 
-            Layout.alignment: Qt.AlignVCenter
+            Layout.alignment: row.stacked
+                              ? Qt.AlignLeft | Qt.AlignVCenter
+                              : Qt.AlignRight | Qt.AlignVCenter
             spacing: Theme.space3
         }
     }
