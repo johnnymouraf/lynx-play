@@ -50,12 +50,12 @@ T.Button {
 
             PropertyChanges {
                 target: fill
-                color: Theme.accentSubtle
+                color: Theme.accent
             }
 
             PropertyChanges {
                 target: label
-                color: Theme.accent
+                color: Theme.onAccent
             }
         },
         State {

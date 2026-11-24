@@ -124,7 +124,7 @@ Item {
 
                             PropertyChanges {
                                 target: box
-                                border.color: Theme.accent
+                                border.width: 0
                             }
                         }
                     ]

@@ -15,9 +15,7 @@ Rectangle {
     implicitWidth: segments.implicitWidth + 2 * Theme.space1
     implicitHeight: segments.implicitHeight + 2 * Theme.space1
     radius: Theme.radiusMd
-    color: Theme.bg
-    border.width: 1
-    border.color: Theme.border
+    color: Theme.menu
     Accessible.role: Accessible.Grouping
     Accessible.name: control.name
 

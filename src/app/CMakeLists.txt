@@ -119,6 +119,7 @@ qt_add_qml_module(mfplay
         ${mfplay_licenses}
         assets/icons/check.svg
         assets/icons/chevron-down.svg
+        assets/icons/chevron-up.svg
         assets/icons/chevron-right.svg
         assets/icons/circle-check.svg
         assets/icons/circle-exclamation-point.svg
@@ -132,7 +133,9 @@ qt_add_qml_module(mfplay
         assets/icons/flask-conical.svg
         assets/icons/house-wifi.svg
         assets/icons/info.svg
+        assets/icons/layout-grid.svg
         assets/icons/link-2.svg
+        assets/icons/list.svg
         assets/icons/loader-circle.svg
         assets/icons/lock-keyhole.svg
         assets/icons/menu.svg

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Templates as T
 import MFPlay
 
-// The design's Toggle: an amber track with a dark thumb when on.
+// The design's Toggle: an accent track with a white thumb when on.
 T.Switch {
     id: control
 
@@ -22,16 +22,18 @@ T.Switch {
         width: implicitWidth
         height: implicitHeight
         radius: height / 2
-        color: control.checked ? Theme.accent : Theme.surfaceHigh
-        border.width: control.checked ? 0 : 1
+        color: Theme.surfaceHigh
+        border.width: 1
         border.color: Theme.borderControl
 
         Rectangle {
+            id: thumb
+
             y: 3
             width: 22
             height: 22
             radius: width / 2
-            color: control.checked ? Theme.onAccent : Theme.textMuted
+            color: Theme.textMuted
             x: control.checked ? track.width - width - 3 : 3
 
             Behavior on x {
@@ -49,4 +51,37 @@ T.Switch {
     }
 
     contentItem: Item {}
+
+    states: [
+        State {
+            name: "disabled"
+            when: !control.enabled
+
+            PropertyChanges {
+                target: track
+                color: Theme.surfaceRaised
+                border.width: 0
+            }
+
+            PropertyChanges {
+                target: thumb
+                color: Theme.textDisabled
+            }
+        },
+        State {
+            name: "checked"
+            when: control.checked
+
+            PropertyChanges {
+                target: track
+                color: Theme.accent
+                border.width: 0
+            }
+
+            PropertyChanges {
+                target: thumb
+                color: Theme.onAccent
+            }
+        }
+    ]
 }

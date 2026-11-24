@@ -3,11 +3,13 @@ import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import MFPlay
 
-// The design's Select: a value with a chevron that opens the list of choices
-// below it. `options` lists {label, value}.
+// The design's Select: an optional label over a value with a chevron that
+// opens the list of choices below it. `options` lists {label, value}.
 FocusScope {
     id: control
 
+    // Shown above the box; `name` alone names it for screen readers.
+    property string label
     property string name
     property var options: []
     property var currentValue
@@ -49,53 +51,67 @@ FocusScope {
     }
 
     implicitWidth: 300
-    implicitHeight: Theme.sizeControl
+    implicitHeight: column.implicitHeight
     activeFocusOnTab: true
     Accessible.role: Accessible.ComboBox
-    Accessible.name: control.name
+    Accessible.name: control.label.length > 0 ? control.label : control.name
     Accessible.description: control.currentLabel
     Accessible.onPressAction: control.openMenu()
 
-    Rectangle {
-        id: box
+    Column {
+        id: column
 
-        anchors.fill: parent
-        radius: Theme.radiusMd
-        color: Theme.surfaceHigh
-        border.width: 1
-        border.color: control.activeFocus ? Theme.accent : Theme.borderControl
+        width: control.width
+        spacing: Theme.space2
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.space3
-            anchors.rightMargin: Theme.space3
-            spacing: Theme.space2
-
-            AppText {
-                Layout.fillWidth: true
-                text: control.currentLabel
-                textStyle: "labelLarge"
-            }
-
-            Icon {
-                name: "chevron-down"
-                color: Theme.textMuted
-            }
+        AppText {
+            visible: control.label.length > 0
+            text: control.label
+            textStyle: "labelMedium"
         }
-    }
 
-    FocusRing {
-        targetRadius: box.radius
-        visible: control.activeFocus && !menu.visible
-    }
+        Rectangle {
+            id: box
 
-    MouseArea {
-        anchors.fill: box
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: {
-            control.forceActiveFocus(Qt.MouseFocusReason);
-            control.openMenu();
+            width: column.width
+            height: Theme.sizeControl
+            radius: Theme.radiusMd
+            color: Theme.surfaceHigh
+            border.width: control.activeFocus && !menu.visible ? 0 : 1
+            border.color: menu.visible ? Theme.accent : Theme.borderControl
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.space3
+                anchors.rightMargin: Theme.space3
+                spacing: Theme.space2
+
+                AppText {
+                    Layout.fillWidth: true
+                    text: control.currentLabel
+                    textStyle: "bodyLarge"
+                }
+
+                Icon {
+                    name: menu.visible ? "chevron-up" : "chevron-down"
+                    color: Theme.textMuted
+                }
+            }
+
+            FocusRing {
+                targetRadius: box.radius
+                visible: control.activeFocus && !menu.visible
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    control.forceActiveFocus(Qt.MouseFocusReason);
+                    control.openMenu();
+                }
+            }
         }
     }
 
@@ -114,7 +130,7 @@ FocusScope {
 
         parent: control
         x: 0
-        y: box.height + Theme.space1
+        y: box.y + box.height + Theme.space2
         width: Math.max(control.width, contentItem.implicitWidth + 2 * padding)
         padding: Theme.space1
         focus: true
