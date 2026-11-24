@@ -224,6 +224,7 @@ FocusScope {
 
                 StatusCount {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 0
                     status: "ready"
                     label: "Pronto"
                     count: page.consoles.model.readyCount
@@ -231,6 +232,7 @@ FocusScope {
 
                 StatusCount {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 0
                     status: "standby"
                     label: "Em repouso"
                     count: page.consoles.model.standbyCount
@@ -238,6 +240,7 @@ FocusScope {
 
                 StatusCount {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 0
                     status: "unpaired"
                     label: "Não pareado"
                     count: page.consoles.model.unpairedCount

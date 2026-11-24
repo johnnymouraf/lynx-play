@@ -115,7 +115,7 @@ DialogShell {
         case PsnLoginClient.Exchanging:
             break;
         default:
-            psnSignInButton.forceActiveFocus(Qt.TabFocusReason);
+            accountField.focusInput();
             break;
         }
     }
