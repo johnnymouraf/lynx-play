@@ -16,8 +16,8 @@ T.Button {
             hoverFill: Theme.accentHover,
             pressedFill: Theme.accentPressed,
             disabledFill: Theme.surfaceHigh,
-            content: Theme.onAccent,
-            hoverContent: Theme.onAccent,
+            content: Theme.accentText,
+            hoverContent: Theme.accentText,
             tile: Theme.tileOnAccent
         },
         secondary: {
@@ -44,7 +44,7 @@ T.Button {
             pressedFill: Theme.danger,
             disabledFill: Theme.surfaceRaised,
             content: Theme.danger,
-            hoverContent: Theme.onDanger,
+            hoverContent: Theme.dangerText,
             tile: Theme.tileOnAccent
         }
     })

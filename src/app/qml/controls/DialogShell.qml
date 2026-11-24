@@ -73,7 +73,7 @@ T.Popup {
                 color: dialog.iconTone === "danger" ? Theme.danger : Theme.accent
                 iconName: dialog.iconName
                 iconSize: Theme.sizeIcon
-                iconColor: dialog.iconTone === "danger" ? Theme.bg : Theme.onAccent
+                iconColor: dialog.iconTone === "danger" ? Theme.bg : Theme.accentText
             }
 
             ColumnLayout {
