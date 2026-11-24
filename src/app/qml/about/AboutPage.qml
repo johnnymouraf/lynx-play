@@ -94,6 +94,8 @@ Item {
                     Item {
                         Layout.preferredWidth: 88
                         Layout.preferredHeight: 88
+                        Layout.maximumWidth: 88
+                        Layout.maximumHeight: 88
 
                         Image {
                             anchors.fill: parent
