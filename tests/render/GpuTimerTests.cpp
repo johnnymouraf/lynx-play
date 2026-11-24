@@ -10,12 +10,11 @@
 
 using namespace mfplay::render;
 
-TEST_CASE("The pipeline's stage list keeps both upscalers and the flow")
+TEST_CASE("The pipeline's stage list keeps both upscalers")
 {
-    CHECK(kEffectStageCount == 8);
+    CHECK(kEffectStageCount == 7);
     CHECK(stageName(EffectStage::VideoSuperResolution) == "VSR");
     CHECK(stageName(EffectStage::DlssSuperResolution) == "DLSS SR");
-    CHECK(stageName(EffectStage::OpticalFlow) == "optical flow");
 
     std::array<std::string_view, kEffectStageCount> names;
 
@@ -29,7 +28,7 @@ TEST_CASE("The pipeline's stage list keeps both upscalers and the flow")
     CHECK(std::ranges::find(names, "unknown") == names.end());
 }
 
-TEST_CASE("GPU timestamps become per-stage and total milliseconds")
+TEST_CASE("GPU timestamps become per-stage, total and wait milliseconds")
 {
     // One tick per microsecond.
     constexpr std::uint64_t frequency = 1'000'000;
@@ -42,7 +41,6 @@ TEST_CASE("GPU timestamps become per-stage and total milliseconds")
                         2'100, 2'250,
                         2'250, 2'350,
                         2'350, 2'700,
-                        2'700, 2'800,
                         2'800};
 
     const auto times = frameGpuTimes(timestamps, frequency);
@@ -55,8 +53,8 @@ TEST_CASE("GPU timestamps become per-stage and total milliseconds")
     CHECK(times->stages.at(4) == Catch::Approx(0.15));
     CHECK(times->stages.at(5) == Catch::Approx(0.10));
     CHECK(times->stages.at(6) == Catch::Approx(0.35));
-    CHECK(times->stages.at(7) == Catch::Approx(0.10));
-    CHECK(times->total == Catch::Approx(1.80));
+    CHECK(times->total == Catch::Approx(1.60));
+    CHECK(times->wait == Catch::Approx(0.20));
 }
 
 TEST_CASE("A frame without stamps has no GPU times")
@@ -77,8 +75,6 @@ TEST_CASE("A stage that ends before it starts invalidates the frame")
                         400, 500,
                         500, 600,
                         600, 700,
-                        700, 800,
-                        800, 900,
                         900};
 
     CHECK_FALSE(frameGpuTimes(timestamps, 1'000'000).has_value());
