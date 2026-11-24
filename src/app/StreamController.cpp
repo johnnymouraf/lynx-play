@@ -361,6 +361,16 @@ void StreamController::onFirstPicture(std::uint64_t session)
             const QString name = QString::fromLatin1(render::reflexModeName(mode));
             post([this, name] { settings_.setReflex(name); });
         },
+        .upscalingChanged = [this](core::Upscaling upscaling)
+        {
+            const QString name = QString::fromLatin1(core::upscalingName(upscaling).data());
+            post([this, name] { settings_.setUpscaling(name); });
+        },
+        .frameGenerationChanged = [this](core::FrameGenerationMode mode)
+        {
+            const QString name = QString::fromLatin1(core::frameGenerationName(mode).data());
+            post([this, name] { settings_.setFrameGeneration(name); });
+        },
         .microphoneMutedChanged = [this](bool muted)
         { post([this, muted] { settings_.setMicrophoneMuted(muted); }); },
         .statisticsVisibleChanged = [this](bool visible)

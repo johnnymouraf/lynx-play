@@ -127,6 +127,20 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
             QMetaObject::invokeMethod(
                 &settings, [&settings, name] { settings.setReflex(name); }, Qt::QueuedConnection);
         },
+        .upscalingChanged = [&settings](core::Upscaling upscaling)
+        {
+            const QString name = QString::fromLatin1(core::upscalingName(upscaling).data());
+            QMetaObject::invokeMethod(
+                &settings, [&settings, name] { settings.setUpscaling(name); },
+                Qt::QueuedConnection);
+        },
+        .frameGenerationChanged = [&settings](core::FrameGenerationMode mode)
+        {
+            const QString name = QString::fromLatin1(core::frameGenerationName(mode).data());
+            QMetaObject::invokeMethod(
+                &settings, [&settings, name] { settings.setFrameGeneration(name); },
+                Qt::QueuedConnection);
+        },
         .microphoneMutedChanged = [&settings](bool muted)
         {
             QMetaObject::invokeMethod(

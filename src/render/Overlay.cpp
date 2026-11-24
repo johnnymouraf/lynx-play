@@ -12,7 +12,9 @@
 #include <format>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
@@ -31,32 +33,49 @@ namespace
 {
 
 constexpr UINT kViewCount = 8;
+
 constexpr float kPanelMargin = 20.0F;
 constexpr float kStatsWidth = 320.0F;
 constexpr float kMenuWidth = 380.0F;
 constexpr float kMenuHeight = 680.0F;
+constexpr float kPanelPadding = 16.0F;
+constexpr float kGap = 6.0F;
+
+constexpr float kRowHeight = 20.0F;
+constexpr float kCaptionHeight = 16.0F;
+constexpr float kOverlineHeight = 12.0F;
+constexpr float kOverlineTracking = 2.0F;
+
+constexpr float kRadiusSm = 4.0F;
+constexpr float kRadiusMd = 6.0F;
+constexpr float kTileRadius = 5.0F;
 
 constexpr float kBodySize = 14.0F;
 constexpr float kCaptionSize = 12.0F;
-constexpr float kOverlineSize = 12.0F;
-constexpr float kButtonSize = 16.0F;
+constexpr float kOverlineSize = 10.0F;
 constexpr float kTitleSize = 18.0F;
+constexpr float kButtonSize = 16.0F;
 constexpr float kMonoSize = 14.0F;
 
-constexpr ImU32 kText = IM_COL32(0xED, 0xF0, 0xF4, 0xFF);
-constexpr ImU32 kTextMuted = IM_COL32(0xA1, 0xAA, 0xB8, 0xFF);
-constexpr ImU32 kTextSubtle = IM_COL32(0x82, 0x8C, 0x9B, 0xFF);
-constexpr ImU32 kAccent = IM_COL32(0xF5, 0xA2, 0x3A, 0xFF);
-constexpr ImU32 kAccentSubtle = IM_COL32(0x31, 0x2A, 0x21, 0xFF);
-constexpr ImU32 kTextOnAccent = IM_COL32(0x1A, 0x11, 0x05, 0xFF);
+constexpr float kBodyTextOffset = 3.0F;
+constexpr float kCaptionTextOffset = 2.0F;
+
+constexpr ImU32 kText = IM_COL32(0xF5, 0xF5, 0xF5, 0xFF);
+constexpr ImU32 kTextMuted = IM_COL32(0xA6, 0xA6, 0xA6, 0xFF);
+constexpr ImU32 kTextSubtle = IM_COL32(0x73, 0x73, 0x73, 0xFF);
+constexpr ImU32 kAccent = IM_COL32(0x00, 0x70, 0xD1, 0xFF);
+constexpr ImU32 kOnAccent = IM_COL32(0xFF, 0xFF, 0xFF, 0xFF);
 constexpr ImU32 kDanger = IM_COL32(0xF2, 0x62, 0x5F, 0xFF);
-constexpr ImU32 kDangerSubtle = IM_COL32(0x31, 0x21, 0x26, 0xFF);
-constexpr ImU32 kSurfaceHigh = IM_COL32(0x1F, 0x26, 0x31, 0xFF);
-constexpr ImU32 kSurfaceHover = IM_COL32(0x28, 0x31, 0x42, 0xFF);
-constexpr ImU32 kBorderStrong = IM_COL32(0x3A, 0x45, 0x55, 0xFF);
-constexpr ImU32 kBorderControl = IM_COL32(0x62, 0x6D, 0x7F, 0xFF);
-constexpr ImU32 kFocus = IM_COL32(0xFF, 0xB6, 0x5C, 0xFF);
+constexpr ImU32 kDangerSubtle = IM_COL32(0x33, 0x1E, 0x1E, 0xFF);
+constexpr ImU32 kStandby = IM_COL32(0xFF, 0xB5, 0x47, 0xFF);
+constexpr ImU32 kSurfaceHigh = IM_COL32(0x2C, 0x2C, 0x2C, 0xFF);
+constexpr ImU32 kBorderControl = IM_COL32(0x5C, 0x5C, 0x5C, 0xFF);
+constexpr ImU32 kMenu = IM_COL32(0x12, 0x12, 0x12, 0xFF);
+constexpr ImU32 kOverlayControl = IM_COL32(0xFF, 0xFF, 0xFF, 0x0F);
 constexpr ImU32 kOverlayHover = IM_COL32(0xFF, 0xFF, 0xFF, 0x14);
+constexpr ImU32 kPlotBackground = IM_COL32(0xFF, 0xFF, 0xFF, 0x0A);
+constexpr ImU32 kFocus = IM_COL32(0xFF, 0xFF, 0xFF, 0xFF);
+constexpr ImU32 kIconTile = IM_COL32(0x00, 0x00, 0x00, 0x33);
 
 constexpr ImGuiWindowFlags kStatsFlags =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -83,11 +102,9 @@ struct Fonts
 {
     ImFont* body = nullptr;
     ImFont* label = nullptr;
-    ImFont* caption = nullptr;
-    ImFont* overline = nullptr;
-    ImFont* button = nullptr;
     ImFont* title = nullptr;
     ImFont* mono = nullptr;
+    ImFont* monoStrong = nullptr;
 };
 
 struct MenuResult
@@ -95,6 +112,10 @@ struct MenuResult
     bool statisticsToggled = false;
     bool reflexChanged = false;
     core::ReflexMode reflex = core::ReflexMode::Off;
+    bool upscalingChanged = false;
+    core::Upscaling upscaling = core::Upscaling::Shader;
+    bool frameGenerationChanged = false;
+    core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
     bool microphoneToggled = false;
     bool windowLayoutChanged = false;
     core::WindowLayout windowLayout;
@@ -110,13 +131,13 @@ const char* stageLabel(EffectStage stage)
     case EffectStage::RtxVideoHdr:
         return "RTX HDR";
     case EffectStage::VideoSuperResolution:
-        return "VSR";
+        return "RTX VSR";
     case EffectStage::DlssSuperResolution:
         return "DLSS SR";
     case EffectStage::Cadence:
         return "Cadência";
     case EffectStage::Scaling:
-        return "Escala";
+        return "Composição";
     case EffectStage::Overlay:
         return "Overlay";
     case EffectStage::OpticalFlow:
@@ -136,6 +157,22 @@ const char* reflexModeLabel(core::ReflexMode mode)
         return "Ligado";
     case core::ReflexMode::Boost:
         return "Ligado + Boost";
+    }
+
+    return "Desligado";
+}
+
+// The segmented control's labels, as short as the design's three columns.
+const char* reflexSegmentLabel(core::ReflexMode mode)
+{
+    switch (mode)
+    {
+    case core::ReflexMode::Off:
+        return "Desligado";
+    case core::ReflexMode::On:
+        return "Ligado";
+    case core::ReflexMode::Boost:
+        return "Boost";
     }
 
     return "Desligado";
@@ -237,242 +274,367 @@ std::string fpsText(const core::StreamMetricsSnapshot& video, double fps)
     return video.formatValid ? decimalText(fps) + " fps" : "—";
 }
 
-float textWidth(ImFont* font, float size, const char* text)
+std::string cadenceText(const OverlayStats& stats)
 {
-    return font->CalcTextSizeA(size, FLT_MAX, 0.0F, text).x;
+    if (!stats.cadenceValid)
+    {
+        return "—";
+    }
+
+    return std::format("{} fps · {}/{} repetidos",
+                       decimalText(stats.cadenceFramesPerSecond), stats.cadenceRepeatedFrames,
+                       stats.cadenceWindowFrames);
+}
+
+float textWidth(ImFont* font, float size, std::string_view text)
+{
+    return font->CalcTextSizeA(size, FLT_MAX, 0.0F, text.data(), text.data() + text.size()).x;
 }
 
 void drawText(ImDrawList* drawList, ImFont* font, float size, ImVec2 position, ImU32 color,
-              const char* text)
+              std::string_view text)
 {
-    drawList->AddText(font, size, position, color, text);
+    drawList->AddText(font, size, position, color, text.data(), text.data() + text.size());
 }
 
-void rightText(ImFont* font, float size, ImU32 color, const char* text)
+// The uppercase overlines carry the design's 2 px tracking.
+void drawTrackedText(ImDrawList* drawList, ImFont* font, float size, ImVec2 position, ImU32 color,
+                     std::string_view text, float tracking)
 {
-    ImGui::PushFont(font, size);
-    const float width = ImGui::CalcTextSize(text).x;
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - width);
-    ImGui::PushStyleColor(ImGuiCol_Text, color);
-    ImGui::TextUnformatted(text);
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
+    float x = position.x;
+
+    for (std::size_t index = 0; index < text.size();)
+    {
+        std::size_t next = index + 1;
+
+        while (next < text.size() && (static_cast<unsigned char>(text.at(next)) & 0xC0U) == 0x80U)
+        {
+            ++next;
+        }
+
+        const std::string_view glyph = text.substr(index, next - index);
+        drawList->AddText(font, size, ImVec2(x, position.y), color, glyph.data(),
+                          glyph.data() + glyph.size());
+        x += textWidth(font, size, glyph) + tracking;
+        index = next;
+    }
 }
 
-void valueRow(const Fonts& fonts, const char* label, const char* value, ImU32 valueColor = kText)
+// Breaks a caption on its spaces so it fits the row; a word wider than the
+// row stays on a line of its own.
+std::vector<std::string> wrapText(ImFont* font, float size, std::string_view text, float width)
 {
-    ImGui::PushFont(fonts.label, kBodySize);
-    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-    ImGui::TextUnformatted(label);
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
+    std::vector<std::string> lines;
+    std::string line;
+    std::size_t start = 0;
 
-    rightText(fonts.mono, kMonoSize, valueColor, value);
-}
+    while (start < text.size())
+    {
+        std::size_t end = text.find(' ', start);
 
-void sectionLabel(const Fonts& fonts, const char* label)
-{
-    ImGui::PushFont(fonts.overline, kOverlineSize);
-    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-    ImGui::TextUnformatted(label);
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
+        if (end == std::string_view::npos)
+        {
+            end = text.size();
+        }
+
+        const std::string_view word = text.substr(start, end - start);
+        const std::string candidate =
+            line.empty() ? std::string(word) : line + " " + std::string(word);
+
+        if (line.empty() || textWidth(font, size, candidate) <= width)
+        {
+            line = candidate;
+        }
+        else
+        {
+            lines.push_back(line);
+            line = std::string(word);
+        }
+
+        start = end + 1;
+    }
+
+    if (!line.empty())
+    {
+        lines.push_back(line);
+    }
+
+    if (lines.empty())
+    {
+        lines.emplace_back();
+    }
+
+    return lines;
 }
 
 void applyStyle()
 {
     ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowPadding = ImVec2(12.0F, 12.0F);
-    style.WindowRounding = 10.0F;
-    style.WindowBorderSize = 1.0F;
-    style.ItemSpacing = ImVec2(8.0F, 4.0F);
+    style.WindowPadding = ImVec2(kPanelPadding, kPanelPadding);
+    style.WindowRounding = kRadiusMd;
+    style.WindowBorderSize = 0.0F;
+    style.ItemSpacing = ImVec2(0.0F, kGap);
     style.FramePadding = ImVec2(12.0F, 8.0F);
-    style.FrameRounding = 6.0F;
+    style.FrameRounding = kRadiusMd;
 
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0392F, 0.0509F, 0.0706F, 0.851F);
+    // #121212 at 90%: the stream stays visible under the panels.
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.0706F, 0.0706F, 0.0706F, 0.9020F);
     style.Colors[ImGuiCol_Border] = ImVec4(1.0F, 1.0F, 1.0F, 0.1216F);
-    style.Colors[ImGuiCol_Text] = ImVec4(0.9294F, 0.9412F, 0.9569F, 1.0F);
-    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.6314F, 0.6667F, 0.7216F, 1.0F);
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.0392F, 0.0509F, 0.0706F, 1.0F);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.1216F, 0.1490F, 0.1922F, 1.0F);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.1216F, 0.1490F, 0.1922F, 1.0F);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.1569F, 0.1922F, 0.2588F, 1.0F);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.2275F, 0.2706F, 0.3333F, 1.0F);
-    style.Colors[ImGuiCol_NavCursor] = ImVec4(0.9608F, 0.7137F, 0.3647F, 1.0F);
-    style.Colors[ImGuiCol_PlotLines] = ImVec4(0.9608F, 0.6353F, 0.2275F, 1.0F);
+    style.Colors[ImGuiCol_Text] = ImVec4(0.9608F, 0.9608F, 0.9608F, 1.0F);
+    style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.3020F, 0.3020F, 0.3020F, 1.0F);
+    style.Colors[ImGuiCol_FrameBg] = ImVec4(1.0F, 1.0F, 1.0F, 0.0588F);
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(1.0F, 1.0F, 1.0F, 0.0784F);
+    style.Colors[ImGuiCol_Button] = ImVec4(0.1725F, 0.1725F, 0.1725F, 1.0F);
+    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.2000F, 0.2000F, 0.2000F, 1.0F);
+    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.2314F, 0.2314F, 0.2314F, 1.0F);
+    style.Colors[ImGuiCol_NavCursor] = ImVec4(1.0F, 1.0F, 1.0F, 1.0F);
+    style.Colors[ImGuiCol_PlotLines] = ImVec4(0.0F, 0.4392F, 0.8196F, 1.0F);
 }
 
-void drawRateSection(const Fonts& fonts, const OverlayStats& stats)
+void sectionHeading(const Fonts& fonts, std::string_view label)
 {
-    const core::StreamMetricsSnapshot& video = stats.video;
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
 
-    sectionLabel(fonts, "TAXAS");
+    drawTrackedText(ImGui::GetWindowDrawList(), fonts.monoStrong, kOverlineSize,
+                    ImVec2(start.x, start.y + 1.0F), kTextSubtle, label, kOverlineTracking);
+    ImGui::Dummy(ImVec2(width, kOverlineHeight));
+}
 
-    std::string cadence = "—";
+void statRow(const Fonts& fonts, std::string_view label, const std::string& value,
+             ImU32 valueColor = kText)
+{
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
 
-    if (stats.cadenceValid)
+    drawText(drawList, fonts.body, kBodySize, ImVec2(start.x, start.y + kBodyTextOffset),
+             kTextMuted, label);
+
+    const float labelWidth = textWidth(fonts.body, kBodySize, label);
+    const float valueWidth = textWidth(fonts.mono, kMonoSize, value);
+    const bool sameLine = labelWidth + 12.0F + valueWidth <= width;
+
+    if (sameLine)
     {
-        cadence = std::format("{} fps · {}/{} repetidos",
-                              decimalText(stats.cadenceFramesPerSecond),
-                              stats.cadenceRepeatedFrames, stats.cadenceWindowFrames);
+        drawText(drawList, fonts.mono, kMonoSize,
+                 ImVec2(start.x + width - valueWidth, start.y + kBodyTextOffset), valueColor,
+                 value);
+        ImGui::Dummy(ImVec2(width, kRowHeight));
+        return;
     }
 
-    valueRow(fonts, "Fonte", fpsText(video, video.sourceFps).c_str());
-    valueRow(fonts, "Jogo", fpsText(video, video.gameFps).c_str());
-    valueRow(fonts, "Gerados", fpsText(video, video.generatedFps).c_str(),
-             video.generatedFps > 0.0 ? kAccent : kText);
-    valueRow(fonts, "Exibidos", fpsText(video, video.displayedFps).c_str());
-    valueRow(fonts, "Cadência", cadence.c_str());
+    // A value the row can't hold goes under its label, right-aligned.
+    const std::vector<std::string> lines = wrapText(fonts.mono, kMonoSize, value, width);
+
+    for (std::size_t index = 0; index < lines.size(); ++index)
+    {
+        const std::string& line = lines.at(index);
+        const float lineWidth = textWidth(fonts.mono, kMonoSize, line);
+
+        drawText(drawList, fonts.mono, kMonoSize,
+                 ImVec2(start.x + width - lineWidth,
+                        start.y + kRowHeight * static_cast<float>(index + 1) + kBodyTextOffset),
+                 valueColor, line);
+    }
+
+    ImGui::Dummy(ImVec2(width, kRowHeight * static_cast<float>(lines.size() + 1)));
+}
+
+void statisticsHeader(const Fonts& fonts)
+{
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+
+    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x, start.y + kBodyTextOffset), kText,
+             "Estatísticas");
+
+    const float shortcutWidth = textWidth(fonts.label, kCaptionSize, "F2");
+    drawText(drawList, fonts.label, kCaptionSize,
+             ImVec2(start.x + width - shortcutWidth, start.y + kCaptionTextOffset), kTextMuted,
+             "F2");
+
+    ImGui::Dummy(ImVec2(width, 24.0F));
 }
 
 void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
 {
     const core::StreamMetricsSnapshot& video = stats.video;
 
-    sectionLabel(fonts, "VÍDEO");
+    sectionHeading(fonts, "VÍDEO");
 
     const std::string resolution = resolutionText(video, stats.outputWidth, stats.outputHeight);
     const std::string codec = codecText(video, stats.hdrStream);
-    const std::string hdr = hdrText(stats);
     const std::string bitrate =
         video.bitrateMbps > 0.0 ? decimalText(video.bitrateMbps) + " Mbps" : "—";
-    const std::string loss = video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
+    const std::string loss =
+        video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
 
-    valueRow(fonts, "Resolução", resolution.c_str());
-    valueRow(fonts, "Codec", codec.c_str());
-    valueRow(fonts, "HDR", hdr.c_str());
-    valueRow(fonts, "Bitrate", bitrate.c_str());
-    valueRow(fonts, "Perda de pacotes", loss.c_str());
+    statRow(fonts, "Resolução", resolution);
+    statRow(fonts, "Codec", codec);
+    statRow(fonts, "HDR", hdrText(stats));
+    statRow(fonts, "Fonte", fpsText(video, video.sourceFps));
+    statRow(fonts, "Jogo", fpsText(video, video.gameFps));
+    statRow(fonts, "Gerados", fpsText(video, video.generatedFps),
+            video.generatedFps > 0.0 ? kAccent : kText);
+    statRow(fonts, "Exibidos", fpsText(video, video.displayedFps));
+    statRow(fonts, "Cadência", cadenceText(stats));
+    statRow(fonts, "Bitrate", bitrate);
+    statRow(fonts, "Perda de pacotes", loss);
 }
 
 void drawLatencySection(const Fonts& fonts, const OverlayStats& stats)
 {
     const core::StreamMetricsSnapshot& video = stats.video;
 
-    sectionLabel(fonts, "LATÊNCIA");
+    sectionHeading(fonts, "LATÊNCIA");
 
-    const std::string decode =
-        video.decodeValid ? millisecondsText(video.decodeMilliseconds) : "—";
     const std::string present =
         video.presentIntervalValid ? millisecondsText(video.presentIntervalMilliseconds) : "—";
-    const std::string ready =
-        video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—";
 
-    valueRow(fonts, "Decodificação", decode.c_str());
-    valueRow(fonts, "Apresentação", present.c_str());
-    valueRow(fonts, "Quadro até a tela", ready.c_str());
-}
-
-void drawFrameTime(const Fonts& fonts, const OverlayStats& stats)
-{
-    const core::StreamMetricsSnapshot& video = stats.video;
-
-    if (video.frameTimeCount < 2)
-    {
-        return;
-    }
-
-    float maximum = 33.3F;
-
-    for (std::size_t index = 0; index < video.frameTimeCount; ++index)
-    {
-        maximum = std::max(maximum, video.frameTimes.at(index) * 1.2F);
-    }
-
-    ImGui::PushFont(fonts.caption, kCaptionSize);
-    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-    ImGui::TextUnformatted("Tempo de quadro");
-    ImGui::PopStyleColor();
-    rightText(fonts.caption, kCaptionSize, kTextMuted,
-              millisecondsText(video.presentIntervalMilliseconds).c_str());
-    ImGui::PopFont();
-    ImGui::NewLine();
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0F, 0.0F));
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0F, 1.0F, 1.0F, 0.0392F));
-    ImGui::PlotLines("##frame-times", video.frameTimes.data(), static_cast<int>(video.frameTimeCount),
-                      0, nullptr, 0.0F, maximum, ImVec2(-1.0F, 36.0F));
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar();
+    statRow(fonts, "Decodificação",
+            video.decodeValid ? millisecondsText(video.decodeMilliseconds) : "—");
+    statRow(fonts, "Apresentação", present);
+    statRow(fonts, "Quadro até a tela",
+            video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—");
 }
 
 void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
 {
-    sectionLabel(fonts, "GPU POR ETAPA");
+    sectionHeading(fonts, "GPU POR ETAPA");
 
     for (std::size_t index = 0; index < kEffectStageCount; ++index)
     {
         const auto stage = static_cast<EffectStage>(index);
         std::string value = "—";
+        ImU32 color = kText;
 
         if (stage == EffectStage::OpticalFlow && stats.opticalFlow != StageOverlayState::Running)
         {
             value = stats.opticalFlow == StageOverlayState::Off ? "desligado" : "indisponível";
+            color = kTextSubtle;
         }
         else if (stage == EffectStage::DlssSuperResolution &&
                  stats.dlss != StageOverlayState::Running)
         {
             value = stats.dlss == StageOverlayState::Off ? "desligado" : "indisponível";
+            color = kTextSubtle;
         }
         else if (stats.gpuTimingsValid)
         {
             value = millisecondsText(stats.stageMilliseconds.at(index), 2);
         }
 
-        valueRow(fonts, stageLabel(stage), value.c_str());
+        statRow(fonts, stageLabel(stage), value, color);
     }
 
-    valueRow(fonts, "Total",
-             stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds, 2).c_str() : "—");
+    statRow(fonts, "Frame Generation",
+            stats.frameGeneration == core::FrameGenerationMode::X2 ? "Ligado 2x" : "Desligado",
+            stats.frameGeneration == core::FrameGenerationMode::X2 ? kAccent : kTextSubtle);
+    statRow(fonts, "Total",
+            stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds, 2) : "—");
+}
+
+void drawFrameTime(const Fonts& fonts, const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+
+    drawText(drawList, fonts.label, kCaptionSize,
+             ImVec2(start.x, start.y + kCaptionTextOffset), kTextMuted, "Tempo de quadro");
+
+    const std::string value = video.presentIntervalValid
+                                   ? millisecondsText(video.presentIntervalMilliseconds)
+                                   : "—";
+    const float valueWidth = textWidth(fonts.label, kCaptionSize, value);
+    drawText(drawList, fonts.label, kCaptionSize,
+             ImVec2(start.x + width - valueWidth, start.y + kCaptionTextOffset), kTextMuted, value);
+
+    constexpr float kPlotHeight = 36.0F;
+    const ImVec2 plotTop(start.x, start.y + 20.0F);
+    const ImVec2 plotBottom(plotTop.x + width, plotTop.y + kPlotHeight);
+    drawList->AddRectFilled(plotTop, plotBottom, kPlotBackground, kRadiusSm);
+
+    if (video.frameTimeCount >= 2)
+    {
+        float maximum = 33.3F;
+
+        for (std::size_t index = 0; index < video.frameTimeCount; ++index)
+        {
+            maximum = std::max(maximum, video.frameTimes.at(index) * 1.2F);
+        }
+
+        const float innerWidth = width - 8.0F;
+        const float innerHeight = kPlotHeight - 8.0F;
+        const float step = innerWidth / static_cast<float>(video.frameTimeCount - 1);
+
+        std::vector<ImVec2> points;
+        points.reserve(video.frameTimeCount);
+
+        for (std::size_t index = 0; index < video.frameTimeCount; ++index)
+        {
+            const float fraction =
+                std::clamp(video.frameTimes.at(index) / maximum, 0.0F, 1.0F);
+            points.emplace_back(plotTop.x + 4.0F + step * static_cast<float>(index),
+                                plotBottom.y - 4.0F - fraction * innerHeight);
+        }
+
+        drawList->AddPolyline(points.data(), static_cast<int>(points.size()), kAccent, 0, 1.5F);
+    }
+
+    ImGui::Dummy(ImVec2(width, 56.0F));
 }
 
 void drawReflexSection(const Fonts& fonts, const ReflexOverlayStats& reflex)
 {
-    sectionLabel(fonts, "NVIDIA REFLEX");
+    sectionHeading(fonts, "NVIDIA REFLEX");
 
     switch (reflex.state)
     {
     case ReflexOverlayStats::State::Unavailable:
-        valueRow(fonts, "Disponibilidade", reflex.reason.empty() ? "indisponível" : reflex.reason.c_str());
+        statRow(fonts, "Disponibilidade",
+                reflex.reason.empty() ? std::string("indisponível") : reflex.reason);
         return;
 
     case ReflexOverlayStats::State::Waiting:
-        valueRow(fonts, "Modo", reflex.mode.c_str());
-        valueRow(fonts, "Latência total", "aguardando dados…");
+        statRow(fonts, "Modo", reflex.mode);
+        statRow(fonts, "Latência total", "aguardando dados…");
         return;
 
     case ReflexOverlayStats::State::Active:
     case ReflexOverlayStats::State::Stalled:
     case ReflexOverlayStats::State::Failed:
-        valueRow(fonts, "Modo", reflex.mode.c_str());
-        valueRow(fonts, "Low latency efetivo", reflex.lowLatencyEffective ? "sim" : "não");
-        valueRow(fonts, "Sleep médio", millisecondsText(reflex.sleepMeanMs, 3).c_str());
-        valueRow(fonts, "Sleep máximo", millisecondsText(reflex.sleepMaxMs, 3).c_str());
-        valueRow(fonts, "Driver vê Sleep", reflex.driverSeesSleep ? "sim" : "não");
-        valueRow(fonts, "Latência total",
-                 reflex.latencyValid ? millisecondsText(reflex.latencyTotalMs).c_str() : "—");
-        valueRow(fonts, "GPU", reflex.latencyValid ? millisecondsText(reflex.latencyGpuMs).c_str() : "—");
-        valueRow(fonts, "Render",
-                 reflex.latencyValid ? millisecondsText(reflex.latencyRenderMs).c_str() : "—");
-        valueRow(fonts, "Apresentação",
-                 reflex.latencyValid ? millisecondsText(reflex.latencyPresentMs).c_str() : "—");
-        valueRow(fonts, "Driver",
-                 reflex.latencyValid ? millisecondsText(reflex.latencyDriverMs).c_str() : "—");
-        valueRow(fonts, "Fila do SO",
-                 reflex.latencyValid ? millisecondsText(reflex.latencyQueueMs).c_str() : "—");
+        break;
+    }
 
-        if (reflex.state == ReflexOverlayStats::State::Stalled)
-        {
-            valueRow(fonts, "Aviso", "sleep alto: desligado nesta transmissão", kAccent);
-        }
+    statRow(fonts, "Modo", reflex.mode);
+    statRow(fonts, "Low latency efetivo", reflex.lowLatencyEffective ? "sim" : "não");
+    statRow(fonts, "Sleep médio", millisecondsText(reflex.sleepMeanMs, 3));
+    statRow(fonts, "Sleep máximo", millisecondsText(reflex.sleepMaxMs, 3));
+    statRow(fonts, "Driver vê Sleep", reflex.driverSeesSleep ? "sim" : "não");
+    statRow(fonts, "Latência total",
+            reflex.latencyValid ? millisecondsText(reflex.latencyTotalMs) : "—");
+    statRow(fonts, "GPU", reflex.latencyValid ? millisecondsText(reflex.latencyGpuMs) : "—");
+    statRow(fonts, "Render",
+            reflex.latencyValid ? millisecondsText(reflex.latencyRenderMs) : "—");
+    statRow(fonts, "Apresentação",
+            reflex.latencyValid ? millisecondsText(reflex.latencyPresentMs) : "—");
+    statRow(fonts, "Driver",
+            reflex.latencyValid ? millisecondsText(reflex.latencyDriverMs) : "—");
+    statRow(fonts, "Fila do SO",
+            reflex.latencyValid ? millisecondsText(reflex.latencyQueueMs) : "—");
 
-        if (reflex.state == ReflexOverlayStats::State::Failed)
-        {
-            valueRow(fonts, "Aviso", "o sleep do driver falhou", kDanger);
-        }
+    if (reflex.state == ReflexOverlayStats::State::Stalled)
+    {
+        statRow(fonts, "Aviso", "sleep alto: desligado nesta transmissão", kStandby);
+    }
 
-        return;
+    if (reflex.state == ReflexOverlayStats::State::Failed)
+    {
+        statRow(fonts, "Aviso", "o sleep do driver falhou", kDanger);
     }
 }
 
@@ -504,47 +666,25 @@ std::string controllerSummary(const OverlayGamepad& gamepad)
         gamepad.accel[2]);
 }
 
-void wrappedValue(const Fonts& fonts, const std::string& value)
-{
-    ImGui::PushFont(fonts.mono, kMonoSize);
-    ImGui::TextWrapped("%s", value.c_str());
-    ImGui::PopFont();
-}
-
-void valueLine(const Fonts& fonts, const char* label, const std::string& value)
-{
-    ImGui::PushFont(fonts.label, kBodySize);
-    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-    ImGui::TextUnformatted(label);
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
-
-    wrappedValue(fonts, value);
-}
-
 void drawControllerSection(const Fonts& fonts, const OverlayGamepad& gamepad)
 {
-    sectionLabel(fonts, "CONTROLE");
+    sectionHeading(fonts, "CONTROLE");
 
     if (!gamepad.connected)
     {
-        valueRow(fonts, "Estado", "sem controle");
+        statRow(fonts, "Estado", "sem controle");
         return;
     }
 
-    valueLine(fonts, "Botões", gamepad.buttons.empty() ? "—" : gamepad.buttons);
-    valueRow(fonts, "Gatilhos",
-             std::format("L2 {} · R2 {}", gamepad.leftTrigger, gamepad.rightTrigger).c_str());
-    valueRow(fonts, "Toque 1", touchText(gamepad.touches[0]).c_str());
-    valueRow(fonts, "Toque 2", touchText(gamepad.touches[1]).c_str());
-    valueRow(fonts, "Giroscópio",
-             std::format("{:.2f} {:.2f} {:.2f} rad/s", gamepad.gyro[0], gamepad.gyro[1],
-                         gamepad.gyro[2])
-                 .c_str());
-    valueRow(fonts, "Acelerômetro",
-             std::format("{:.2f} {:.2f} {:.2f} g", gamepad.accel[0], gamepad.accel[1],
-                         gamepad.accel[2])
-                 .c_str());
+    statRow(fonts, "Botões", gamepad.buttons.empty() ? "—" : gamepad.buttons);
+    statRow(fonts, "Gatilhos",
+            std::format("L2 {} · R2 {}", gamepad.leftTrigger, gamepad.rightTrigger));
+    statRow(fonts, "Toque 1", touchText(gamepad.touches[0]));
+    statRow(fonts, "Toque 2", touchText(gamepad.touches[1]));
+    statRow(fonts, "Giroscópio", std::format("{:.2f} {:.2f} {:.2f} rad/s", gamepad.gyro[0],
+                                              gamepad.gyro[1], gamepad.gyro[2]));
+    statRow(fonts, "Acelerômetro", std::format("{:.2f} {:.2f} {:.2f} g", gamepad.accel[0],
+                                                gamepad.accel[1], gamepad.accel[2]));
 }
 
 void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const OverlayGamepad& gamepad)
@@ -558,21 +698,15 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const Overlay
         return;
     }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0F, 6.0F));
-    ImGui::PushFont(fonts.label, kBodySize);
-    ImGui::TextUnformatted("Estatísticas");
-    ImGui::PopFont();
-    rightText(fonts.caption, kCaptionSize, kTextMuted, "F2");
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0F, kGap));
 
-    // The controller section goes first: the panel is taller than a 720p
-    // window, and this is the part a controller report has to see.
-    drawControllerSection(fonts, gamepad);
-    drawRateSection(fonts, stats);
+    statisticsHeader(fonts);
     drawVideoSection(fonts, stats);
     drawLatencySection(fonts, stats);
     drawGpuSection(fonts, stats);
     drawFrameTime(fonts, stats);
     drawReflexSection(fonts, stats.reflex);
+    drawControllerSection(fonts, gamepad);
 
     ImGui::PopStyleVar();
     ImGui::End();
@@ -580,221 +714,327 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const Overlay
 
 void drawSwitch(ImDrawList* drawList, ImVec2 topLeft, bool on)
 {
-    const ImVec2 kTrackSize(48.0F, 28.0F);
+    constexpr ImVec2 kTrackSize(48.0F, 28.0F);
     constexpr float kThumbRadius = 11.0F;
+    constexpr float kInset = 3.0F;
 
     const ImVec2 bottomRight(topLeft.x + kTrackSize.x, topLeft.y + kTrackSize.y);
-    drawList->AddRectFilled(topLeft, bottomRight, on ? kAccent : kSurfaceHigh,
-                             kTrackSize.y / 2.0F);
+    drawList->AddRectFilled(topLeft, bottomRight, on ? kAccent : kSurfaceHigh, kTrackSize.y / 2.0F);
 
     if (!on)
     {
-        drawList->AddRect(topLeft, bottomRight, kBorderControl, kTrackSize.y / 2.0F);
+        drawList->AddRect(topLeft, bottomRight, kBorderControl, kTrackSize.y / 2.0F, 0, 1.0F);
     }
 
-    const float thumbX = topLeft.x + (on ? kTrackSize.x - 3.0F - 2.0F * kThumbRadius : 3.0F);
-    drawList->AddCircleFilled(ImVec2(thumbX + kThumbRadius, topLeft.y + kTrackSize.y / 2.0F),
-                               kThumbRadius, on ? kTextOnAccent : kTextMuted);
+    const float thumbX =
+        topLeft.x + (on ? kTrackSize.x - kInset - 2.0F * kThumbRadius : kInset) + kThumbRadius;
+    drawList->AddCircleFilled(ImVec2(thumbX, topLeft.y + kTrackSize.y / 2.0F), kThumbRadius,
+                               on ? kOnAccent : kTextMuted);
 }
 
-bool toggleRow(const char* id, const Fonts& fonts, const char* label, const char* detail, bool on,
-               float height)
+void drawControlBlock(ImDrawList* drawList, ImVec2 start, ImVec2 size, bool hovered, bool focused)
 {
+    const ImVec2 bottomRight(start.x + size.x, start.y + size.y);
+    drawList->AddRectFilled(start, bottomRight, kOverlayControl, kRadiusMd);
+
+    if (hovered)
+    {
+        drawList->AddRectFilled(start, bottomRight, kOverlayHover, kRadiusMd);
+    }
+
+    if (focused)
+    {
+        drawList->AddRect(start, bottomRight, kFocus, kRadiusMd, 0, 2.0F);
+    }
+}
+
+bool toggleRow(const char* id, const Fonts& fonts, std::string_view label, std::string_view detail,
+               bool on)
+{
+    constexpr float kBlockPaddingY = 8.0F;
+    constexpr float kBlockPaddingX = 12.0F;
+    constexpr float kToggleWidth = 48.0F;
+    constexpr float kToggleHeight = 28.0F;
+    constexpr float kToggleGap = 12.0F;
+    constexpr float kDetailGap = 2.0F;
+
     const ImVec2 start = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
+    const float detailWidth = width - 2.0F * kBlockPaddingX - kToggleWidth - kToggleGap;
+    const std::vector<std::string> detailLines =
+        detail.empty() ? std::vector<std::string>{}
+                       : wrapText(fonts.label, kCaptionSize, detail, detailWidth);
+    const float textHeight =
+        kRowHeight + (detailLines.empty()
+                          ? 0.0F
+                          : kDetailGap + kCaptionHeight * static_cast<float>(detailLines.size()));
+    const float height = 2.0F * kBlockPaddingY + std::max(textHeight, kToggleHeight);
 
     ImGui::PushID(id);
-    ImGui::InvisibleButton("row", ImVec2(width, height));
-    const bool clicked = ImGui::IsItemClicked();
+    ImGui::SetCursorScreenPos(start);
+    const bool activated = ImGui::InvisibleButton("row", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
+    drawControlBlock(drawList, start, ImVec2(width, height), hovered, focused);
 
-    if (hovered)
+    const float contentHeight = height - 2.0F * kBlockPaddingY;
+    const float textTop = start.y + kBlockPaddingY + (contentHeight - textHeight) / 2.0F;
+    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + kBlockPaddingX, textTop + 3.0F),
+             kText, label);
+
+    float detailY = textTop + kRowHeight + kDetailGap;
+
+    for (const std::string& line : detailLines)
     {
-        drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height), kOverlayHover,
-                                6.0F);
+        drawText(drawList, fonts.label, kCaptionSize,
+                 ImVec2(start.x + kBlockPaddingX, detailY + kCaptionTextOffset), kTextMuted, line);
+        detailY += kCaptionHeight;
     }
 
-    if (focused)
-    {
-        drawList->AddRect(start, ImVec2(start.x + width, start.y + height), kFocus, 6.0F, 0, 2.0F);
-    }
-
-    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + 12.0F, start.y + 8.0F), kText,
-             label);
-
-    if (detail != nullptr && detail[0] != '\0')
-    {
-        drawText(drawList, fonts.caption, kCaptionSize, ImVec2(start.x + 12.0F, start.y + 30.0F),
-                 kTextMuted, detail);
-    }
-
-    drawSwitch(drawList, ImVec2(start.x + width - 12.0F - 48.0F, start.y + (height - 28.0F) / 2.0F),
+    drawSwitch(drawList,
+               ImVec2(start.x + width - kBlockPaddingX - kToggleWidth,
+                      start.y + (height - kToggleHeight) / 2.0F),
                on);
 
-    return clicked;
+    return activated;
 }
 
-// A row whose value cycles through choices when clicked; the detail line
-// says what a click does.
-bool cycleRow(const char* id, const Fonts& fonts, const char* label, const char* detail,
-              const char* value, float height)
+// A row whose value cycles through choices when activated.
+bool cycleRow(const char* id, const Fonts& fonts, std::string_view label, std::string_view detail,
+              std::string_view value)
 {
+    constexpr float kBlockPaddingY = 8.0F;
+    constexpr float kBlockPaddingX = 12.0F;
+    constexpr float kDetailGap = 2.0F;
+
     const ImVec2 start = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
+    const std::vector<std::string> detailLines =
+        wrapText(fonts.label, kCaptionSize, detail, width - 2.0F * kBlockPaddingX);
+    const float textHeight =
+        kRowHeight + kDetailGap + kCaptionHeight * static_cast<float>(detailLines.size());
+    const float height = 2.0F * kBlockPaddingY + std::max(textHeight, 28.0F);
 
     ImGui::PushID(id);
-    ImGui::InvisibleButton("row", ImVec2(width, height));
-    const bool clicked = ImGui::IsItemClicked();
+    ImGui::SetCursorScreenPos(start);
+    const bool activated = ImGui::InvisibleButton("row", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
     const bool focused = ImGui::IsItemFocused();
     ImGui::PopID();
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
+    drawControlBlock(drawList, start, ImVec2(width, height), hovered, focused);
 
-    if (hovered)
-    {
-        drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height), kOverlayHover,
-                                 6.0F);
-    }
-
-    if (focused)
-    {
-        drawList->AddRect(start, ImVec2(start.x + width, start.y + height), kFocus, 6.0F, 0, 2.0F);
-    }
-
-    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + 12.0F, start.y + 8.0F), kText,
+    const float labelY = start.y + kBlockPaddingY + 3.0F;
+    drawText(drawList, fonts.label, kBodySize, ImVec2(start.x + kBlockPaddingX, labelY), kText,
              label);
-
-    if (detail != nullptr && detail[0] != '\0')
-    {
-        drawText(drawList, fonts.caption, kCaptionSize, ImVec2(start.x + 12.0F, start.y + 30.0F),
-                 kTextMuted, detail);
-    }
 
     const float valueWidth = textWidth(fonts.label, kBodySize, value);
     drawText(drawList, fonts.label, kBodySize,
-             ImVec2(start.x + width - 12.0F - valueWidth, start.y + 8.0F), kAccent, value);
+             ImVec2(start.x + width - kBlockPaddingX - valueWidth, labelY), kAccent, value);
 
-    return clicked;
+    float detailY = start.y + kBlockPaddingY + kRowHeight + kDetailGap;
+
+    for (const std::string& line : detailLines)
+    {
+        drawText(drawList, fonts.label, kCaptionSize,
+                 ImVec2(start.x + kBlockPaddingX, detailY + kCaptionTextOffset), kTextMuted, line);
+        detailY += kCaptionHeight;
+    }
+
+    return activated;
 }
 
-bool actionButton(const char* id, const Fonts& fonts, const char* label, bool danger)
-{
-    const ImVec2 start = ImGui::GetCursorScreenPos();
-    const float width = ImGui::GetContentRegionAvail().x;
-    constexpr float kHeight = 44.0F;
-
-    ImGui::PushID(id);
-    ImGui::InvisibleButton("button", ImVec2(width, kHeight));
-    const bool clicked = ImGui::IsItemClicked();
-    const bool hovered = ImGui::IsItemHovered();
-    const bool focused = ImGui::IsItemFocused();
-    ImGui::PopID();
-
-    ImDrawList* const drawList = ImGui::GetWindowDrawList();
-    const ImVec2 bottomRight(start.x + width, start.y + kHeight);
-
-    drawList->AddRectFilled(start, bottomRight, danger ? kDangerSubtle : kSurfaceHigh, 10.0F);
-
-    if (!danger)
-    {
-        drawList->AddRect(start, bottomRight, kBorderStrong, 10.0F);
-    }
-
-    if (hovered)
-    {
-        drawList->AddRectFilled(start, bottomRight,
-                                 danger ? IM_COL32(0x3B, 0x27, 0x2D, 0xFF) : kSurfaceHover, 10.0F);
-    }
-
-    if (focused)
-    {
-        drawList->AddRect(start, bottomRight, kFocus, 10.0F, 0, 2.0F);
-    }
-
-    const float labelWidth = textWidth(fonts.button, kButtonSize, label);
-    drawText(drawList, fonts.button, kButtonSize,
-             ImVec2(start.x + (width - labelWidth) / 2.0F, start.y + (kHeight - kButtonSize) / 2.0F),
-             danger ? kDanger : kText, label);
-
-    return clicked;
-}
-
-bool reflexSegments(const Fonts& fonts, const ImVec2& start, const ReflexOverlayStats& reflex,
-                    core::ReflexMode current, core::ReflexMode* chosen)
+bool reflexBlock(const Fonts& fonts, const ReflexOverlayStats& reflex, core::ReflexMode current,
+                 core::ReflexMode* chosen)
 {
     constexpr std::array<core::ReflexMode, 3> kModes{
         core::ReflexMode::Off,
         core::ReflexMode::On,
         core::ReflexMode::Boost,
     };
-    constexpr float kSegmentPadding = 16.0F;
+    constexpr float kBlockPadding = 12.0F;
+    constexpr float kLabelGap = 10.0F;
     constexpr float kOuterPadding = 4.0F;
-    constexpr float kGap = 4.0F;
-    constexpr float kHeight = 36.0F;
-    constexpr float kContainerHeight = kHeight + 2.0F * kOuterPadding;
+    constexpr float kSegmentGap = 4.0F;
+    constexpr float kSegmentHeight = 36.0F;
 
-    std::array<float, 3> widths{};
-
-    for (std::size_t index = 0; index < kModes.size(); ++index)
-    {
-        widths.at(index) = 2.0F * kSegmentPadding +
-                           textWidth(fonts.label, kBodySize, reflexModeLabel(kModes.at(index)));
-    }
-
-    const float containerWidth = 2.0F * kOuterPadding + widths.at(0) + widths.at(1) + widths.at(2) +
-                                 2.0F * kGap;
-    const bool available = reflex.state != ReflexOverlayStats::State::Unavailable;
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    const float height = 2.0F * kBlockPadding + kRowHeight + kLabelGap +
+                         2.0F * kOuterPadding + kSegmentHeight;
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(start, ImVec2(start.x + containerWidth, start.y + kContainerHeight),
-                             IM_COL32(0x0A, 0x0D, 0x12, 0xFF), 10.0F);
-    drawList->AddRect(start, ImVec2(start.x + containerWidth, start.y + kContainerHeight),
-                       kBorderStrong, 10.0F);
+    drawList->AddRectFilled(start, ImVec2(start.x + width, start.y + height), kOverlayControl,
+                             kRadiusMd);
 
+    drawText(drawList, fonts.label, kBodySize,
+             ImVec2(start.x + kBlockPadding, start.y + kBlockPadding + 3.0F), kText,
+             "NVIDIA Reflex");
+
+    const ImVec2 containerTop(start.x + kBlockPadding,
+                               start.y + kBlockPadding + kRowHeight + kLabelGap);
+    const ImVec2 containerBottom(containerTop.x + width - 2.0F * kBlockPadding,
+                                  containerTop.y + 2.0F * kOuterPadding + kSegmentHeight);
+    drawList->AddRectFilled(containerTop, containerBottom, kMenu, kRadiusMd);
+
+    const float segmentWidth = (containerBottom.x - containerTop.x - 2.0F * kOuterPadding -
+                                2.0F * kSegmentGap) /
+                                static_cast<float>(kModes.size());
+    const bool available = reflex.state != ReflexOverlayStats::State::Unavailable;
     bool clicked = false;
-    float x = start.x + kOuterPadding;
+    float x = containerTop.x + kOuterPadding;
 
     for (std::size_t index = 0; index < kModes.size(); ++index)
     {
-        const float width = widths.at(index);
-        const ImVec2 segmentTop(x, start.y + kOuterPadding);
-        const ImVec2 segmentBottom(x + width, segmentTop.y + kHeight);
-        const bool selected = kModes.at(index) == current;
+        const core::ReflexMode mode = kModes.at(index);
+        const bool selected = mode == current;
+        const ImVec2 segmentTop(x, containerTop.y + kOuterPadding);
+        const ImVec2 segmentBottom(segmentTop.x + segmentWidth, segmentTop.y + kSegmentHeight);
 
-        if (selected)
-        {
-            drawList->AddRectFilled(segmentTop, segmentBottom, kAccentSubtle, 6.0F);
-        }
+        drawList->AddRectFilled(segmentTop, segmentBottom,
+                                 selected ? kAccent : IM_COL32(0, 0, 0, 0), kRadiusSm);
 
         ImGui::SetCursorScreenPos(segmentTop);
         ImGui::PushID(static_cast<int>(index));
-        ImGui::InvisibleButton("segment", ImVec2(width, kHeight));
+        const bool activated =
+            ImGui::InvisibleButton("segment", ImVec2(segmentWidth, kSegmentHeight));
+        const bool hovered = ImGui::IsItemHovered();
+        const bool focused = ImGui::IsItemFocused();
+        ImGui::PopID();
 
-        if (ImGui::IsItemClicked())
+        if (hovered && !selected)
         {
-            *chosen = kModes.at(index);
+            drawList->AddRectFilled(segmentTop, segmentBottom, kOverlayHover, kRadiusSm);
+        }
+
+        if (focused)
+        {
+            drawList->AddRect(segmentTop, segmentBottom, kFocus, kRadiusSm, 0, 2.0F);
+        }
+
+        const char* const label = reflexSegmentLabel(mode);
+        const float labelWidth = textWidth(fonts.label, kBodySize, label);
+        const ImU32 color = !available ? kTextSubtle : (selected ? kOnAccent : kTextMuted);
+
+        drawText(drawList, fonts.label, kBodySize,
+                 ImVec2(segmentTop.x + (segmentWidth - labelWidth) / 2.0F,
+                        segmentTop.y + (kSegmentHeight - kBodySize) / 2.0F + 2.0F),
+                 color, label);
+
+        if (activated)
+        {
+            *chosen = mode;
             clicked = true;
         }
 
-        ImGui::PopID();
-
-        const char* label = reflexModeLabel(kModes.at(index));
-        const float labelWidth = textWidth(fonts.label, kBodySize, label);
-        const ImU32 color = !available ? kTextSubtle : (selected ? kAccent : kText);
-        drawText(drawList, fonts.label, kBodySize,
-                 ImVec2(segmentTop.x + (width - labelWidth) / 2.0F,
-                        segmentTop.y + (kHeight - kBodySize) / 2.0F),
-                 color, label);
-
-        x += width + kGap;
+        x += segmentWidth + kSegmentGap;
     }
 
+    ImGui::SetCursorScreenPos(start);
+    ImGui::Dummy(ImVec2(width, height));
     return clicked;
+}
+
+void drawPowerIcon(ImDrawList* drawList, ImVec2 center, float radius, ImU32 color)
+{
+    constexpr float kPi = 3.14159265F;
+    constexpr float kGap = 0.55F;
+    constexpr float kStroke = 1.8F;
+
+    drawList->PathArcTo(center, radius, -kPi / 2.0F + kGap, -kPi / 2.0F + 2.0F * kPi - kGap, 24);
+    drawList->PathStroke(color, 0, kStroke);
+    drawList->AddLine(ImVec2(center.x, center.y - radius - 1.5F),
+                       ImVec2(center.x, center.y - 1.0F), color, kStroke);
+}
+
+bool disconnectButton(const Fonts& fonts)
+{
+    constexpr float kHeight = 52.0F;
+    constexpr float kTileSize = 32.0F;
+    constexpr float kTileGap = 12.0F;
+
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+
+    ImGui::PushID("disconnect");
+    const bool activated = ImGui::InvisibleButton("button", ImVec2(width, kHeight));
+    const bool hovered = ImGui::IsItemHovered();
+    const bool focused = ImGui::IsItemFocused();
+    ImGui::PopID();
+
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+    const ImVec2 bottomRight(start.x + width, start.y + kHeight);
+    drawList->AddRectFilled(start, bottomRight, kDangerSubtle, kRadiusMd);
+
+    if (hovered)
+    {
+        drawList->AddRectFilled(start, bottomRight, kOverlayHover, kRadiusMd);
+    }
+
+    if (focused)
+    {
+        drawList->AddRect(start, bottomRight, kFocus, kRadiusMd, 0, 2.0F);
+    }
+
+    constexpr std::string_view kLabel = "Desconectar";
+    const float labelWidth = textWidth(fonts.title, kButtonSize, kLabel);
+    const float contentWidth = kTileSize + kTileGap + labelWidth;
+    const ImVec2 tileTop(start.x + (width - contentWidth) / 2.0F,
+                          start.y + (kHeight - kTileSize) / 2.0F);
+
+    drawList->AddRectFilled(tileTop, ImVec2(tileTop.x + kTileSize, tileTop.y + kTileSize),
+                             kIconTile, kTileRadius);
+    drawPowerIcon(drawList, ImVec2(tileTop.x + kTileSize / 2.0F, tileTop.y + kTileSize / 2.0F),
+                  6.5F, kDanger);
+    drawText(drawList, fonts.title, kButtonSize,
+             ImVec2(tileTop.x + kTileSize + kTileGap,
+                    start.y + (kHeight - kButtonSize) / 2.0F - 1.0F),
+             kDanger, kLabel);
+
+    return activated;
+}
+
+void menuHeader(const Fonts& fonts, const OverlayOptions& options)
+{
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ImDrawList* const drawList = ImGui::GetWindowDrawList();
+
+    drawText(drawList, fonts.title, kTitleSize, ImVec2(start.x + 4.0F, start.y + 5.0F), kText,
+             "Menu rápido");
+
+    if (!options.sessionName.empty())
+    {
+        const long long seconds = static_cast<long long>(ImGui::GetTime());
+        const long long minutes = seconds / 60;
+        const std::string session =
+            minutes > 0
+                ? std::format("{} · jogando há {} min", options.sessionName, minutes)
+                : std::format("{} · jogando agora", options.sessionName);
+
+        drawText(drawList, fonts.label, kCaptionSize, ImVec2(start.x + 4.0F, start.y + 31.0F),
+                 kTextMuted, session);
+    }
+
+    ImGui::Dummy(ImVec2(width, 52.0F));
+}
+
+void menuFooter(const Fonts& fonts)
+{
+    constexpr std::string_view kHint = "Fechar: F1 ou segure Create + Options";
+
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    const float hintWidth = textWidth(fonts.label, kCaptionSize, kHint);
+
+    drawText(ImGui::GetWindowDrawList(), fonts.label, kCaptionSize,
+             ImVec2(start.x + (width - hintWidth) / 2.0F, start.y + kCaptionTextOffset), kTextMuted,
+             kHint);
+    ImGui::Dummy(ImVec2(width, kCaptionHeight));
 }
 
 MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const OverlayOptions& options,
@@ -817,44 +1057,11 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
         return result;
     }
 
-    const Fonts& menuFonts = fonts;
+    menuHeader(fonts, options);
 
-    ImGui::PushFont(menuFonts.title, kTitleSize);
-    ImGui::TextUnformatted("Menu rápido");
-    ImGui::PopFont();
-
-    // The session line counts from the overlay's first frame.
-    const long long seconds = static_cast<long long>(ImGui::GetTime());
-    const long long minutes = seconds / 60;
-    const std::string sessionLine =
-        options.sessionName.empty()
-            ? std::string()
-            : std::format("{} · {}", options.sessionName,
-                          minutes > 0 ? std::format("jogando há {} min", minutes)
-                                      : std::string("jogando agora"));
-
-    if (!sessionLine.empty())
-    {
-        ImGui::PushFont(menuFonts.caption, kCaptionSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-        ImGui::TextUnformatted(sessionLine.c_str());
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
-    }
-
-    ImGui::Dummy(ImVec2(0.0F, 4.0F));
-
-    const ImVec2 reflexStart = ImGui::GetCursorScreenPos();
-    ImDrawList* const drawList = ImGui::GetWindowDrawList();
-    drawText(drawList, menuFonts.label, kBodySize, ImVec2(reflexStart.x + 12.0F, reflexStart.y + 8.0F),
-             kText, "NVIDIA Reflex");
     core::ReflexMode chosen = currentReflex;
-    const bool reflexClicked = reflexSegments(
-        menuFonts, ImVec2(reflexStart.x + 12.0F, reflexStart.y + 36.0F), stats.reflex, currentReflex,
-        &chosen);
-    ImGui::SetCursorScreenPos(ImVec2(reflexStart.x, reflexStart.y + 88.0F));
 
-    if (reflexClicked)
+    if (reflexBlock(fonts, stats.reflex, currentReflex, &chosen))
     {
         result.reflexChanged = true;
         result.reflex = chosen;
@@ -862,41 +1069,60 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
                      static_cast<int>(stats.reflex.state));
     }
 
-    if (cycleRow("window-row", menuFonts, "Janela", "Clique para alternar tela cheia e tamanhos",
-                 windowLayoutText(windowLayout).c_str(), 54.0F))
+    const bool vsrOn = stats.upscaling == core::Upscaling::Vsr;
+
+    if (toggleRow("vsr-row", fonts, "RTX Video Super Resolution",
+                  "Limpa artefatos e amplia para a tela.", vsrOn))
+    {
+        result.upscalingChanged = true;
+        result.upscaling = vsrOn ? core::Upscaling::Shader : core::Upscaling::Vsr;
+        spdlog::info("overlay: upscaling {}", core::upscalingName(result.upscaling));
+    }
+
+    const bool frameGenerationOn = stats.frameGeneration == core::FrameGenerationMode::X2;
+
+    if (toggleRow("frame-generation-row", fonts, "DLSS Frame Generation 2x",
+                  "Dobra o fps; adiciona cerca de 1 quadro de latência.", frameGenerationOn))
+    {
+        result.frameGenerationChanged = true;
+        result.frameGeneration =
+            frameGenerationOn ? core::FrameGenerationMode::Off : core::FrameGenerationMode::X2;
+        spdlog::info("overlay: frame generation {}",
+                     core::frameGenerationName(result.frameGeneration));
+    }
+
+    if (toggleRow("statistics-row", fonts, "Mostrar estatísticas", std::string_view{},
+                  statsVisible))
+    {
+        result.statisticsToggled = true;
+    }
+
+    if (toggleRow("microphone-row", fonts, "Microfone", options.microphoneDetail,
+                  !microphoneMuted))
+    {
+        result.microphoneToggled = true;
+    }
+
+    if (cycleRow("window-row", fonts, "Janela", "Clique para alternar tela cheia e tamanhos",
+                 windowLayoutText(windowLayout)))
     {
         result.windowLayoutChanged = true;
         result.windowLayout = core::nextWindowLayout(windowLayout);
     }
 
-    if (toggleRow("stats-row", menuFonts, "Mostrar estatísticas", "", statsVisible, 44.0F))
-    {
-        result.statisticsToggled = true;
-    }
-
-    if (toggleRow("microphone-row", menuFonts, "Microfone", options.microphoneDetail.c_str(),
-                  !microphoneMuted, 54.0F))
-    {
-        result.microphoneToggled = true;
-    }
-
+    constexpr float kActionsPadding = 8.0F;
+    constexpr float kActionHeight = 52.0F;
     const float remaining = ImGui::GetContentRegionAvail().y;
-    ImGui::Dummy(ImVec2(0.0F, std::max(8.0F, remaining - 44.0F - 16.0F - 12.0F)));
+    ImGui::Dummy(ImVec2(0.0F, std::max(8.0F, remaining - 3.0F * kGap - kActionsPadding -
+                                                   kActionHeight - kCaptionHeight)));
+    ImGui::Dummy(ImVec2(0.0F, kActionsPadding));
 
-    if (actionButton("disconnect", menuFonts, "Desconectar", true))
+    if (disconnectButton(fonts))
     {
         result.disconnect = true;
     }
 
-    ImGui::Dummy(ImVec2(0.0F, 2.0F));
-    ImGui::PushFont(menuFonts.caption, kCaptionSize);
-    ImGui::PushStyleColor(ImGuiCol_Text, kTextMuted);
-    const char* const hint = "Fechar: F1 ou segure Create + Options";
-    const float hintWidth = ImGui::CalcTextSize(hint).x;
-    ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x - hintWidth) / 2.0F);
-    ImGui::TextUnformatted(hint);
-    ImGui::PopStyleColor();
-    ImGui::PopFont();
+    menuFooter(fonts);
 
     ImGui::End();
     return result;
@@ -1058,11 +1284,9 @@ void Overlay::loadFonts(const OverlayFonts& fonts)
 
     bodyFont_ = add(fontData_.body, kBodySize);
     labelFont_ = add(fontData_.label, kBodySize);
-    captionFont_ = add(fontData_.label, kCaptionSize);
-    overlineFont_ = add(fontData_.title, kOverlineSize);
-    buttonFont_ = add(fontData_.title, kButtonSize);
     titleFont_ = add(fontData_.title, kTitleSize);
     monoFont_ = add(fontData_.mono, kMonoSize);
+    monoStrongFont_ = add(fontData_.monoStrong, kOverlineSize);
 
     if (bodyFont_ == nullptr)
     {
@@ -1074,21 +1298,6 @@ void Overlay::loadFonts(const OverlayFonts& fonts)
         labelFont_ = bodyFont_;
     }
 
-    if (captionFont_ == nullptr)
-    {
-        captionFont_ = bodyFont_;
-    }
-
-    if (overlineFont_ == nullptr)
-    {
-        overlineFont_ = bodyFont_;
-    }
-
-    if (buttonFont_ == nullptr)
-    {
-        buttonFont_ = bodyFont_;
-    }
-
     if (titleFont_ == nullptr)
     {
         titleFont_ = bodyFont_;
@@ -1097,6 +1306,11 @@ void Overlay::loadFonts(const OverlayFonts& fonts)
     if (monoFont_ == nullptr)
     {
         monoFont_ = bodyFont_;
+    }
+
+    if (monoStrongFont_ == nullptr)
+    {
+        monoStrongFont_ = monoFont_;
     }
 
     io.FontDefault = bodyFont_;
@@ -1118,11 +1332,9 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
     const Fonts fonts{
         .body = bodyFont_,
         .label = labelFont_,
-        .caption = captionFont_,
-        .overline = overlineFont_,
-        .button = buttonFont_,
         .title = titleFont_,
         .mono = monoFont_,
+        .monoStrong = monoStrongFont_,
     };
 
     ImGui_ImplDX12_NewFrame();
@@ -1173,6 +1385,16 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             {
                 spdlog::warn("overlay: no reflex action");
             }
+        }
+
+        if (menu.upscalingChanged && actions_.upscalingChanged)
+        {
+            actions_.upscalingChanged(menu.upscaling);
+        }
+
+        if (menu.frameGenerationChanged && actions_.frameGenerationChanged)
+        {
+            actions_.frameGenerationChanged(menu.frameGeneration);
         }
 
         if (menu.windowLayoutChanged)

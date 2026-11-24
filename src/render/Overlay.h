@@ -83,6 +83,10 @@ struct OverlayStats
     double totalMilliseconds = 0.0;
     StageOverlayState opticalFlow = StageOverlayState::Off;
     StageOverlayState dlss = StageOverlayState::Off;
+    // The scaling path and DLSS Frame Generation the renderer is applying,
+    // for the quick menu's toggles.
+    core::Upscaling upscaling = core::Upscaling::Shader;
+    core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
 
     // The published cadence, once two windows agree.
     bool cadenceValid = false;
@@ -129,6 +133,8 @@ struct OverlayOptions
 struct OverlayActions
 {
     std::function<void(core::ReflexMode)> reflexChanged;
+    std::function<void(core::Upscaling)> upscalingChanged;
+    std::function<void(core::FrameGenerationMode)> frameGenerationChanged;
     std::function<void(bool)> microphoneMutedChanged;
     std::function<void(bool)> statisticsVisibleChanged;
     std::function<void(bool)> menuOpenChanged;
@@ -238,7 +244,7 @@ private:
     OverlayFonts fontData_;
     ImFont* bodyFont_ = nullptr;
     ImFont* labelFont_ = nullptr;
-    ImFont* strongFont_ = nullptr;
+    ImFont* titleFont_ = nullptr;
     ImFont* monoFont_ = nullptr;
     ImFont* monoStrongFont_ = nullptr;
 
