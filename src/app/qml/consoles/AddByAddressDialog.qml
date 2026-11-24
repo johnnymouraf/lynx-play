@@ -33,6 +33,7 @@ DialogShell {
     }
 
     title: "Adicionar console pelo IP"
+    iconName: "network"
     onOpened: addressField.focusInput()
     onClosed: {
         if (dialog.addedKey.length > 0) {
@@ -62,12 +63,14 @@ DialogShell {
 
     actions: [
         ActionButton {
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "x"
             text: "Cancelar"
             onClicked: dialog.close()
         },
         ActionButton {
             variant: "primary"
+            iconName: "plus"
             text: "Adicionar"
             onClicked: dialog.submit()
         }

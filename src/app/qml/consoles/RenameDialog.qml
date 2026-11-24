@@ -24,6 +24,7 @@ DialogShell {
     }
 
     title: "Renomear console"
+    iconName: "pencil"
     onOpened: nameField.focusInput()
 
     InputField {
@@ -39,12 +40,14 @@ DialogShell {
 
     actions: [
         ActionButton {
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "x"
             text: "Cancelar"
             onClicked: dialog.close()
         },
         ActionButton {
             variant: "primary"
+            iconName: "check"
             text: "Salvar"
             onClicked: dialog.submit()
         }

@@ -43,6 +43,8 @@ DialogShell {
         "Reprodução remota",
         "Vincular dispositivo"
     ]
+    readonly property string failureText:
+        dialog.pairing.failureTitle + ". " + dialog.pairing.failureMessage
 
     signal paired(string key, string name)
 
@@ -193,6 +195,8 @@ DialogShell {
 
     eyebrow: dialog.headings[dialog.view].eyebrow
     title: dialog.headings[dialog.view].title
+    iconName: dialog.view === "failure" ? "triangle-alert" : "link"
+    iconTone: dialog.view === "failure" ? "danger" : "accent"
     onViewChanged: dialog.focusViewAction()
     onOpened: dialog.focusAccountAction()
     onClosed: dialog.pairing.cancel()
@@ -220,301 +224,201 @@ DialogShell {
     ColumnLayout {
         Layout.fillWidth: true
         visible: dialog.view === "account"
-        spacing: Theme.space5
+        spacing: Theme.space4
 
         AppText {
             Layout.fillWidth: true
-            text: "Para jogar remotamente, o PS5 precisa reconhecer este PC com a sua conta PSN."
+            text: "Para jogar remotamente, o PS5 precisa reconhecer este PC. Informe o Account ID da sua conta PSN; ele fica salvo só neste PC."
             textStyle: "bodyMedium"
             color: Theme.textMuted
             wrapMode: Text.WordWrap
         }
 
-        Rectangle {
+        // The browser sign-in keeps its own flow inside step 1, styled with the
+        // dialog's buttons; manual entry stays below it.
+        RowLayout {
             Layout.fillWidth: true
-            implicitHeight: psnPanel.implicitHeight + 2 * Theme.space4
-            radius: Theme.radiusMd
-            color: Theme.surface
-            border.width: 1
-            border.color: Theme.border
+            visible: dialog.psnLogin.state === PsnLoginClient.Idle
+            spacing: Theme.space3
 
-            ColumnLayout {
-                id: psnPanel
+            AppText {
+                text: "Conta PSN"
+                textStyle: "labelMedium"
+            }
 
-                anchors.fill: parent
-                anchors.margins: Theme.space4
+            Item {
+                Layout.fillWidth: true
+            }
+
+            ActionButton {
+                id: psnSignInButton
+
+                variant: "secondary"
+                iconName: "external-link"
+                text: "Entrar com a PSN"
+                onClicked: dialog.psnLogin.start()
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: dialog.psnLogin.state === PsnLoginClient.Waiting
+            spacing: Theme.space3
+
+            AppText {
+                Layout.fillWidth: true
+                text: "No navegador, entre com a sua conta PSN e autorize o acesso. Depois, copie o endereço da página para onde ele foi redirecionado."
+                textStyle: "bodyMedium"
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+            }
+
+            InputField {
+                id: redirectField
+
+                Layout.fillWidth: true
+                label: "Endereço de retorno"
+                placeholderText: "https://remoteplay.dl.playstation.net/remoteplay/redirect?code=…"
+                maximumLength: 1024
+                onAccepted: dialog.submitRedirect()
+            }
+
+            RowLayout {
                 spacing: Theme.space3
 
-                AppText {
-                    text: "Conta PSN"
-                    textStyle: "labelMedium"
+                ActionButton {
+                    variant: "primary"
+                    iconName: "check"
+                    text: "Concluir login"
+                    onClicked: dialog.submitRedirect()
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: dialog.psnLogin.state === PsnLoginClient.Idle
-                    spacing: Theme.space2
+                ActionButton {
+                    variant: "secondary"
+                    iconName: "external-link"
+                    text: "Abrir o navegador de novo"
+                    onClicked: dialog.psnLogin.start()
+                }
+            }
 
-                    AppText {
-                        Layout.fillWidth: true
-                        text: "Entre no navegador com a sua conta. O Account ID volta preenchido aqui."
-                        textStyle: "bodyMedium"
-                        color: Theme.textMuted
-                        wrapMode: Text.WordWrap
-                    }
+            ActionButton {
+                variant: "secondary"
+                iconName: "pencil"
+                text: "Prefiro informar manualmente"
+                onClicked: dialog.resetPsn()
+            }
+        }
 
-                    ActionButton {
-                        id: psnSignInButton
+        RowLayout {
+            Layout.fillWidth: true
+            visible: dialog.psnLogin.state === PsnLoginClient.Exchanging
+            spacing: Theme.space4
 
-                        Layout.fillWidth: true
-                        variant: "primary"
-                        iconName: "external-link"
-                        text: "Entrar com a PSN"
-                        onClicked: dialog.psnLogin.start()
-                    }
+            Spinner {
+                size: 32
+            }
+
+            AppText {
+                Layout.fillWidth: true
+                text: "Concluindo o login na PSN…"
+                textStyle: "titleSmall"
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: dialog.psnLogin.state === PsnLoginClient.Failed
+            spacing: Theme.space3
+
+            AppText {
+                Layout.fillWidth: true
+                text: dialog.psnLogin.failureTitle + ". " + dialog.psnLogin.failureMessage
+                textStyle: "bodySmall"
+                lineHeight: 18
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                spacing: Theme.space3
+
+                ActionButton {
+                    id: retryPsnButton
+
+                    variant: "primary"
+                    iconName: "rotate-ccw"
+                    text: "Tentar de novo"
+                    onClicked: dialog.psnLogin.start()
                 }
 
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: dialog.psnLogin.state === PsnLoginClient.Waiting
-                    spacing: Theme.space3
-
-                    AppText {
-                        Layout.fillWidth: true
-                        text: "No navegador, entre com a sua conta PSN e autorize o acesso. Depois, copie o endereço da página para onde ele foi redirecionado."
-                        textStyle: "bodyMedium"
-                        color: Theme.textMuted
-                        wrapMode: Text.WordWrap
-                    }
-
-                    InputField {
-                        id: redirectField
-
-                        Layout.fillWidth: true
-                        label: "Endereço de retorno"
-                        placeholderText: "https://remoteplay.dl.playstation.net/remoteplay/redirect?code=…"
-                        maximumLength: 1024
-                        onAccepted: dialog.submitRedirect()
-                    }
-
-                    RowLayout {
-                        spacing: Theme.space3
-
-                        ActionButton {
-                            variant: "primary"
-                            text: "Concluir login"
-                            onClicked: dialog.submitRedirect()
-                        }
-
-                        ActionButton {
-                            iconName: "external-link"
-                            text: "Abrir o navegador de novo"
-                            onClicked: dialog.psnLogin.start()
-                        }
-                    }
-
-                    ActionButton {
-                        iconName: "pencil"
-                        text: "Prefiro informar manualmente"
-                        onClicked: dialog.resetPsn()
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    visible: dialog.psnLogin.state === PsnLoginClient.Exchanging
-                    spacing: Theme.space4
-
-                    Spinner {
-                        size: 32
-                    }
-
-                    AppText {
-                        Layout.fillWidth: true
-                        text: "Concluindo o login na PSN…"
-                        textStyle: "titleSmall"
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: dialog.psnLogin.state === PsnLoginClient.Failed
-                    spacing: Theme.space3
-
-                    Banner {
-                        Layout.fillWidth: true
-                        tone: "danger"
-                        title: dialog.psnLogin.failureTitle
-                        message: dialog.psnLogin.failureMessage
-                    }
-
-                    RowLayout {
-                        spacing: Theme.space3
-
-                        ActionButton {
-                            id: retryPsnButton
-
-                            variant: "primary"
-                            iconName: "rotate-ccw"
-                            text: "Tentar de novo"
-                            onClicked: dialog.psnLogin.start()
-                        }
-
-                        ActionButton {
-                            iconName: "pencil"
-                            text: "Informar manualmente"
-                            onClicked: dialog.resetPsn()
-                        }
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: dialog.psnLogin.state === PsnLoginClient.Succeeded
-                    spacing: Theme.space3
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.space3
-
-                        Rectangle {
-                            implicitWidth: 40
-                            implicitHeight: 40
-                            radius: 20
-                            color: Theme.readySubtle
-
-                            Icon {
-                                anchors.centerIn: parent
-                                name: "check"
-                                size: 22
-                                bold: true
-                                color: Theme.ready
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-
-                            AppText {
-                                Layout.fillWidth: true
-                                text: "Conta PSN conectada"
-                                textStyle: "titleSmall"
-                            }
-
-                            AppText {
-                                Layout.fillWidth: true
-                                text: `Account ID ${dialog.psnLogin.accountId}`
-                                textStyle: "bodyMedium"
-                                color: Theme.textMuted
-                                wrapMode: Text.WordWrap
-                            }
-
-                            AppText {
-                                Layout.fillWidth: true
-                                text: `Acesso válido até ${dialog.psnLogin.expiryText}.`
-                                textStyle: "bodyMedium"
-                                color: Theme.textMuted
-                                wrapMode: Text.WordWrap
-                            }
-                        }
-                    }
-
-                    ActionButton {
-                        id: usePsnButton
-
-                        Layout.fillWidth: true
-                        variant: "primary"
-                        text: "Usar este ID"
-                        onClicked: dialog.usePsnAccount()
-                    }
-
-                    ActionButton {
-                        text: "Usar outro Account ID"
-                        onClicked: dialog.resetPsn()
-                    }
+                ActionButton {
+                    variant: "secondary"
+                    iconName: "pencil"
+                    text: "Informar manualmente"
+                    onClicked: dialog.resetPsn()
                 }
             }
         }
 
         ColumnLayout {
             Layout.fillWidth: true
-            visible: dialog.psnLogin.state === PsnLoginClient.Idle
-            spacing: Theme.space4
+            visible: dialog.psnLogin.state === PsnLoginClient.Succeeded
+            spacing: Theme.space2
+
+            AppText {
+                Layout.fillWidth: true
+                text: "Conta PSN conectada"
+                textStyle: "labelMedium"
+                color: Theme.ready
+            }
+
+            AppText {
+                Layout.fillWidth: true
+                text: `Account ID ${dialog.psnLogin.accountId}`
+                textStyle: "bodyMedium"
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+            }
+
+            AppText {
+                Layout.fillWidth: true
+                text: `Acesso válido até ${dialog.psnLogin.expiryText}.`
+                textStyle: "bodyMedium"
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+            }
 
             RowLayout {
-                Layout.fillWidth: true
+                Layout.topMargin: Theme.space1
                 spacing: Theme.space3
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: Theme.border
+                ActionButton {
+                    id: usePsnButton
+
+                    variant: "primary"
+                    iconName: "check"
+                    text: "Usar este ID"
+                    onClicked: dialog.usePsnAccount()
                 }
 
-                AppText {
-                    text: "ou informe manualmente"
-                    textStyle: "bodyMedium"
-                    color: Theme.textMuted
+                ActionButton {
+                    variant: "secondary"
+                    iconName: "pencil"
+                    text: "Usar outro Account ID"
+                    onClicked: dialog.resetPsn()
                 }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: Theme.border
-                }
-            }
-
-            InputField {
-                id: accountField
-
-                Layout.fillWidth: true
-                label: "Account ID da PSN"
-                placeholderText: "Ex.: 1234567890123456789"
-                helperText: "Aceita o número (19 dígitos) ou o formato Base64, como Kx3fQ9aZ0bM=."
-                maximumLength: 24
-                onAccepted: dialog.continueToPin()
-            }
-
-            ActionButton {
-                iconName: "circle-question-mark"
-                text: "Como encontrar meu Account ID"
-                onClicked: Qt.openUrlExternally("https://chiaki-ng.github.io/chiaki-ng/setup/configuration/#registering-your-playstation")
             }
         }
 
-        Rectangle {
+        InputField {
+            id: accountField
+
             Layout.fillWidth: true
-            visible: dialog.psnLogin.state === PsnLoginClient.Idle
-            implicitHeight: privacyNote.implicitHeight + 2 * Theme.space3
-            radius: Theme.radiusMd
-            color: Theme.surface
-
-            RowLayout {
-                id: privacyNote
-
-                anchors.fill: parent
-                anchors.topMargin: Theme.space3
-                anchors.bottomMargin: Theme.space3
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: Theme.space3
-
-                Icon {
-                    Layout.alignment: Qt.AlignTop
-                    name: "lock-keyhole"
-                    size: 18
-                    color: Theme.textMuted
-                }
-
-                AppText {
-                    Layout.fillWidth: true
-                    text: "O Account ID fica salvo só neste PC e é enviado apenas para o seu PS5 durante o pareamento."
-                    textStyle: "bodyMedium"
-                    color: Theme.textMuted
-                    wrapMode: Text.WordWrap
-                }
-            }
+            label: "Account ID da PSN"
+            placeholderText: "Ex.: 1234567890123456789"
+            helperText: "Aceita o número (19 dígitos) ou o formato Base64, como Kx3fQ9aZ0bM=."
+            maximumLength: 24
+            onAccepted: dialog.continueToPin()
         }
     }
 
@@ -636,44 +540,15 @@ DialogShell {
     ColumnLayout {
         Layout.fillWidth: true
         visible: dialog.view === "success"
-        spacing: Theme.space5
+        spacing: Theme.space4
 
-        RowLayout {
+        AppText {
             Layout.fillWidth: true
-            spacing: Theme.space4
-
-            Rectangle {
-                implicitWidth: 56
-                implicitHeight: 56
-                radius: 28
-                color: Theme.readySubtle
-
-                Icon {
-                    anchors.centerIn: parent
-                    name: "check"
-                    size: 28
-                    bold: true
-                    color: Theme.ready
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-
-                AppText {
-                    Layout.fillWidth: true
-                    text: `Tudo certo com o ${dialog.consoleName}`
-                    textStyle: "titleSmall"
-                }
-
-                AppText {
-                    Layout.fillWidth: true
-                    text: "Este PC já pode ligar e jogar neste console."
-                    textStyle: "bodyMedium"
-                    color: Theme.textMuted
-                }
-            }
+            text: `Tudo certo com ${dialog.consoleName}. Este PC já pode ligar e jogar neste console.`
+            textStyle: "bodySmall"
+            lineHeight: 18
+            color: Theme.ready
+            wrapMode: Text.WordWrap
         }
 
         InputField {
@@ -690,51 +565,60 @@ DialogShell {
     ColumnLayout {
         Layout.fillWidth: true
         visible: dialog.view === "failure"
-        spacing: Theme.space5
+        spacing: 10
 
-        Banner {
-            Layout.fillWidth: true
-            tone: "danger"
-            title: dialog.pairing.failureTitle
-            message: dialog.pairing.failureMessage
+        AppText {
+            text: "Código mostrado na TV"
+            textStyle: "labelMedium"
         }
 
-        ColumnLayout {
+        PinInput {
+            error: true
+            readOnly: true
+            text: pinInput.text
+        }
+
+        AppText {
             Layout.fillWidth: true
-            visible: dialog.pairing.retryStep === "pin"
-            spacing: 10
-
-            AppText {
-                text: "Código mostrado na TV"
-                textStyle: "labelMedium"
-            }
-
-            PinInput {
-                error: true
-                readOnly: true
-                text: pinInput.text
-            }
+            text: dialog.failureText
+            textStyle: "bodySmall"
+            lineHeight: 18
+            color: Theme.danger
+            wrapMode: Text.WordWrap
         }
     }
+
+    leadingActions: [
+        ActionButton {
+            visible: dialog.view === "account"
+            variant: "secondary"
+            iconName: "circle-question-mark"
+            text: "Ajuda"
+            onClicked: Qt.openUrlExternally("https://chiaki-ng.github.io/chiaki-ng/setup/configuration/#registering-your-playstation")
+        }
+    ]
 
     actions: [
         ActionButton {
             id: cancelButton
 
             visible: dialog.view === "account" || dialog.view === "pairing"
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "x"
             text: "Cancelar"
             onClicked: dialog.close()
         },
         ActionButton {
             visible: dialog.view === "pin" || dialog.view === "failure"
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "arrow-left"
             text: "Voltar"
             onClicked: dialog.goBack()
         },
         ActionButton {
             visible: dialog.view === "success"
-            variant: "ghost"
+            variant: "secondary"
+            iconName: "check"
             text: "Concluir"
             onClicked: dialog.finish(false)
         },
@@ -742,12 +626,14 @@ DialogShell {
             visible: dialog.view === "account"
                      && dialog.psnLogin.state === PsnLoginClient.Idle
             variant: "primary"
+            iconName: "arrow-right"
             text: "Continuar"
             onClicked: dialog.continueToPin()
         },
         ActionButton {
             visible: dialog.view === "pin"
             variant: "primary"
+            iconName: "link-2"
             text: "Parear"
             onClicked: dialog.startPairing()
         },

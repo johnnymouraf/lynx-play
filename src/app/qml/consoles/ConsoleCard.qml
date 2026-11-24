@@ -206,6 +206,7 @@ Item {
 
         CardAction {
             Layout.preferredWidth: 220
+            Layout.preferredHeight: Theme.sizeControlLg
             status: card.status
             searching: card.searching
             consoleName: card.name

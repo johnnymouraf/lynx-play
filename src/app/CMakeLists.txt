@@ -125,6 +125,8 @@ qt_add_qml_module(mfplay
     RESOURCES
         ${mfplay_fonts}
         ${mfplay_licenses}
+        assets/icons/arrow-left.svg
+        assets/icons/arrow-right.svg
         assets/icons/check.svg
         assets/icons/chevron-down.svg
         assets/icons/chevron-up.svg
@@ -142,6 +144,7 @@ qt_add_qml_module(mfplay
         assets/icons/house-wifi.svg
         assets/icons/info.svg
         assets/icons/layout-grid.svg
+        assets/icons/link.svg
         assets/icons/link-2.svg
         assets/icons/list.svg
         assets/icons/loader-circle.svg
@@ -163,6 +166,7 @@ qt_add_qml_module(mfplay
         assets/icons/square.svg
         assets/icons/trash.svg
         assets/icons/triangle.svg
+        assets/icons/triangle-alert.svg
         assets/icons/tv-minimal-play.svg
         assets/icons/volume-2.svg
         assets/icons/wifi-off.svg
