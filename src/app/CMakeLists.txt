@@ -70,6 +70,8 @@ qt_add_qml_module(mfplay
         qml/Theme.qml
         qml/about/AboutPage.qml
         qml/consoles/AddByAddressDialog.qml
+        qml/consoles/AddConsoleTile.qml
+        qml/consoles/CardAction.qml
         qml/consoles/ConsoleCard.qml
         qml/consoles/ConsolesPage.qml
         qml/consoles/DiscoveryBanner.qml
