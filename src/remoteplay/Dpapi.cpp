@@ -15,9 +15,8 @@ namespace mfplay::remoteplay
 namespace
 {
 
-// Fixed when the app was still called Lynx Play: changing it makes every saved
-// registration key and PSN token unreadable.
-constexpr std::string_view kEntropy = "Lynx Play console secrets";
+// Changing it makes every saved registration key and PSN token unreadable.
+constexpr std::string_view kEntropy = "MFPlay console secrets";
 
 struct LocalFreeDeleter
 {

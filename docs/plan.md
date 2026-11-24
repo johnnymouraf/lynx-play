@@ -9,7 +9,6 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 
 - [Phases](#phases)
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
-- [Current: 3.1 Rename to MFPlay](#current-31-rename-to-mfplay)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Shared by the redesign steps (3.2–3.5)](#shared-by-the-redesign-steps-3235)
@@ -67,7 +66,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
         motion vectors and compared with VSR.
 - [ ] **3. MFPlay: name and redesign**: the app becomes MFPlay and every
       screen follows the Drafia redesign (`design file`).
-  - [ ] **3.1 Rename to MFPlay**: name everywhere (code, namespace, CMake,
+  - [x] **3.1 Rename to MFPlay**: name everywhere (code, namespace, CMake,
         QML module, exe, workflow, docs), the vector icon and logo from the
         design, data moved from `MFPlay` to `MFPlay`, the repository renamed
         to `johnnymouraf/mfplay`.
@@ -140,32 +139,6 @@ Out of scope for now: capture card input (planned for the future).
 - Internet: PSN NAT traversal plus a manual address.
 - Builds only in GitHub Actions; the app is tested by running the downloaded
   artifact on the owner's machine.
-
-## Current: 3.1 Rename to MFPlay
-
-- **Goal:** the project, the app and the repository are called MFPlay;
-  "Lynx" remains only in the migration of the old data folders and in git
-  history.
-- **Guardrails:** no local build; nothing in `third_party/chiaki-ng`; no
-  force-push; commit and push to `main` after each delivery; screen layouts
-  don't change yet (only the logo and the icon); the repository is renamed
-  only once the renamed code is green.
-- **Success criteria:**
-  1. `git grep -i lynx` finds only the migration of the old folders and the
-     DPAPI entropy, which must keep its value for saved secrets to decrypt.
-  2. CI is green; the artifact `mfplay-windows-x64` holds `mfplay.exe` with the
-     MF icon.
-  3. With a `MFPlay` folder in `%APPDATA%` or `%LOCALAPPDATA%`, the first run
-     copies it to `MFPlay` and shows the paired consoles; the old folder stays
-     untouched (checked by running the app on this machine, which has real
-     `LynxPlay` data; the tests never touch the disk).
-  4. The window title, the rail and Sobre show MFPlay with the design's vector
-     logo (checked by running the app here).
-  5. The repository is `johnnymouraf/mfplay`, with `origin` and the README and
-     Sobre links updated.
-- **Deliveries:** (1) rename code, CMake, QML module, workflow and docs; (2)
-  data migration; (3) `.ico` and logo exported from the design;
-  (4) rename the repository and check the app running.
 
 ## Auto mode
 

@@ -25,6 +25,7 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QVariantMap>
 
@@ -200,14 +201,7 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
 
 int main(int argc, char* argv[])
 {
-    const auto adoptionFailures = mfplay::core::adoptLegacyDataDirs();
     startLogging();
-
-    for (const auto& failure : adoptionFailures)
-    {
-        spdlog::error("Data from before the rename to MFPlay was not copied: {}", failure);
-    }
-
     mfplay::core::installTerminateLogging();
     mfplay::app::installQtLogBridge();
     spdlog::info("MFPlay {} starting", mfplay::app::kVersion);
@@ -238,6 +232,8 @@ int main(int argc, char* argv[])
         },
         settings);
     QGuiApplication::setApplicationName(QStringLiteral("MFPlay"));
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(":/qt/qml/MFPlay/assets/images/app-icon.svg")));
     QGuiApplication::setApplicationVersion(controller.version());
 
     auto sdl = mfplay::input::SdlRuntime::create();
