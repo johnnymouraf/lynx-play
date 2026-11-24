@@ -51,11 +51,13 @@ constexpr double kMinFileFramesPerSecond = 1.0;
 constexpr double kMaxFileFramesPerSecond = 240.0;
 
 // Developer options: `--play-file <file> [--fps <rate>]` plays an elementary
-// stream instead of opening the interface.
+// stream instead of opening the interface; `--gallery` opens the interface on
+// the gallery of its shared controls.
 struct CommandLine
 {
     std::optional<std::filesystem::path> playFile;
     double framesPerSecond = 60.0;
+    bool gallery = false;
 };
 
 void startLogging()
@@ -164,9 +166,11 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
         u"play-file"_s, u"Plays an H.264 or H.265 elementary stream in a loop."_s, u"file"_s);
     const QCommandLineOption framesPerSecond(u"fps"_s, u"The file's frame rate (60)."_s,
                                              u"rate"_s, u"60"_s);
+    const QCommandLineOption gallery(u"gallery"_s,
+                                     u"Shows every shared control of the interface."_s);
 
     QCommandLineParser parser;
-    parser.addOptions({playFile, framesPerSecond});
+    parser.addOptions({playFile, framesPerSecond, gallery});
     parser.process(application);
 
     CommandLine commandLine;
@@ -186,6 +190,8 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
     {
         commandLine.playFile = parser.value(playFile).toStdWString();
     }
+
+    commandLine.gallery = parser.isSet(gallery);
 
     return commandLine;
 }
@@ -272,6 +278,7 @@ int main(int argc, char* argv[])
         {QStringLiteral("settings"), QVariant::fromValue(&settings)},
         {QStringLiteral("stream"), QVariant::fromValue(&stream)},
         {QStringLiteral("input"), QVariant::fromValue(&input)},
+        {QStringLiteral("gallery"), commandLine->gallery},
     });
 
     QObject::connect(

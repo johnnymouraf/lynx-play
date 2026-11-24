@@ -110,6 +110,8 @@ qt_add_qml_module(mfplay
         qml/controls/Toggle.qml
         qml/controls/ValueSlider.qml
         qml/controls/ViewToggle.qml
+        qml/dev/Gallery.qml
+        qml/dev/GallerySection.qml
         qml/settings/AudioSettings.qml
         qml/settings/ControllerSettings.qml
         qml/settings/RtxSettings.qml

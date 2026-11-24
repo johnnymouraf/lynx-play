@@ -18,6 +18,7 @@ interface) is written for Windows and Direct3D 12.
 - [Status](#status)
 - [Download](#download)
 - [Playing a test stream](#playing-a-test-stream)
+- [Control gallery](#control-gallery)
 - [Requirements](#requirements)
 - [Building](#building)
 - [Project layout](#project-layout)
@@ -77,6 +78,15 @@ ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=60 -t 20 `
   -vf "zscale=min=bt709:tin=bt709:pin=bt709:m=bt2020nc:t=smpte2084:p=bt2020:r=limited:npl=1000,format=yuv420p10le" `
   -c:v libx265 -x265-params "keyint=60:bframes=0:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc" `
   test-hdr10.h265
+```
+
+## Control gallery
+
+To compare the interface's shared controls with the design, open the gallery
+of every control in its states:
+
+```powershell
+.\mfplay.exe --gallery
 ```
 
 ## Requirements

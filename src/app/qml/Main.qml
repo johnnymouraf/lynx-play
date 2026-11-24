@@ -11,6 +11,8 @@ ApplicationWindow {
     required property SettingsController settings
     required property StreamController stream
     required property InputController input
+    // Set by the `--gallery` developer option.
+    property bool gallery: false
 
     property string section: "consoles"
     // The sections the StackLayout below holds, in order.
@@ -165,6 +167,13 @@ ApplicationWindow {
             visible: window.connecting
             stream: window.stream
             controller: window.controller
+        }
+
+        Loader {
+            anchors.fill: parent
+            active: window.gallery
+
+            sourceComponent: Gallery {}
         }
     }
 
