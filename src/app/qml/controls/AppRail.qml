@@ -2,44 +2,43 @@ import QtQuick
 import QtQuick.Layouts
 import MFPlay
 
-// The left rail: brand and the app's sections.
+// The design's AppRail: the brand, the app's sections and Sobre at the
+// bottom.
 Rectangle {
     id: rail
 
+    // "consoles", "settings" or "about".
     property string section: "consoles"
-    property bool controllerConnected: false
-    property string controllerTitle
-    property string controllerDetail
-    property bool controllerBatteryLow: false
 
     signal sectionRequested(string section)
 
     implicitWidth: Theme.sizeRail
-    color: Theme.surface
-
-    Rectangle {
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        width: 1
-        color: Theme.border
-    }
+    color: Theme.menu
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.topMargin: Theme.space6
+        anchors.topMargin: 28
         anchors.leftMargin: Theme.space4
         anchors.rightMargin: Theme.space4
-        anchors.bottomMargin: Theme.space5
-        spacing: Theme.space8
+        anchors.bottomMargin: Theme.space4
+        spacing: 0
 
         BrandLogo {
             Layout.leftMargin: Theme.space2
         }
 
+        AppText {
+            Layout.topMargin: Theme.space6
+            Layout.leftMargin: 10
+            text: "Menu"
+            textStyle: "overline"
+            color: Theme.textSubtle
+        }
+
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: Theme.space1
+            Layout.topMargin: Theme.space2
+            spacing: 6
 
             NavItem {
                 Layout.fillWidth: true
@@ -62,47 +61,12 @@ Rectangle {
             Layout.fillHeight: true
         }
 
-        RowLayout {
+        NavItem {
             Layout.fillWidth: true
-            visible: rail.controllerConnected
-            spacing: Theme.space3
-            Accessible.role: Accessible.StaticText
-            Accessible.name: `${rail.controllerTitle}, ${rail.controllerDetail}`
-
-            Icon {
-                Layout.alignment: Qt.AlignVCenter
-                name: "gamepad-2"
-                size: 20
-                color: Theme.textMuted
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 0
-
-                AppText {
-                    Layout.fillWidth: true
-                    text: rail.controllerTitle
-                    textStyle: "labelMedium"
-                    elide: Text.ElideRight
-                }
-
-                AppText {
-                    Layout.fillWidth: true
-                    text: rail.controllerDetail
-                    textStyle: "caption"
-                    color: Theme.textMuted
-                    elide: Text.ElideRight
-                }
-            }
-
-            Rectangle {
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 8
-                implicitHeight: 8
-                radius: 4
-                color: rail.controllerBatteryLow ? Theme.standby : Theme.ready
-            }
+            text: "Sobre"
+            iconName: "info"
+            selected: rail.section === "about"
+            onClicked: rail.sectionRequested("about")
         }
     }
 }

@@ -2,17 +2,18 @@ import QtQuick
 import QtQuick.Templates as T
 import MFPlay
 
-// An entry of the app rail or of a section list.
+// The design's NavItem: an entry of the app rail or of a section list, with
+// its icon in a tile.
 T.Button {
     id: control
 
     property string iconName
     property bool selected: false
 
-    implicitWidth: 216
-    implicitHeight: 48
-    leftPadding: Theme.space4
-    rightPadding: Theme.space4
+    implicitWidth: 200
+    implicitHeight: Theme.sizeControlLg
+    leftPadding: 10
+    rightPadding: 10
     spacing: Theme.space3
     focusPolicy: Qt.StrongFocus
     hoverEnabled: true
@@ -22,13 +23,13 @@ T.Button {
     contentItem: Row {
         spacing: control.spacing
 
-        Icon {
-            id: icon
+        IconTile {
+            id: tile
 
             anchors.verticalCenter: parent.verticalCenter
-            name: control.iconName
-            size: 22
-            color: Theme.textMuted
+            iconName: control.iconName
+            iconColor: Theme.textMuted
+            color: Theme.surfaceRaised
         }
 
         AppText {
@@ -37,7 +38,6 @@ T.Button {
             anchors.verticalCenter: parent.verticalCenter
             text: control.text
             textStyle: "labelLarge"
-            color: Theme.textMuted
         }
     }
 
@@ -45,7 +45,7 @@ T.Button {
         id: fill
 
         radius: Theme.radiusMd
-        color: "transparent"
+        color: Theme.surface
 
         FocusRing {
             targetRadius: fill.radius
@@ -60,36 +60,41 @@ T.Button {
 
             PropertyChanges {
                 target: fill
-                color: Theme.accentSubtle
+                color: Theme.accent
             }
 
             PropertyChanges {
-                target: icon
-                color: Theme.accent
+                target: tile
+                color: Theme.accentPressed
+                iconColor: Theme.onAccent
             }
 
             PropertyChanges {
                 target: label
-                color: Theme.accent
+                color: Theme.onAccent
             }
         },
         State {
-            name: "highlighted"
-            when: control.hovered || control.visualFocus
+            name: "hovered"
+            when: control.hovered
 
             PropertyChanges {
                 target: fill
-                color: Theme.surfaceHigh
+                color: Theme.surfaceHover
             }
 
             PropertyChanges {
-                target: icon
-                color: Theme.text
+                target: tile
+                iconColor: Theme.text
             }
+        },
+        State {
+            name: "focused"
+            when: control.visualFocus
 
             PropertyChanges {
-                target: label
-                color: Theme.text
+                target: tile
+                iconColor: Theme.text
             }
         }
     ]

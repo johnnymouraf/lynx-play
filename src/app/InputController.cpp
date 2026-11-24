@@ -154,6 +154,11 @@ bool InputController::controllerBatteryLow() const
     return batteryLow_;
 }
 
+int InputController::controllerBattery() const
+{
+    return battery_;
+}
+
 QVariantList InputController::controllers() const
 {
     return controllers_;
@@ -270,6 +275,7 @@ void InputController::refreshStatus()
     QString status;
     bool wired = false;
     bool batteryLow = false;
+    int battery = -1;
 
     if (active != nullptr)
     {
@@ -295,7 +301,8 @@ void InputController::refreshStatus()
         else if (active->batteryPercent >= 0)
         {
             status = QStringLiteral("Bateria %1 %").arg(active->batteryPercent);
-            batteryLow = active->batteryPercent < kLowBatteryPercent;
+            battery = active->batteryPercent;
+            batteryLow = battery < kLowBatteryPercent;
         }
         else
         {
@@ -303,9 +310,9 @@ void InputController::refreshStatus()
         }
     }
 
-    const bool statusChanged =
-        connected != connected_ || title != title_ || detail != detail_ || status != status_ ||
-        wired != wired_ || batteryLow != batteryLow_ || controllers != controllers_;
+    const bool statusChanged = connected != connected_ || title != title_ || detail != detail_ ||
+                               status != status_ || wired != wired_ || batteryLow != batteryLow_ ||
+                               battery != battery_ || controllers != controllers_;
 
     connected_ = connected;
     title_ = title;
@@ -313,6 +320,7 @@ void InputController::refreshStatus()
     status_ = status;
     wired_ = wired;
     batteryLow_ = batteryLow;
+    battery_ = battery;
     controllers_ = controllers;
 
     if (statusChanged)

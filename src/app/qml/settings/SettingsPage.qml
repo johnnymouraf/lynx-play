@@ -13,7 +13,7 @@ Item {
 
     property string section: "video"
     // The sections the StackLayout below holds, in order.
-    readonly property var sectionIds: ["video", "audio", "controls", "rtx", "about"]
+    readonly property var sectionIds: ["video", "audio", "controls", "rtx"]
 
     RowLayout {
         anchors.fill: parent
@@ -71,14 +71,6 @@ Item {
                     onClicked: page.section = "rtx"
                 }
 
-                NavItem {
-                    Layout.fillWidth: true
-                    text: "Sobre"
-                    iconName: "info"
-                    selected: page.section === "about"
-                    onClicked: page.section = "about"
-                }
-
                 Item {
                     Layout.fillHeight: true
                 }
@@ -130,10 +122,6 @@ Item {
                 RtxSettings {
                     settings: page.settings
                     gpuName: page.controller.gpuName
-                }
-
-                AboutSettings {
-                    controller: page.controller
                 }
             }
         }

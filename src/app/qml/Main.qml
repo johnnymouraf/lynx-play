@@ -13,6 +13,26 @@ ApplicationWindow {
     required property InputController input
 
     property string section: "consoles"
+    // The sections the StackLayout below holds, in order.
+    readonly property var sectionIds: ["consoles", "settings", "about"]
+    // The side margins of the pages and the footer: the design's 48 px, or
+    // 32 px in a window narrower than 1280.
+    readonly property int pageMargin: window.width >= 1280 ? Theme.space12 : Theme.space8
+    readonly property var hintsBySection: ({
+        consoles: [
+            { button: "cross", label: "Jogar" },
+            { button: "triangle", label: "Opções do console" },
+            { button: "square", label: "Adicionar pelo IP" },
+            { button: "options", label: "Menu" }
+        ],
+        settings: window.navigationHints,
+        about: window.navigationHints
+    })
+    readonly property var navigationHints: [
+        { button: "cross", label: "Selecionar" },
+        { button: "circle", label: "Voltar" },
+        { button: "options", label: "Menu" }
+    ]
 
     readonly property bool connecting: window.stream.phase !== StreamController.Idle
                                         && window.stream.phase !== StreamController.Streaming
@@ -26,6 +46,16 @@ ApplicationWindow {
     color: Theme.bg
     font.family: Theme.fontBody
     font.pixelSize: 14
+
+    function controllerStatusText() {
+        const battery = window.input.controllerBattery;
+
+        if (battery >= 0) {
+            return `Bateria ${battery} %`;
+        }
+
+        return "Conectado";
+    }
 
     Component.onCompleted: consolesPage.focusFirstControl()
 
@@ -69,10 +99,6 @@ ApplicationWindow {
             AppRail {
                 Layout.fillHeight: true
                 section: window.section
-                controllerConnected: window.input.controllerConnected
-                controllerTitle: window.input.controllerTitle
-                controllerDetail: window.input.controllerDetail
-                controllerBatteryLow: window.input.controllerBatteryLow
                 onSectionRequested: requested => window.section = requested
             }
 
@@ -81,14 +107,14 @@ ApplicationWindow {
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 0
+                spacing: Theme.space5
 
                 StackLayout {
                     id: sections
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    currentIndex: window.section === "consoles" ? 0 : 1
+                    currentIndex: window.sectionIds.indexOf(window.section)
 
                     ConsolesPage {
                         id: consolesPage
@@ -102,11 +128,34 @@ ApplicationWindow {
                         settings: window.settings
                         input: window.input
                     }
+
+                    AboutPage {
+                        controller: window.controller
+                        sideMargin: window.pageMargin
+                    }
                 }
 
-                ControllerHintBar {
+                RowLayout {
                     Layout.fillWidth: true
-                    visible: window.input.controllerConnected && window.section === "consoles"
+                    Layout.leftMargin: window.pageMargin
+                    Layout.rightMargin: window.pageMargin
+                    Layout.bottomMargin: Theme.space4
+                    spacing: Theme.space4
+
+                    ControllerHintBar {
+                        Layout.fillWidth: true
+                        opacity: window.input.controllerConnected ? 1 : 0
+                        hints: window.hintsBySection[window.section]
+                    }
+
+                    ControllerStatus {
+                        Layout.preferredWidth: 240
+                        connected: window.input.controllerConnected
+                        name: window.input.controllerTitle
+                        status: window.controllerStatusText()
+                        connection: window.input.controllerWired ? "via USB" : "via Bluetooth"
+                        batteryLow: window.input.controllerBatteryLow
+                    }
                 }
             }
         }
@@ -123,7 +172,7 @@ ApplicationWindow {
         id: toast
 
         x: contentArea.x + (contentArea.width - width) / 2
-        y: window.height - height - Theme.space6
+        y: window.height - height - Theme.sizeControlLg - Theme.space4 - Theme.space5
         width: Math.min(400, contentArea.width - 2 * Theme.space8)
     }
 }

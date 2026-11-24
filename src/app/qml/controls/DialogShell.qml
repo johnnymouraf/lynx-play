@@ -3,13 +3,14 @@ import QtQuick.Layouts
 import QtQuick.Templates as T
 import MFPlay
 
-// The design's DialogShell: a modal over a scrim, with an optional eyebrow,
-// a title, a close button, the body and a footer for the actions.
+// The design's DialogShell: a modal over a scrim, with an optional icon tile
+// and eyebrow, a title, a close button, the body and the actions at the end.
 T.Popup {
     id: dialog
 
     property string title
     property string eyebrow
+    property string iconName
     default property alias body: bodyColumn.data
     property alias actions: actionRow.data
     property bool showFooter: true
@@ -47,9 +48,7 @@ T.Popup {
 
     background: Rectangle {
         radius: Theme.radiusXl
-        color: Theme.surfaceRaised
-        border.width: 1
-        border.color: Theme.border
+        color: Theme.surface
     }
 
     contentItem: ColumnLayout {
@@ -57,38 +56,49 @@ T.Popup {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.topMargin: Theme.space6
-            Layout.leftMargin: Theme.space6
-            Layout.rightMargin: Theme.space4
-            Layout.bottomMargin: Theme.space2
-            spacing: Theme.space4
+            Layout.topMargin: Theme.space5
+            Layout.leftMargin: Theme.space5
+            Layout.rightMargin: Theme.space5
+            Layout.bottomMargin: Theme.space4
+            spacing: 14
+
+            IconTile {
+                visible: dialog.iconName.length > 0
+                implicitWidth: Theme.space10
+                implicitHeight: Theme.space10
+                radius: Theme.radiusMd
+                color: Theme.accent
+                iconName: dialog.iconName
+                iconSize: Theme.sizeIcon
+                iconColor: Theme.onAccent
+            }
 
             ColumnLayout {
                 Layout.fillWidth: true
-                Layout.topMargin: Theme.space1
-                Layout.alignment: Qt.AlignTop
-                spacing: Theme.space1
+                spacing: 2
 
                 AppText {
                     visible: dialog.eyebrow.length > 0
                     text: dialog.eyebrow
                     textStyle: "overline"
-                    font.capitalization: Font.AllUppercase
-                    color: Theme.accent
+                    color: Theme.textSubtle
                 }
 
                 AppText {
                     Layout.fillWidth: true
                     text: dialog.title
-                    textStyle: "titleMedium"
+                    textStyle: "dialogTitle"
                     wrapMode: Text.WordWrap
                     Accessible.role: Accessible.Heading
                 }
             }
 
             IconButton {
-                Layout.alignment: Qt.AlignTop
+                implicitWidth: Theme.sizeControlSm
+                implicitHeight: Theme.sizeControlSm
+                restingFill: Theme.surfaceRaised
                 iconName: "x"
+                iconSize: Theme.space4
                 text: "Fechar"
                 onClicked: dialog.close()
             }
@@ -98,40 +108,21 @@ T.Popup {
             id: bodyColumn
 
             Layout.fillWidth: true
-            Layout.topMargin: Theme.space4
-            Layout.leftMargin: Theme.space6
-            Layout.rightMargin: Theme.space6
-            Layout.bottomMargin: Theme.space6
-            spacing: Theme.space5
+            Layout.topMargin: Theme.space1
+            Layout.leftMargin: Theme.space5
+            Layout.rightMargin: Theme.space5
+            Layout.bottomMargin: Theme.space5
+            spacing: Theme.space4
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.leftMargin: 1
-            Layout.rightMargin: 1
-            Layout.bottomMargin: 1
+        Row {
+            id: actionRow
+
+            Layout.alignment: Qt.AlignRight
+            Layout.rightMargin: Theme.space5
+            Layout.bottomMargin: Theme.space5
             visible: dialog.showFooter
-            implicitHeight: actionRow.implicitHeight + 2 * Theme.space4
-            color: Theme.surface
-            bottomLeftRadius: Theme.radiusXl - 1
-            bottomRightRadius: Theme.radiusXl - 1
-
-            Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Theme.border
-            }
-
-            Row {
-                id: actionRow
-
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.space6
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.space3
-            }
+            spacing: 10
         }
     }
 }

@@ -2,9 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import MFPlay
 
-// The design's SettingRow: a label, an optional description and the row's
-// control at its end, over a divider.
-Item {
+// The design's SettingRow: a solid block with a label, an optional
+// description and the row's control at its end.
+Rectangle {
     id: row
 
     property string label
@@ -12,12 +12,16 @@ Item {
     default property alias control: controlSlot.data
 
     implicitHeight: content.implicitHeight + 2 * Theme.space4
+    radius: Theme.radiusMd
+    color: Theme.surface
 
     RowLayout {
         id: content
 
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.leftMargin: Theme.space5
+        anchors.rightMargin: Theme.space5
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.space6
 
@@ -48,13 +52,5 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             spacing: Theme.space3
         }
-    }
-
-    Rectangle {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 1
-        color: Theme.border
     }
 }

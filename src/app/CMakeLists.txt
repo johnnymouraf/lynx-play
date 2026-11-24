@@ -68,6 +68,7 @@ qt_add_qml_module(mfplay
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
+        qml/about/AboutPage.qml
         qml/consoles/AddByAddressDialog.qml
         qml/consoles/ConsoleCard.qml
         qml/consoles/ConsolesPage.qml
@@ -81,7 +82,9 @@ qt_add_qml_module(mfplay
         qml/controls/AppText.qml
         qml/controls/Banner.qml
         qml/controls/BrandLogo.qml
+        qml/controls/ControllerHint.qml
         qml/controls/ControllerHintBar.qml
+        qml/controls/ControllerStatus.qml
         qml/controls/DialogShell.qml
         qml/controls/FocusRing.qml
         qml/controls/Icon.qml
@@ -101,11 +104,12 @@ qt_add_qml_module(mfplay
         qml/controls/SettingRow.qml
         qml/controls/Spinner.qml
         qml/controls/StateBadge.qml
+        qml/controls/StatusCount.qml
         qml/controls/ThinScrollBar.qml
         qml/controls/Toast.qml
         qml/controls/Toggle.qml
         qml/controls/ValueSlider.qml
-        qml/settings/AboutSettings.qml
+        qml/controls/ViewToggle.qml
         qml/settings/AudioSettings.qml
         qml/settings/ControllerSettings.qml
         qml/settings/RtxSettings.qml

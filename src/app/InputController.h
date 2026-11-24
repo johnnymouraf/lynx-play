@@ -32,6 +32,7 @@ class InputController : public QObject
     Q_PROPERTY(QString controllerStatus READ controllerStatus NOTIFY changed)
     Q_PROPERTY(bool controllerWired READ controllerWired NOTIFY changed)
     Q_PROPERTY(bool controllerBatteryLow READ controllerBatteryLow NOTIFY changed)
+    Q_PROPERTY(int controllerBattery READ controllerBattery NOTIFY changed)
     Q_PROPERTY(QVariantList controllers READ controllers NOTIFY changed)
     Q_PROPERTY(QString preferredController READ preferredController WRITE setPreferredController
                    NOTIFY changed)
@@ -52,6 +53,9 @@ public:
     [[nodiscard]] QString controllerStatus() const;
     [[nodiscard]] bool controllerWired() const;
     [[nodiscard]] bool controllerBatteryLow() const;
+    // The active wireless controller's charge in percent, or -1 when it is
+    // wired or doesn't report one.
+    [[nodiscard]] int controllerBattery() const;
     [[nodiscard]] QVariantList controllers() const;
 
     [[nodiscard]] QString preferredController() const;
@@ -78,6 +82,7 @@ private:
     QString status_;
     bool wired_ = false;
     bool batteryLow_ = false;
+    int battery_ = -1;
     QVariantList controllers_;
 };
 

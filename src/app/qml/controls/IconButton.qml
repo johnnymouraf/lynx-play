@@ -8,6 +8,7 @@ T.Button {
     id: control
 
     property string iconName: "x"
+    property int iconSize: Theme.sizeIcon
     property color restingFill: "transparent"
 
     implicitWidth: Theme.sizeControl
@@ -20,6 +21,7 @@ T.Button {
         Icon {
             anchors.centerIn: parent
             name: control.iconName
+            size: control.iconSize
             color: control.enabled ? Theme.textMuted : Theme.textDisabled
         }
     }
