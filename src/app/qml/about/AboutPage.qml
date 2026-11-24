@@ -84,7 +84,7 @@ Item {
                 radius: Theme.radiusMd
                 color: Theme.surface
 
-                RowLayout {
+                Row {
                     id: appCard
 
                     anchors.fill: parent
@@ -92,10 +92,8 @@ Item {
                     spacing: Theme.space6
 
                     Item {
-                        Layout.preferredWidth: 88
-                        Layout.preferredHeight: 88
-                        Layout.maximumWidth: 88
-                        Layout.maximumHeight: 88
+                        width: 88
+                        height: 88
 
                         Image {
                             anchors.fill: parent
@@ -105,8 +103,7 @@ Item {
                         }
                     }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
+                    Column {
                         spacing: 6
 
                         Text {
