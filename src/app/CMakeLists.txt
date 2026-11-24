@@ -5,11 +5,6 @@ set(CMAKE_INSTALL_BINDIR .)
 find_package(Qt6 6.10 REQUIRED COMPONENTS Gui Network Qml Quick Svg)
 qt_standard_project_setup(REQUIRES 6.10)
 
-# CI passes the run number, so a downloaded build says which one it is.
-set(MFPLAY_VERSION "${PROJECT_VERSION}")
-if(MFPLAY_BUILD_NUMBER)
-    string(APPEND MFPLAY_VERSION "-build.${MFPLAY_BUILD_NUMBER}")
-endif()
 configure_file(Version.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/app/Version.h" @ONLY)
 
 qt_add_executable(mfplay WIN32

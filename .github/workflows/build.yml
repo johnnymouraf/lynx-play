@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, "auto/**"]
+    branches: [master, "auto/**"]
   pull_request:
   workflow_dispatch:
 
@@ -134,7 +134,6 @@ jobs:
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
           -DMFPLAY_NGX_ROOT="${{ github.workspace }}/.ngx"
-          -DMFPLAY_BUILD_NUMBER="${{ github.run_number }}"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'
@@ -160,20 +159,27 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      # The artifact expires in a day; the versioned release is where the
-      # portable build stays.
+      # The artifact expires in a day; the release is where the portable build
+      # stays. The version comes from CMakeLists.txt, so a delivery that
+      # changes the app bumps it; a push that doesn't bump it keeps the
+      # release already published.
       - name: Publish the release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = [regex]::Match((Get-Content CMakeLists.txt -Raw),
             'project\(MFPlay\s+VERSION\s+([0-9.]+)').Groups[1].Value
-          $full = "$version-build.${{ github.run_number }}"
+          $tag = "v$version"
+          gh release view $tag --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists; keeping it."
+            exit 0
+          }
           Compress-Archive -Path dist/mfplay/* -DestinationPath mfplay-windows-x64.zip
-          gh release create "v$full" `
-            --title "MFPlay $full" `
-            --notes "Portable build of main at ``${{ github.sha }}``." `
+          gh release create $tag `
+            --title "MFPlay $version" `
+            --notes "Portable build of master at ``${{ github.sha }}``." `
             --latest `
             mfplay-windows-x64.zip
           # Keep the newest twelve releases; older assets would pile up.

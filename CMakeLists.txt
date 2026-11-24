@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(MFPlay
-    VERSION 0.1.0
+    VERSION 1.0.0
     DESCRIPTION "Remote Play client for the PS5 with NVIDIA RTX enhancements"
     LANGUAGES C CXX)
 
@@ -13,8 +13,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(MFPLAY_BUILD_TESTS "Build the unit tests" ON)
-
-set(MFPLAY_BUILD_NUMBER "" CACHE STRING "Build number appended to the app version")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(MFPlayWarnings)

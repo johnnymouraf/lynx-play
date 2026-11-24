@@ -30,10 +30,10 @@ The plan and its progress live in [docs/plan.md](docs/plan.md).
 
 ## Download
 
-Every green build of `main` publishes a versioned release
-(`v0.1.0-build.N`) with the portable package,
-`mfplay-windows-x64.zip`: extract it anywhere and run `mfplay.exe`.
-There is no installer.
+Every green build of `master` publishes a release tagged with the version in
+`CMakeLists.txt` (`v1.0.0`) and the portable package,
+`mfplay-windows-x64.zip`: extract it anywhere and run `mfplay.exe`. There is
+no installer. Bump the version for every delivery, without a build suffix.
 
 Download the newest release with the GitHub CLI, or from the Releases page:
 
@@ -42,10 +42,10 @@ gh release download --repo johnnymouraf/mfplay --pattern "mfplay-windows-x64.zip
 ```
 
 Logs are written to `%LOCALAPPDATA%\MFPlay\logs`. The newest twelve
-releases are kept; older ones are removed by the build. The saved and paired consoles live in
-`%APPDATA%\MFPlay\consoles.json`, with their keys and the PSN account ID
-encrypted for the current Windows user (DPAPI), and the video settings in
-`%APPDATA%\MFPlay\settings.json`.
+releases are kept; older ones are removed by the build. The saved and
+paired consoles live in `%APPDATA%\MFPlay\consoles.json`, with their keys
+and the PSN account ID encrypted for the current Windows user (DPAPI), and
+the video settings in `%APPDATA%\MFPlay\settings.json`.
 
 The first run asks Windows Firewall to let MFPlay use the network: allow it,
 or the consoles' answers to the network search never reach the app.

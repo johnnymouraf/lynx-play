@@ -16,6 +16,9 @@ the layout and `docs/plan.md` for the plan in progress.
   free.
 - After pushing, follow the run with `gh run watch` and read failures with
   `gh run view --log-failed`.
+- Version and release: the `project(... VERSION x.y.z)` in `CMakeLists.txt`
+  is both the app version and the release tag (`vx.y.z`). Bump it on every
+  delivery; there is no build suffix.
 - To test a build, download its artifact into a fresh folder and run it:
   `gh run download <run-id> --name mfplay-windows-x64 --dir <folder>`.
   Running the app on this machine is how features are checked: it is the target
@@ -40,7 +43,7 @@ registration keys, PINs, tokens or IP addresses outside the local network.
 
 ## Git
 
-- Delivery: commit and push to `main` after each delivery of the current
+- Delivery: commit and push to `master` after each delivery of the current
   milestone, so no work is lost.
 - Commits: Conventional Commits in English.
 - No force-push.

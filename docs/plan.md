@@ -141,7 +141,7 @@ Scope of the last run: 3.2–3.5, started and closed on 2026-11-24 with the
 owner at the machine. The first run (2026-11-22) built 1.1–1.5 and 2.1–2.6.
 Delivery: each step works on the branch `auto/<step>` (for example `auto/3.2`),
 commits and pushes each delivery there so CI builds it, and the orchestrator
-fast-forwards `main` to the branch once the step is done and green.
+fast-forwards `master` to the branch once the step is done and green.
 
 ### Shared by every step
 
@@ -153,7 +153,7 @@ fast-forwards `main` to the branch once the step is done and green.
 - **Read first:** `CLAUDE.md`, `README.md`, this plan, and the code of the steps
   before yours.
 - **Building:** never compile on this machine. Push to `auto/<step>`; the
-  `Build` workflow runs on `main` and `auto/**` branches. Follow runs with
+  `Build` workflow runs on `master` and `auto/**` branches. Follow runs with
   `gh run watch <id> --exit-status` and read failures with
   `gh run view <id> --log-failed`. A warm run takes about 10 minutes; a new
   vcpkg dependency adds its first build (FFmpeg can take 30+ minutes once).
@@ -180,7 +180,7 @@ fast-forwards `main` to the branch once the step is done and green.
   Never commit media or tools.
 - **Guardrails for every step:** no work beyond the step's mission; no change to
   `docs/plan.md` or `docs/issues.md` (report issues instead); never commit to
-  `main`, never force-push, never rewrite pushed history; no NVIDIA or other
+  `master`, never force-push, never rewrite pushed history; no NVIDIA or other
   third-party binaries, SDKs, fonts without a bundling license, or media in the
   repository; no PSN account IDs, console keys, PINs or tokens in the
   repository, logs or test fixtures (use obviously fake values); no capture
@@ -213,18 +213,18 @@ console's screen), and the PSN login (4.2) needs their account.
 on this machine. Changing it: nothing is redone; the run just stops earlier or
 later.
 
-#### D2 – Step branches instead of commits on `main` (all)
+#### D2 – Step branches instead of commits on `master` (all)
 
 Builds only run in CI, so each step must push to compile; auto mode wants one
-delivery per step on `main`.
+delivery per step on `master`.
 
-- A. Each step on `auto/<step>`, one commit per delivery pushed there, `main`
-  fast-forwarded when the step is green: `main` only gets working steps, and
-  every delivery is still committed and pushed as the owner asked.
-- B. Every delivery straight on `main`: `main` may hold broken builds
+- A. Each step on `auto/<step>`, one commit per delivery pushed there,
+  `master` fast-forwarded when the step is green: `master` only gets working
+  steps, and every delivery is still committed and pushed as the owner asked.
+- B. Every delivery straight on `master`: `master` may hold broken builds
   overnight.
 
-**Chosen: A**, because `main` stays green and nothing is lost. Changing it:
+**Chosen: A**, because `master` stays green and nothing is lost. Changing it:
 delete the merged `auto/*` branches; no code changes.
 
 #### D3 – Keeping the laptop awake (all)
