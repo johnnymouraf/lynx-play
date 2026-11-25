@@ -1,5 +1,6 @@
 #include "remoteplay/ChiakiLogSink.h"
 
+#include <charconv>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -10,7 +11,11 @@ namespace mfplay::remoteplay
 namespace
 {
 
-constexpr std::uint32_t kLoggedLevels = CHIAKI_LOG_INFO | CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR;
+constexpr std::uint32_t kLoggedLevels =
+    CHIAKI_LOG_VERBOSE | CHIAKI_LOG_INFO | CHIAKI_LOG_WARNING | CHIAKI_LOG_ERROR;
+constexpr std::string_view kConnectionQuality = "connection quality: ";
+constexpr std::string_view kTargetBitrateKey = "target_bitrate=";
+constexpr auto kQualityInterval = std::chrono::seconds(5);
 constexpr auto kRepeatInterval = std::chrono::minutes(1);
 constexpr std::size_t kMaxRememberedMessages = 256;
 
@@ -32,6 +37,23 @@ spdlog::level::level_enum toSpdlogLevel(ChiakiLogLevel level)
     return spdlog::level::info;
 }
 
+// The console's target_bitrate out of a "connection quality" report, or -1.
+long targetBitrateOf(std::string_view report)
+{
+    const auto key = report.find(kTargetBitrateKey);
+
+    if (key == std::string_view::npos)
+    {
+        return -1;
+    }
+
+    const auto digits = report.substr(key + kTargetBitrateKey.size());
+    long value = -1;
+    std::from_chars(digits.data(), digits.data() + digits.size(), value);
+
+    return value;
+}
+
 } // namespace
 
 ChiakiLogSink::ChiakiLogSink(Observer observer) : observer_(std::move(observer))
@@ -49,6 +71,12 @@ void ChiakiLogSink::forward(ChiakiLogLevel level, const char* message, void* use
     auto& sink = *static_cast<ChiakiLogSink*>(user);
     const std::string text(message);
 
+    if (level == CHIAKI_LOG_VERBOSE)
+    {
+        sink.logConnectionQuality(text);
+        return;
+    }
+
     if (sink.observer_)
     {
         sink.observer_(level, text);
@@ -60,6 +88,35 @@ void ChiakiLogSink::forward(ChiakiLogLevel level, const char* message, void* use
     }
 
     spdlog::log(toSpdlogLevel(level), "[chiaki] {}", text);
+}
+
+void ChiakiLogSink::logConnectionQuality(const std::string& message)
+{
+    const auto start = message.find(kConnectionQuality);
+
+    if (start == std::string::npos)
+    {
+        return;
+    }
+
+    const std::string_view report = std::string_view(message).substr(start);
+    const long target = targetBitrateOf(report);
+    const auto now = std::chrono::steady_clock::now();
+
+    {
+        const std::scoped_lock lock(mutex_);
+        const bool changed = target != lastTargetBitrate_;
+
+        if (!changed && now - lastQualityLogged_ < kQualityInterval)
+        {
+            return;
+        }
+
+        lastTargetBitrate_ = target;
+        lastQualityLogged_ = now;
+    }
+
+    spdlog::info("[chiaki] Console {}", report);
 }
 
 bool ChiakiLogSink::isRepeat(const std::string& message)

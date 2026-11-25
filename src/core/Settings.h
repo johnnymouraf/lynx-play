@@ -155,7 +155,7 @@ enum class FrameGenerationMode
 }
 
 inline constexpr std::uint32_t kMinBitrateKbps = 2000;
-inline constexpr std::uint32_t kMaxBitrateKbps = 50000;
+inline constexpr std::uint32_t kMaxBitrateKbps = 80000;
 
 // What the PS5 is asked to stream and how it is shown.
 struct VideoSettings
