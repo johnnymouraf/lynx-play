@@ -18,8 +18,6 @@ Rectangle {
 
     readonly property bool hot: hover.hovered || button.nativeHovered
     readonly property bool down: tap.pressed || button.nativePressed
-    readonly property string iconFont: Qt.fontFamilies().indexOf("Segoe Fluent Icons") >= 0
-                                       ? "Segoe Fluent Icons" : "Segoe MDL2 Assets"
 
     signal clicked
 
@@ -48,7 +46,7 @@ Rectangle {
         anchors.centerIn: parent
         text: button.glyph
         color: button.danger && button.hot ? Theme.dangerContent : Theme.text
-        font.family: button.iconFont
+        font.families: ["Segoe Fluent Icons", "Segoe MDL2 Assets"]
         font.pixelSize: 10
         renderType: Text.NativeRendering
     }
