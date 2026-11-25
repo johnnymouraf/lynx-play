@@ -9,7 +9,7 @@ import MFPlay
 Rectangle {
     id: button
 
-    // A code point of Segoe Fluent Icons (Windows 11) or Segoe MDL2 Assets.
+    // A code point of Segoe Fluent Icons (Windows 11).
     property string glyph
     property string tooltip
     property bool danger: false
@@ -46,7 +46,7 @@ Rectangle {
         anchors.centerIn: parent
         text: button.glyph
         color: button.danger && button.hot ? Theme.dangerContent : Theme.text
-        font.families: ["Segoe Fluent Icons", "Segoe MDL2 Assets"]
+        font.family: "Segoe Fluent Icons"
         font.pixelSize: 10
         renderType: Text.NativeRendering
     }
