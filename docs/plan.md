@@ -727,7 +727,7 @@ Windows 11 may leave the value absent at the default.
 
 **Chosen: B**. Changing it: `FrameGeneration::probe`.
 
-#### D54 – Motion-vector scale `-1/W, -1/H` (2.5)
+#### D54 – Motion-vector scale `1/W, 1/H` (2.5)
 
 The DLSS-G header says "normalize", the guide says "pixels".
 
@@ -735,9 +735,10 @@ The DLSS-G header says "normalize", the guide says "pixels".
 - B. `1`.
 - C. `-1/W`, as Veyra does with current→previous pixel vectors.
 
-**Chosen: C**; the docs say `+1/W`, so the sign still needs a real pan to
-confirm (see the comment at the constant). Changing it:
-`kMotionVectorScaleSign`.
+**Chosen: A** in 1.0.4, the documented sign: the optical flow's vectors point
+current→previous, which is what the DLSS guide and Streamline's `+1/W` expect.
+C, taken from Veyra, shipped until 1.0.3; a steady pan with Frame Generation
+on confirms the choice. Changing it: `kMotionVectorScaleSign`.
 
 #### D55 – The 30 fps schedule holds the real frame for the repeat (2.5)
 
