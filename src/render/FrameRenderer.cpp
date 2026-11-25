@@ -30,6 +30,8 @@ constexpr std::chrono::milliseconds kOverlayIdleRedraw{kOverlayIdleRedrawMillise
 constexpr DWORD kGamepadPollMilliseconds = 16;
 constexpr std::chrono::seconds kStatisticsPeriod{5};
 constexpr std::chrono::seconds kDisplayRefreshCheckPeriod{1};
+constexpr UINT kDefaultFrameLatency = 1;
+constexpr UINT kGenerationFrameLatency = 2;
 
 constexpr std::array<float, 4> kBlack{0.0F, 0.0F, 0.0F, 1.0F};
 
@@ -652,16 +654,18 @@ std::optional<VideoFrame> FrameRenderer::takeNewerFrame(std::optional<VideoFrame
 void FrameRenderer::countDroppedFrames(std::uint64_t dropped)
 {
     droppedFrames_ += dropped;
-    restartPairSequence();
 }
 
-void FrameRenderer::restartPairSequence()
+void FrameRenderer::applyFrameLatency()
 {
-    cadence_.reset();
-    cadenceReferenceValid_ = false;
-    flowReferenceValid_ = false;
-    dlssResetPending_ = true;
-    frameSchedule_.reset();
+    const bool generating = requestedFrameGenerationApplied_ == core::FrameGenerationMode::X2 &&
+                            frameGeneration_ && !frameGenerationFailed_;
+    const UINT wanted = generating ? kGenerationFrameLatency : kDefaultFrameLatency;
+
+    if (const auto applied = swapChain_.setFrameLatency(wanted); !applied)
+    {
+        spdlog::warn("{}", applied.error());
+    }
 }
 
 DWORD FrameRenderer::waitTimeout() const
@@ -743,6 +747,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 {
     drainCadence();
     updateDisplayRefresh();
+    applyFrameLatency();
 
     // A minimized window has an empty client area: presenting into it would
     // run the whole frame for a picture nobody sees, so the pipeline stays
@@ -830,8 +835,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     {
         shownFrame_ = std::move(newest);
 
-        // A frame the mailbox replaced breaks the pair sequence: the next
-        // picture is no longer the one the metric compares against.
+        // A frame the mailbox replaced is gone, but the stream goes on: the
+        // previous processed picture stays the reference for the next pair.
         if (const std::uint64_t dropped = mailbox_->takeDroppedCount(); dropped > 0)
         {
             countDroppedFrames(dropped);
@@ -1054,6 +1059,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         if (showsNewFrame)
         {
             CadenceDetector::Decision decision = CadenceDetector::Decision::Ignored;
+            bool sampled = false;
 
             // This frame's decision says whether it generates, so the CPU waits
             // for the GPU to finish the frame's cadence sample. A decision
@@ -1074,7 +1080,13 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
                                               : 0.0,
                     };
                     decision = observeCadence(comparison);
+                    sampled = true;
                 }
+            }
+
+            if (!sampled && metrics_ != nullptr)
+            {
+                metrics_->addUnclassifiedFrame(Clock::now());
             }
 
             // A scene cut restarts the detector's windows but not the source
@@ -2415,7 +2427,15 @@ void FrameRenderer::updateDisplayRefresh()
 
     if (!displayCheckedAt_ || now - *displayCheckedAt_ >= kDisplayRefreshCheckPeriod)
     {
-        displayRefreshHertz_ = swapChain_.displayRefreshHertz();
+        const std::optional<double> refresh = swapChain_.displayRefreshHertz();
+
+        if (refresh != displayRefreshHertz_ || !displayCheckedAt_)
+        {
+            spdlog::info("Display refresh: {}", refresh ? std::format("{:.0f} Hz", *refresh)
+                                                          : std::string("not reported"));
+        }
+
+        displayRefreshHertz_ = refresh;
         displayCheckedAt_ = now;
     }
 
@@ -3179,15 +3199,21 @@ void FrameRenderer::reportStatistics()
                  summary->perSecond, summary->averageMilliseconds, summary->maxMilliseconds,
                  dropped);
 
+    const bool overlayVisible = overlay_ != nullptr && overlay_->visible();
+    spdlog::info("Presentation: frame latency {}, overlay {}, display {}",
+                 swapChain_.frameLatency(), overlayVisible ? "visible" : "hidden",
+                 displayRefreshHertz_ ? std::format("{:.0f} Hz", *displayRefreshHertz_)
+                                      : std::string("unknown"));
+
     if (metrics_ != nullptr)
     {
         const core::StreamMetricsSnapshot video =
             metrics_->snapshot(core::StreamMetrics::Clock::now());
 
-        spdlog::info("Rates: source {:.1f} fps, game {:.1f} fps, generated {:.1f} fps, displayed "
-                     "{:.1f} fps; real presents {:.1f} fps, repeated {:.1f} fps",
-                     video.sourceFps, video.gameFps, video.generatedFps, video.displayedFps,
-                     video.realPresentedFps, video.repeatedPresentedFps);
+        spdlog::info("Rates: source {:.1f} fps, game {:.1f} fps (+{:.1f} fps unclassified), generated {:.1f} "
+                     "fps, displayed {:.1f} fps; real presents {:.1f} fps, repeated {:.1f} fps",
+                     video.sourceFps, video.gameFps, video.unclassifiedFps, video.generatedFps,
+                     video.displayedFps, video.realPresentedFps, video.repeatedPresentedFps);
     }
 
     if (lastGpuTimes_)

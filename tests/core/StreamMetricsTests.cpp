@@ -218,3 +218,33 @@ TEST_CASE("StreamMetrics reports quiet counters before the stream starts")
     CHECK(snapshot.repeatedPresentedFps == 0.0);
     CHECK(snapshot.bitrateMbps == 0.0);
 }
+
+TEST_CASE("StreamMetrics does not count frames without a cadence sample as repeats")
+{
+    StreamMetrics metrics(kStart);
+
+    // A 30 fps game in a 30 fps stream; every sixth picture has no cadence
+    // sample, as after a restart of the compare window.
+    for (int frame = 0; frame < 30; ++frame)
+    {
+        const auto at = kStart + (frame + 1) * 33ms;
+
+        if (frame % 6 == 0)
+        {
+            metrics.addUnclassifiedFrame(at);
+        }
+        else
+        {
+            metrics.addCadenceFrame(at, true);
+        }
+
+        metrics.addPresented(at, std::nullopt, std::nullopt, true);
+    }
+
+    const StreamMetricsSnapshot snapshot = atOneSecond(metrics);
+
+    CHECK(snapshot.gameFps == Catch::Approx(25.0));
+    CHECK(snapshot.unclassifiedFps == Catch::Approx(5.0));
+    CHECK(snapshot.realPresentedFps == Catch::Approx(30.0));
+    CHECK(snapshot.repeatedPresentedFps == 0.0);
+}

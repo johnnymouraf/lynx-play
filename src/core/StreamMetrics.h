@@ -29,14 +29,18 @@ struct StreamMetricsSnapshot
     double sourceFps = 0.0;
     // Distinct source pictures per second: the game's own rate.
     double gameFps = 0.0;
+    // New source pictures shown without a cadence sample, so not counted in
+    // the game rate; they are not repeats either.
+    double unclassifiedFps = 0.0;
     // Pictures DLSS Frame Generation produced and presented per second.
     double generatedFps = 0.0;
     // New pictures shown per second, the distinct source ones plus the
     // generated ones. With Frame Generation off it equals the game rate.
     double displayedFps = 0.0;
     // Real pictures shown per second and, of those, the ones that repeated
-    // a picture already on screen. Frame Generation holds the real picture
-    // for the repeat, so it presents no repeated real picture.
+    // a picture already on screen; the unclassified ones are not repeats.
+    // Frame Generation holds the real picture for the repeat, so it presents
+    // no repeated real picture.
     double realPresentedFps = 0.0;
     double repeatedPresentedFps = 0.0;
     double bitrateMbps = 0.0;
@@ -75,6 +79,10 @@ public:
     // One source picture the cadence detector classified: a distinct one is
     // a new game picture and counts as shown.
     void addCadenceFrame(Clock::time_point at, bool distinct);
+    // One new source picture the cadence detector had no sample for: the first
+    // after a restart, or one whose sample missed its wait. It is neither a
+    // distinct nor a repeated picture as far as anyone knows.
+    void addUnclassifiedFrame(Clock::time_point at);
     // Packet counters since the previous call, from the session.
     void addPacketStats(Clock::time_point at, std::uint64_t received, std::uint64_t lost);
     // One real present; `newFrame` says it showed a picture the decoder just
@@ -95,6 +103,7 @@ private:
     std::string codec_;
     SlidingWindow received_;
     SlidingWindow distinct_;
+    SlidingWindow unclassified_;
     SlidingWindow generated_;
     SlidingWindow presented_;
     SlidingWindow decodeTime_;

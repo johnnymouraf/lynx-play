@@ -256,3 +256,19 @@ TEST_CASE("Releasing a held real picture gives back the distinct frame's decode 
     CHECK_FALSE(held.release().has_value());
     CHECK_FALSE(held.waiting(decoded + std::chrono::milliseconds(4)));
 }
+
+TEST_CASE("A 60 Hz display keeps generating for a 30 fps game that measures slightly fast")
+{
+    FrameSchedule schedule({.containerFramesPerSecond = 30.0});
+    schedule.setCadence(30.4);
+    schedule.setDisplay(true, 60.0);
+
+    CHECK_FALSE(schedule.displayTooSlow());
+
+    const FrameGenerationPlan first = schedule.observe(Decision::Distinct);
+    const FrameGenerationPlan second = schedule.observe(Decision::Distinct);
+
+    CHECK(first.generate);
+    CHECK(second.generate);
+    CHECK_FALSE(second.reset);
+}

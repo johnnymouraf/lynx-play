@@ -82,6 +82,12 @@ void StreamMetrics::addCadenceFrame(Clock::time_point at, bool distinct)
     distinct_.add(at);
 }
 
+void StreamMetrics::addUnclassifiedFrame(Clock::time_point at)
+{
+    const std::scoped_lock lock(mutex_);
+    unclassified_.add(at);
+}
+
 void StreamMetrics::addPacketStats(Clock::time_point at, std::uint64_t received,
                                    std::uint64_t lost)
 {
@@ -121,6 +127,7 @@ StreamMetricsSnapshot StreamMetrics::snapshot(Clock::time_point now)
 
     const SlidingWindow::Summary received = received_.summarize(now);
     const SlidingWindow::Summary distinct = distinct_.summarize(now);
+    const SlidingWindow::Summary unclassified = unclassified_.summarize(now);
     const SlidingWindow::Summary generated = generated_.summarize(now);
     const SlidingWindow::Summary presented = presented_.summarize(now);
     const SlidingWindow::Summary decode = decodeTime_.summarize(now);
@@ -137,11 +144,12 @@ StreamMetricsSnapshot StreamMetrics::snapshot(Clock::time_point now)
     snapshot.codec = codec_;
     snapshot.sourceFps = received.perSecond;
     snapshot.gameFps = distinct.perSecond;
+    snapshot.unclassifiedFps = unclassified.perSecond;
     snapshot.generatedFps = generated.perSecond;
     snapshot.displayedFps = snapshot.gameFps + snapshot.generatedFps;
     snapshot.realPresentedFps = presented.perSecond;
-    snapshot.repeatedPresentedFps =
-        std::max(0.0, snapshot.realPresentedFps - snapshot.gameFps);
+    snapshot.repeatedPresentedFps = std::max(
+        0.0, snapshot.realPresentedFps - snapshot.gameFps - snapshot.unclassifiedFps);
 
     if (bytes.elapsedSeconds > 0.0)
     {

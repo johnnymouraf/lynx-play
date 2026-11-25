@@ -10,8 +10,6 @@ namespace
 
 using core::describeFailure;
 
-constexpr UINT kMaxQueuedFrames = 1;
-
 } // namespace
 
 std::expected<SwapChain, std::string> SwapChain::create(const GpuDevice& gpu, HWND window,
@@ -92,6 +90,29 @@ std::expected<void, std::string> SwapChain::resize(SurfaceSize size, DXGI_FORMAT
     }
 
     return createRenderTargets();
+}
+
+std::expected<void, std::string> SwapChain::setFrameLatency(UINT frames)
+{
+    if (frames == frameLatency_)
+    {
+        return {};
+    }
+
+    if (const HRESULT result = swapChain_->SetMaximumFrameLatency(frames); FAILED(result))
+    {
+        return std::unexpected(describeFailure("SetMaximumFrameLatency", result));
+    }
+
+    frameLatency_ = frames;
+    spdlog::info("Presentation: frame latency {}", frameLatency_);
+
+    return {};
+}
+
+UINT SwapChain::frameLatency() const
+{
+    return frameLatency_;
 }
 
 bool SwapChain::waitForFrameSlot(std::chrono::milliseconds timeout) const
@@ -206,14 +227,13 @@ std::expected<void, std::string> SwapChain::createChain(SurfaceSize size, DXGI_F
         return std::unexpected(describeFailure("IDXGISwapChain3 query", result));
     }
 
-    if (const HRESULT result = swapChain_->SetMaximumFrameLatency(kMaxQueuedFrames);
+    if (const HRESULT result = swapChain_->SetMaximumFrameLatency(frameLatency_);
         FAILED(result))
     {
         return std::unexpected(describeFailure("SetMaximumFrameLatency", result));
     }
 
-    spdlog::info("Presentation: frame queue depth {} (one frame at most waits for the display)",
-                 kMaxQueuedFrames);
+    spdlog::info("Presentation: frame latency {}", frameLatency_);
 
     frameLatencyWaitable_.reset(swapChain_->GetFrameLatencyWaitableObject());
     size_ = size;

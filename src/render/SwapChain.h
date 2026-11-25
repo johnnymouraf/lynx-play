@@ -22,8 +22,8 @@ enum class PresentTiming
     Immediate,
 };
 
-// A flip-model swap chain that holds at most one queued frame: the renderer
-// waits on it before drawing, so every frame shows the newest content.
+// A flip-model swap chain that holds few queued frames (one by default): the
+// renderer waits on it before drawing, so every frame shows the newest content.
 class SwapChain
 {
 public:
@@ -44,6 +44,12 @@ public:
 
     // Blocks until DXGI can take a new frame; false when the timeout expires.
     [[nodiscard]] bool waitForFrameSlot(std::chrono::milliseconds timeout) const;
+
+    // How many frames may wait for the display before the frame slot blocks.
+    // One shows the newest content; two lets a source frame's two presents
+    // (Frame Generation) queue back to back. The buffer count covers both.
+    [[nodiscard]] std::expected<void, std::string> setFrameLatency(UINT frames);
+    [[nodiscard]] UINT frameLatency() const;
 
     [[nodiscard]] HRESULT present(PresentTiming timing);
 
@@ -76,6 +82,7 @@ private:
     HWND window_ = nullptr;
     SurfaceSize size_;
     DXGI_FORMAT format_ = kSdrFormat;
+    UINT frameLatency_ = 1;
     bool tearing_ = false;
 };
 

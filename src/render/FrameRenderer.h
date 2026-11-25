@@ -231,7 +231,8 @@ private:
     // Copies the retained real picture into the current back buffer and
     // presents it. `secondPresent` waits for the slot the generated picture
     // just took; the frame's first present uses the slot the render loop
-    // already waited for.
+    // already waited for. With a frame latency of two that wait returns at
+    // once while the display keeps up.
     [[nodiscard]] std::expected<void, std::string> presentReal(std::uint64_t frameId,
                                                                bool secondPresent);
     // Presents the retained real picture again with the overlay drawn over it,
@@ -248,10 +249,12 @@ private:
     // The mailbox's frame when it has one, else `current`; a `current` frame
     // it replaces is dropped.
     [[nodiscard]] std::optional<VideoFrame> takeNewerFrame(std::optional<VideoFrame> current);
-    // A frame the pipeline will never show: the pairs around it are broken.
+    // A frame the loop replaced before showing it. The stream is continuous,
+    // so the pair history stays: the next pair spans the gap.
     void countDroppedFrames(std::uint64_t dropped);
-    // The compare windows, the flow and the DLSS history start over.
-    void restartPairSequence();
+    // Frame Generation queues two presents per source frame, so the swap chain
+    // may hold two; otherwise one keeps the latency lowest.
+    void applyFrameLatency();
     // Reads the display's refresh rate about once a second and tells the
     // schedule.
     void updateDisplayRefresh();
