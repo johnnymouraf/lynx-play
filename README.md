@@ -99,7 +99,11 @@ of every control in its states:
 ## Building
 
 The project is built in GitHub Actions (`.github/workflows/build.yml`), which is
-the reference for the toolchain:
+the reference for the toolchain. The build job is read-only; only the release
+and artifact-purge jobs hold write permissions. Every action is pinned to a
+commit SHA, which Dependabot keeps current.
+
+The toolchain:
 
 - The Visual Studio C++ build tools (Windows SDK and libraries), LLVM 20+
   `clang-cl`, CMake 3.28+ and Ninja.
