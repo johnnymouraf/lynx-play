@@ -22,6 +22,7 @@ double toMilliseconds(SlidingWindow::Clock::duration duration)
 StreamMetrics::StreamMetrics(Clock::time_point start)
     : received_(kMetricsWindow, start),
       distinct_(kMetricsWindow, start),
+      unclassified_(kMetricsWindow, start),
       generated_(kMetricsWindow, start),
       presented_(kMetricsWindow, start),
       decodeTime_(kMetricsWindow, start),
