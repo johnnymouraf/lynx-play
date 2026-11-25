@@ -126,5 +126,5 @@ endif()
 target_include_directories(mfplay_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(mfplay_render
     PUBLIC MFPlay::core d3d12 dxgi
-    PRIVATE d3d11 dxguid user32 advapi32 imgui::imgui MFPlay::input)
+    PRIVATE d3d11 dwmapi dxguid user32 advapi32 imgui::imgui MFPlay::input)
 mfplay_set_warnings(mfplay_render)

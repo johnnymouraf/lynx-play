@@ -17,7 +17,7 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.topMargin: 28
+        anchors.topMargin: Theme.space4
         anchors.leftMargin: Theme.space4
         anchors.rightMargin: Theme.space4
         anchors.bottomMargin: Theme.space4

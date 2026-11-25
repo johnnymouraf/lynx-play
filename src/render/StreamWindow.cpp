@@ -8,6 +8,7 @@
 #include <mutex>
 #include <utility>
 
+#include <dwmapi.h>
 #include <spdlog/spdlog.h>
 
 namespace mfplay::render
@@ -19,6 +20,12 @@ namespace
 constexpr auto kWindowClassName = L"MFPlayStreamWindow";
 constexpr DWORD kWindowedStyle = WS_OVERLAPPEDWINDOW;
 constexpr DWORD kFullscreenStyle = WS_POPUP;
+
+// The caption follows the app's dark theme (Theme.menu, Theme.text and
+// Theme.border), as COLORREFs.
+constexpr COLORREF kCaptionColor = RGB(0x12, 0x12, 0x12);
+constexpr COLORREF kCaptionTextColor = RGB(0xF5, 0xF5, 0xF5);
+constexpr COLORREF kBorderColor = RGB(0x2E, 0x2E, 0x2E);
 
 // Posted by the renderer's thread when it stops for good.
 constexpr UINT kRenderFailedMessage = WM_APP + 1;
@@ -95,6 +102,18 @@ SurfaceSize clientSize(HWND window)
         .width = static_cast<std::uint32_t>(client.right - client.left),
         .height = static_cast<std::uint32_t>(client.bottom - client.top),
     };
+}
+
+// Dark title bar and border. The immersive dark mode works from Windows 10
+// 20H1 and the colors from Windows 11; older systems reject the attributes
+// and keep their default look.
+void applyDarkCaption(HWND window)
+{
+    const BOOL dark = TRUE;
+    DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
+    DwmSetWindowAttribute(window, DWMWA_CAPTION_COLOR, &kCaptionColor, sizeof(kCaptionColor));
+    DwmSetWindowAttribute(window, DWMWA_TEXT_COLOR, &kCaptionTextColor, sizeof(kCaptionTextColor));
+    DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &kBorderColor, sizeof(kBorderColor));
 }
 
 core::WindowSize windowSizeOf(HWND window)
@@ -192,6 +211,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
             core::describeFailure("CreateWindowExW", HRESULT_FROM_WIN32(GetLastError())));
     }
 
+    applyDarkCaption(window);
     registerMouse(window);
     stream->keyboardMouse_ = std::move(options.keyboardMouse);
 

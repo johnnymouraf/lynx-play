@@ -35,6 +35,8 @@ qt_add_executable(mfplay WIN32
     SettingsController.h
     StreamController.cpp
     StreamController.h
+    WindowFrame.cpp
+    WindowFrame.h
     main.cpp
     mfplay.rc)
 
@@ -78,6 +80,7 @@ qt_add_qml_module(mfplay
         qml/controls/AppRail.qml
         qml/controls/AppText.qml
         qml/controls/Banner.qml
+        qml/controls/CaptionButton.qml
         qml/controls/BrandLogo.qml
         qml/controls/ControllerHint.qml
         qml/controls/ControllerHintBar.qml
@@ -104,6 +107,7 @@ qt_add_qml_module(mfplay
         qml/controls/StatusCount.qml
         qml/controls/StatusTag.qml
         qml/controls/ThinScrollBar.qml
+        qml/controls/TitleBar.qml
         qml/controls/Toast.qml
         qml/controls/Toggle.qml
         qml/controls/ValueSlider.qml
@@ -193,7 +197,9 @@ target_link_libraries(mfplay PRIVATE
     Qt6::Network
     Qt6::Qml
     Qt6::Quick
-    Qt6::Svg)
+    Qt6::Svg
+    shell32
+    user32)
 mfplay_set_warnings(mfplay)
 
 install(TARGETS mfplay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

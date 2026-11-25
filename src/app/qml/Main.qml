@@ -90,109 +90,120 @@ ApplicationWindow {
         }
     }
 
-    Item {
+    ColumnLayout {
         anchors.fill: parent
+        spacing: 0
 
-        RowLayout {
-            anchors.fill: parent
-            spacing: 0
-
-            AppRail {
-                Layout.fillHeight: true
-                section: window.section
-                onSectionRequested: requested => window.section = requested
-            }
-
-            Item {
-                id: contentArea
-
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                StackLayout {
-                    id: sections
-
-                    anchors.fill: parent
-                    currentIndex: window.sectionIds.indexOf(window.section)
-
-                    ConsolesPage {
-                        id: consolesPage
-
-                        consoles: window.consoles
-                        settings: window.settings
-                        sideMargin: window.pageMargin
-                        bottomInset: window.footerInset
-                        onToastRequested: (tone, title, message) => toast.show(tone, title, message)
-                    }
-
-                    SettingsPage {
-                        id: settingsPage
-
-                        controller: window.controller
-                        consoles: window.consoles
-                        settings: window.settings
-                        input: window.input
-                        sideMargin: window.pageMargin
-                        bottomInset: window.footerInset
-                    }
-
-                    AboutPage {
-                        controller: window.controller
-                        sideMargin: window.pageMargin
-                        bottomInset: window.footerInset
-                    }
-                }
-
-                RowLayout {
-                    id: footer
-
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.leftMargin: window.section === "settings"
-                                       ? 240 + Theme.space4 : window.pageMargin
-                    anchors.rightMargin: window.pageMargin
-                    anchors.bottomMargin: window.pageMargin
-                    spacing: Theme.space4
-
-                    ControllerHintBar {
-                        Layout.fillWidth: true
-                        visible: window.input.controllerConnected
-                        hints: window.hintsBySection[window.section]
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                        visible: !window.input.controllerConnected
-                    }
-
-                    ControllerStatus {
-                        Layout.preferredWidth: 240
-                        visible: window.section !== "settings"
-                                 || (settingsPage.section !== "controls"
-                                     && window.width >= 1180)
-                        connected: window.input.controllerConnected
-                        name: window.input.controllerTitle
-                        status: window.controllerStatusText()
-                        connection: window.input.controllerWired ? "via USB" : "via Bluetooth"
-                        batteryLow: window.input.controllerBatteryLow
-                    }
-                }
-            }
+        TitleBar {
+            Layout.fillWidth: true
+            appWindow: window
         }
 
-        ConnectingPage {
-            anchors.fill: parent
-            visible: window.connecting
-            stream: window.stream
-            controller: window.controller
-        }
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-        Loader {
-            anchors.fill: parent
-            active: window.gallery
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
 
-            sourceComponent: Gallery {}
+                AppRail {
+                    Layout.fillHeight: true
+                    section: window.section
+                    onSectionRequested: requested => window.section = requested
+                }
+
+                Item {
+                    id: contentArea
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    StackLayout {
+                        id: sections
+
+                        anchors.fill: parent
+                        currentIndex: window.sectionIds.indexOf(window.section)
+
+                        ConsolesPage {
+                            id: consolesPage
+
+                            consoles: window.consoles
+                            settings: window.settings
+                            sideMargin: window.pageMargin
+                            bottomInset: window.footerInset
+                            onToastRequested: (tone, title, message) => toast.show(tone, title, message)
+                        }
+
+                        SettingsPage {
+                            id: settingsPage
+
+                            controller: window.controller
+                            consoles: window.consoles
+                            settings: window.settings
+                            input: window.input
+                            sideMargin: window.pageMargin
+                            bottomInset: window.footerInset
+                        }
+
+                        AboutPage {
+                            controller: window.controller
+                            sideMargin: window.pageMargin
+                            bottomInset: window.footerInset
+                        }
+                    }
+
+                    RowLayout {
+                        id: footer
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: window.section === "settings"
+                                           ? 240 + Theme.space4 : window.pageMargin
+                        anchors.rightMargin: window.pageMargin
+                        anchors.bottomMargin: window.pageMargin
+                        spacing: Theme.space4
+
+                        ControllerHintBar {
+                            Layout.fillWidth: true
+                            visible: window.input.controllerConnected
+                            hints: window.hintsBySection[window.section]
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            visible: !window.input.controllerConnected
+                        }
+
+                        ControllerStatus {
+                            Layout.preferredWidth: 240
+                            visible: window.section !== "settings"
+                                     || (settingsPage.section !== "controls"
+                                         && window.width >= 1180)
+                            connected: window.input.controllerConnected
+                            name: window.input.controllerTitle
+                            status: window.controllerStatusText()
+                            connection: window.input.controllerWired ? "via USB" : "via Bluetooth"
+                            batteryLow: window.input.controllerBatteryLow
+                        }
+                    }
+                }
+            }
+
+            ConnectingPage {
+                anchors.fill: parent
+                visible: window.connecting
+                stream: window.stream
+                controller: window.controller
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: window.gallery
+
+                sourceComponent: Gallery {}
+            }
         }
     }
 
