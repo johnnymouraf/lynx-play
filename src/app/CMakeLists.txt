@@ -198,6 +198,7 @@ target_link_libraries(mfplay PRIVATE
     Qt6::Qml
     Qt6::Quick
     Qt6::Svg
+    dwmapi
     shell32
     user32)
 mfplay_set_warnings(mfplay)

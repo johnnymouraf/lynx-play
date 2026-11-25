@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include <dwmapi.h>
 #include <shellapi.h>
 #include <windowsx.h>
 
@@ -265,6 +266,12 @@ void WindowFrame::adoptFrame(HWND handle)
     }
 
     framed_ = true;
+
+    // Windows 11 rounds the corners of a window with a frame, and DWM squares
+    // them while maximized. Windows 10 rejects the attribute and stays square.
+    const DWM_WINDOW_CORNER_PREFERENCE corners = DWMWCP_ROUND;
+    DwmSetWindowAttribute(handle, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners));
+
     SetWindowPos(handle, nullptr, 0, 0, 0, 0,
                  SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }

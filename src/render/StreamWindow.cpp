@@ -104,6 +104,13 @@ SurfaceSize clientSize(HWND window)
     };
 }
 
+// Rounded corners on Windows 11 while windowed; fullscreen covers the whole
+// monitor and must stay square. Older systems reject the attribute.
+void applyCorners(HWND window, DWM_WINDOW_CORNER_PREFERENCE corners)
+{
+    DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE, &corners, sizeof(corners));
+}
+
 // Dark title bar and border. The immersive dark mode works from Windows 10
 // 20H1 and the colors from Windows 11; older systems reject the attributes
 // and keep their default look.
@@ -212,6 +219,7 @@ std::expected<std::unique_ptr<StreamWindow>, std::string> StreamWindow::open(
     }
 
     applyDarkCaption(window);
+    applyCorners(window, DWMWCP_ROUND);
     registerMouse(window);
     stream->keyboardMouse_ = std::move(options.keyboardMouse);
 
@@ -786,6 +794,7 @@ void StreamWindow::enterFullscreen()
     SetWindowPos(window_, HWND_TOP, area.left, area.top, area.right - area.left,
                  area.bottom - area.top, SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
     applyingLayout_ = false;
+    applyCorners(window_, DWMWCP_DONOTROUND);
     mode_ = core::WindowMode::Fullscreen;
 
     // The cursor stays for a moment, in case the player only wanted the
@@ -809,6 +818,7 @@ void StreamWindow::leaveFullscreen()
     SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                  SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
     mode_ = core::WindowMode::Windowed;
+    applyCorners(window_, DWMWCP_ROUND);
     // The remembered size may have changed while fullscreen (from the Vídeo
     // screen or the menu); the placement's own size can be stale.
     resizeWindowed(windowedSize_);
