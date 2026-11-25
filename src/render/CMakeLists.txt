@@ -43,6 +43,8 @@ add_library(mfplay_render STATIC
     ReflexSession.h
     StreamWindow.cpp
     StreamWindow.h
+    StatisticsLayout.cpp
+    StatisticsLayout.h
     SwapChain.cpp
     SwapChain.h
     TestPattern.cpp

@@ -1,6 +1,7 @@
 #include "render/Overlay.h"
 
 #include "render/Hdr.h"
+#include "render/StatisticsLayout.h"
 
 #include <algorithm>
 #include <array>
@@ -11,6 +12,8 @@
 #include <cstdint>
 #include <format>
 #include <mutex>
+#include <numeric>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -37,9 +40,12 @@ constexpr UINT kViewCount = 8;
 constexpr float kPanelMargin = 20.0F;
 constexpr float kStatsWidth = 320.0F;
 constexpr float kMenuWidth = 380.0F;
-constexpr float kMenuHeight = 680.0F;
+constexpr float kMenuHeight = 700.0F;
 constexpr float kPanelPadding = 16.0F;
 constexpr float kGap = 6.0F;
+constexpr float kColumnGap = 24.0F;
+constexpr float kColumnWidth = kStatsWidth - 2.0F * kPanelPadding;
+constexpr float kHeaderHeight = 24.0F;
 
 constexpr float kRowHeight = 20.0F;
 constexpr float kCaptionHeight = 16.0F;
@@ -109,7 +115,8 @@ struct Fonts
 
 struct MenuResult
 {
-    bool statisticsToggled = false;
+    bool statisticsModeChanged = false;
+    core::StatisticsMode statisticsMode = core::StatisticsMode::Off;
     bool reflexChanged = false;
     core::ReflexMode reflex = core::ReflexMode::Off;
     bool upscalingChanged = false;
@@ -257,6 +264,80 @@ std::uint32_t pqColor(std::uint32_t color, float sdrWhiteNits)
 std::string fpsText(const core::StreamMetricsSnapshot& video, double fps)
 {
     return video.formatValid ? decimalText(fps) + " fps" : "—";
+}
+
+std::string bitrateText(const core::StreamMetricsSnapshot& video)
+{
+    return video.bitrateMbps > 0.0 ? decimalText(video.bitrateMbps) + " Mbps" : "—";
+}
+
+std::string packetLossText(const core::StreamMetricsSnapshot& video)
+{
+    return video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
+}
+
+std::string readyToPresentText(const core::StreamMetricsSnapshot& video)
+{
+    return video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—";
+}
+
+// The displayed rate, split into the game's and the generated frames while
+// Frame Generation is on: "60 fps (30 + 30 gerados)".
+std::string displayedFpsText(const OverlayStats& stats)
+{
+    const core::StreamMetricsSnapshot& video = stats.video;
+    const std::string displayed = fpsText(video, video.displayedFps);
+    const bool generating = stats.frameGeneration == core::FrameGenerationMode::X2;
+
+    if (!video.formatValid || !generating)
+    {
+        return displayed;
+    }
+
+    return std::format("{} ({} + {} gerados)", displayed, decimalText(video.gameFps),
+                       decimalText(video.generatedFps));
+}
+
+const char* upscalingLabel(core::Upscaling upscaling)
+{
+    switch (upscaling)
+    {
+    case core::Upscaling::Shader:
+        return "Escala padrão";
+    case core::Upscaling::Vsr:
+        return "RTX VSR";
+    case core::Upscaling::Dlss:
+        return "DLSS";
+    }
+
+    return "Escala padrão";
+}
+
+std::string enhancementsText(const OverlayStats& stats)
+{
+    std::string text = upscalingLabel(stats.upscaling);
+
+    if (stats.frameGeneration == core::FrameGenerationMode::X2)
+    {
+        text += " · Frame Generation 2x";
+    }
+
+    return text;
+}
+
+const char* statisticsModeLabel(core::StatisticsMode mode)
+{
+    switch (mode)
+    {
+    case core::StatisticsMode::Off:
+        return "Desligadas";
+    case core::StatisticsMode::Simple:
+        return "Simplificadas";
+    case core::StatisticsMode::Advanced:
+        return "Avançadas";
+    }
+
+    return "Desligadas";
 }
 
 std::string cadenceText(const OverlayStats& stats)
@@ -426,21 +507,21 @@ void statRow(const Fonts& fonts, std::string_view label, const std::string& valu
     ImGui::Dummy(ImVec2(width, kRowHeight * static_cast<float>(lines.size() + 1)));
 }
 
-void statisticsHeader(const Fonts& fonts)
+void statisticsHeader(const Fonts& fonts, core::StatisticsMode mode)
 {
     const ImVec2 start = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
 
     drawText(drawList, fonts.label, kBodySize, ImVec2(start.x, start.y + kBodyTextOffset), kText,
-             "Estatísticas");
+             std::format("Estatísticas · {}", statisticsModeLabel(mode)));
 
     const float shortcutWidth = textWidth(fonts.label, kCaptionSize, "F2");
     drawText(drawList, fonts.label, kCaptionSize,
              ImVec2(start.x + width - shortcutWidth, start.y + kCaptionTextOffset), kTextMuted,
              "F2");
 
-    ImGui::Dummy(ImVec2(width, 24.0F));
+    ImGui::Dummy(ImVec2(width, kHeaderHeight));
 }
 
 void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
@@ -451,10 +532,6 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
 
     const std::string resolution = resolutionText(video, stats.outputWidth, stats.outputHeight);
     const std::string codec = codecText(video, stats.hdrStream);
-    const std::string bitrate =
-        video.bitrateMbps > 0.0 ? decimalText(video.bitrateMbps) + " Mbps" : "—";
-    const std::string loss =
-        video.packetLossValid ? decimalText(video.packetLossPercent) + " %" : "—";
 
     statRow(fonts, "Resolução", resolution);
     statRow(fonts, "Codec", codec);
@@ -465,8 +542,8 @@ void drawVideoSection(const Fonts& fonts, const OverlayStats& stats)
             video.generatedFps > 0.0 ? kAccent : kText);
     statRow(fonts, "Exibidos", fpsText(video, video.displayedFps));
     statRow(fonts, "Cadência", cadenceText(stats));
-    statRow(fonts, "Bitrate", bitrate);
-    statRow(fonts, "Perda de pacotes", loss);
+    statRow(fonts, "Bitrate", bitrateText(video));
+    statRow(fonts, "Perda de pacotes", packetLossText(video));
 }
 
 void drawLatencySection(const Fonts& fonts, const OverlayStats& stats)
@@ -481,8 +558,7 @@ void drawLatencySection(const Fonts& fonts, const OverlayStats& stats)
     statRow(fonts, "Decodificação",
             video.decodeValid ? millisecondsText(video.decodeMilliseconds) : "—");
     statRow(fonts, "Apresentação", present);
-    statRow(fonts, "Quadro até a tela",
-            video.readyToPresentValid ? millisecondsText(video.readyToPresentMilliseconds) : "—");
+    statRow(fonts, "Quadro até a tela", readyToPresentText(video));
 }
 
 // The flow engine runs apart from the 3D queue, so its time is not part of the
@@ -704,12 +780,81 @@ void drawControllerSection(const Fonts& fonts, const OverlayGamepad& gamepad)
                                                 gamepad.accel[1], gamepad.accel[2]));
 }
 
-void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const OverlayGamepad& gamepad)
+struct StatisticsContext
 {
-    ImGui::SetNextWindowPos(ImVec2(kPanelMargin, kPanelMargin), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(kStatsWidth, 0.0F), ImGuiCond_Always);
+    const Fonts& fonts;
+    const OverlayStats& stats;
+    const OverlayGamepad& gamepad;
+};
 
-    if (!ImGui::Begin("mfplay-statistics", nullptr, kStatsFlags))
+void drawAdvancedSection(std::size_t index, const StatisticsContext& context)
+{
+    switch (index)
+    {
+    case 0:
+        drawVideoSection(context.fonts, context.stats);
+        return;
+    case 1:
+        drawLatencySection(context.fonts, context.stats);
+        return;
+    case 2:
+        drawGpuSection(context.fonts, context.stats);
+        return;
+    case 3:
+        drawFrameTime(context.fonts, context.stats);
+        return;
+    case 4:
+        drawReflexSection(context.fonts, context.stats.reflex);
+        return;
+    case 5:
+        drawControllerSection(context.fonts, context.gamepad);
+        return;
+    default:
+        return;
+    }
+}
+
+// What a player needs at a glance, in one column.
+void drawSimpleSections(const StatisticsContext& context)
+{
+    const Fonts& fonts = context.fonts;
+    const OverlayStats& stats = context.stats;
+    const core::StreamMetricsSnapshot& video = stats.video;
+
+    statRow(fonts, "Resolução", resolutionText(video, stats.outputWidth, stats.outputHeight));
+    statRow(fonts, "Codec", codecText(video, stats.hdrStream));
+    statRow(fonts, "Exibidos", displayedFpsText(stats));
+    statRow(fonts, "Bitrate", bitrateText(video));
+    statRow(fonts, "Perda de pacotes", packetLossText(video));
+    statRow(fonts, "Quadro até a tela", readyToPresentText(video));
+
+    if (stats.reflex.latencyValid)
+    {
+        statRow(fonts, "Latência total", millisecondsText(stats.reflex.latencyTotalMs));
+    }
+
+    statRow(fonts, "Aprimoramentos", enhancementsText(stats),
+            stats.frameGeneration == core::FrameGenerationMode::X2 ? kAccent : kText);
+    drawFrameTime(fonts, stats);
+}
+
+// The panel's top-left window: `width` wide, as tall as its content but never
+// past the viewport, and never outside it.
+bool beginStatisticsWindow(float width, ImVec2 display)
+{
+    const float maxWidth = std::max(display.x - 2.0F * kPanelMargin, 1.0F);
+    const float maxHeight = std::max(display.y - 2.0F * kPanelMargin, 1.0F);
+
+    ImGui::SetNextWindowPos(ImVec2(kPanelMargin, kPanelMargin), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(std::min(width, maxWidth), 0.0F), ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0F, 0.0F), ImVec2(FLT_MAX, maxHeight));
+
+    return ImGui::Begin("mfplay-statistics", nullptr, kStatsFlags);
+}
+
+void drawSimpleStatistics(const StatisticsContext& context, ImVec2 display)
+{
+    if (!beginStatisticsWindow(kStatsWidth, display))
     {
         ImGui::End();
         return;
@@ -717,16 +862,89 @@ void drawStatistics(const Fonts& fonts, const OverlayStats& stats, const Overlay
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0F, kGap));
 
-    statisticsHeader(fonts);
-    drawVideoSection(fonts, stats);
-    drawLatencySection(fonts, stats);
-    drawGpuSection(fonts, stats);
-    drawFrameTime(fonts, stats);
-    drawReflexSection(fonts, stats.reflex);
-    drawControllerSection(fonts, gamepad);
+    statisticsHeader(context.fonts, core::StatisticsMode::Simple);
+    drawSimpleSections(context);
 
     ImGui::PopStyleVar();
     ImGui::End();
+}
+
+// Every section, in as many columns as the window's height and width ask for.
+// Each section's height comes from the frame before, so a window that changes
+// size settles in one frame.
+void drawAdvancedStatistics(const StatisticsContext& context, ImVec2 display,
+                            std::span<float> sectionHeights)
+{
+    const float contentWidth = display.x - 2.0F * (kPanelMargin + kPanelPadding);
+    const float contentHeight =
+        display.y - 2.0F * (kPanelMargin + kPanelPadding) - kHeaderHeight - kGap;
+    const float columnWidth = std::clamp(contentWidth, 1.0F, kColumnWidth);
+    const std::size_t maxColumns = columnsThatFit(contentWidth, columnWidth, kColumnGap);
+    const std::vector<std::size_t> starts =
+        packColumns(sectionHeights, contentHeight, kGap, maxColumns);
+    const auto columns = static_cast<float>(starts.size());
+    const float windowWidth =
+        columns * columnWidth + (columns - 1.0F) * kColumnGap + 2.0F * kPanelPadding;
+
+    if (!beginStatisticsWindow(windowWidth, display))
+    {
+        ImGui::End();
+        return;
+    }
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0F, kGap));
+
+    statisticsHeader(context.fonts, core::StatisticsMode::Advanced);
+
+    for (std::size_t column = 0; column < starts.size(); ++column)
+    {
+        const std::size_t first = starts[column];
+        const bool lastColumn = column + 1 == starts.size();
+        const std::size_t end = lastColumn ? sectionHeights.size() : starts[column + 1];
+        const auto sections = sectionHeights.subspan(first, end - first);
+        const float measured =
+            std::accumulate(sections.begin(), sections.end(), 0.0F) +
+            kGap * static_cast<float>(sections.size() - 1);
+        const float columnHeight = measured > 0.0F ? measured : contentHeight;
+
+        if (column > 0)
+        {
+            ImGui::SameLine(0.0F, kColumnGap);
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
+        ImGui::BeginChild(static_cast<ImGuiID>(column + 1), ImVec2(columnWidth, columnHeight),
+                          ImGuiChildFlags_None, kStatsFlags);
+        ImGui::PopStyleVar();
+
+        for (std::size_t section = first; section < end; ++section)
+        {
+            const float top = ImGui::GetCursorPosY();
+
+            drawAdvancedSection(section, context);
+            sectionHeights[section] = ImGui::GetCursorPosY() - top - kGap;
+        }
+
+        ImGui::EndChild();
+    }
+
+    ImGui::PopStyleVar();
+    ImGui::End();
+}
+
+void drawStatistics(core::StatisticsMode mode, const Fonts& fonts, const OverlayStats& stats,
+                    const OverlayGamepad& gamepad, std::span<float> advancedSectionHeights)
+{
+    const StatisticsContext context{.fonts = fonts, .stats = stats, .gamepad = gamepad};
+    const ImVec2 display = ImGui::GetIO().DisplaySize;
+
+    if (mode == core::StatisticsMode::Advanced)
+    {
+        drawAdvancedStatistics(context, display, advancedSectionHeights);
+        return;
+    }
+
+    drawSimpleStatistics(context, display);
 }
 
 void drawSwitch(ImDrawList* drawList, ImVec2 topLeft, bool on)
@@ -1061,7 +1279,7 @@ void menuFooter(const Fonts& fonts)
 
 MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const OverlayOptions& options,
                     core::ReflexMode currentReflex, bool lowestLatency, bool microphoneMuted,
-                    bool statsVisible, core::WindowLayout windowLayout)
+                    core::StatisticsMode statisticsMode, core::WindowLayout windowLayout)
 {
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float height = std::min(kMenuHeight, std::max(320.0F, display.y - 2.0F * kPanelMargin));
@@ -1113,10 +1331,11 @@ MenuResult drawMenu(const Fonts& fonts, const OverlayStats& stats, const Overlay
                      core::frameGenerationName(result.frameGeneration));
     }
 
-    if (toggleRow("statistics-row", fonts, "Mostrar estatísticas", std::string_view{},
-                  statsVisible))
+    if (cycleRow("statistics-row", fonts, "Estatísticas", "Alterna também com F2.",
+                 statisticsModeLabel(statisticsMode)))
     {
-        result.statisticsToggled = true;
+        result.statisticsModeChanged = true;
+        result.statisticsMode = core::nextStatisticsMode(statisticsMode);
     }
 
     if (toggleRow("vsync-row", fonts, "Sincronização vertical",
@@ -1178,8 +1397,8 @@ std::expected<std::unique_ptr<Overlay>, std::string> Overlay::create(
     overlay->microphoneMuted_ = overlay->options_.microphoneMuted;
     overlay->windowMode_.store(overlay->options_.windowMode);
     overlay->windowSize_.store(overlay->options_.windowSize);
-    overlay->statisticsVisible_.store(overlay->options_.statisticsVisible);
-    overlay->reportedStatisticsVisible_ = overlay->options_.statisticsVisible;
+    overlay->statisticsMode_.store(overlay->options_.statisticsMode);
+    overlay->reportedStatisticsMode_ = overlay->options_.statisticsMode;
 
     const std::lock_guard lock(imGuiMutex());
     overlay->context_ = ImGui::CreateContext();
@@ -1373,11 +1592,11 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
     ImGui::NewFrame();
 
     const bool menuOpen = menuOpen_.load();
-    const bool statisticsVisible = statisticsVisible_.load();
+    const core::StatisticsMode statisticsMode = statisticsMode_.load();
 
-    if (statisticsVisible)
+    if (statisticsMode != core::StatisticsMode::Off)
     {
-        drawStatistics(fonts, stats, gamepad);
+        drawStatistics(statisticsMode, fonts, stats, gamepad, advancedSectionHeights_);
 
         const auto now = std::chrono::steady_clock::now();
 
@@ -1395,12 +1614,13 @@ void Overlay::render(ID3D12GraphicsCommandList& commandList, D3D12_CPU_DESCRIPTO
             .size = windowSize_.load(),
         };
         const MenuResult menu = drawMenu(fonts, stats, options_, reflex_, lowestLatency_,
-                                         microphoneMuted_, statisticsVisible, windowLayout);
+                                         microphoneMuted_, statisticsMode, windowLayout);
 
-        if (menu.statisticsToggled)
+        if (menu.statisticsModeChanged)
         {
-            spdlog::info("overlay: statistics toggle {}", !statisticsVisible);
-            statisticsVisible_.store(!statisticsVisible);
+            spdlog::info("overlay: statistics mode {}",
+                         core::statisticsModeName(menu.statisticsMode));
+            statisticsMode_.store(menu.statisticsMode);
         }
 
         if (menu.reflexChanged)
@@ -1541,15 +1761,15 @@ void Overlay::reportState()
         }
     }
 
-    const bool statisticsVisible = statisticsVisible_.load();
+    const core::StatisticsMode statisticsMode = statisticsMode_.load();
 
-    if (statisticsVisible != reportedStatisticsVisible_)
+    if (statisticsMode != reportedStatisticsMode_)
     {
-        reportedStatisticsVisible_ = statisticsVisible;
+        reportedStatisticsMode_ = statisticsMode;
 
-        if (actions_.statisticsVisibleChanged)
+        if (actions_.statisticsModeChanged)
         {
-            actions_.statisticsVisibleChanged(statisticsVisible);
+            actions_.statisticsModeChanged(statisticsMode);
         }
     }
 }
@@ -1561,7 +1781,7 @@ void Overlay::toggleMenu()
 
 void Overlay::toggleStatistics()
 {
-    statisticsVisible_.store(!statisticsVisible_.load());
+    statisticsMode_.store(core::nextStatisticsMode(statisticsMode_.load()));
 }
 
 void Overlay::setWindowLayout(core::WindowMode mode, core::WindowSize size)
@@ -1577,12 +1797,12 @@ bool Overlay::menuOpen() const
 
 bool Overlay::statisticsVisible() const
 {
-    return statisticsVisible_.load();
+    return statisticsMode_.load() != core::StatisticsMode::Off;
 }
 
 bool Overlay::visible() const
 {
-    return menuOpen_.load() || statisticsVisible_.load();
+    return menuOpen_.load() || statisticsVisible();
 }
 
 bool Overlay::handleMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)

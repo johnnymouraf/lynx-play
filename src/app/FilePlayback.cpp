@@ -153,11 +153,10 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
                 &settings, [&settings, muted] { settings.setMicrophoneMuted(muted); },
                 Qt::QueuedConnection);
         },
-        .statisticsVisibleChanged = [&settings](bool visible)
+        .statisticsModeChanged = [&settings](core::StatisticsMode mode)
         {
             QMetaObject::invokeMethod(
-                &settings,
-                [&settings, visible] { settings.setOverlayStatisticsVisible(visible); },
+                &settings, [&settings, mode] { settings.setOverlayStatisticsMode(mode); },
                 Qt::QueuedConnection);
         },
         .windowLayoutChanged = [&settings](core::WindowMode mode, core::WindowSize size)
@@ -187,7 +186,7 @@ int playFile(const std::filesystem::path& path, double framesPerSecond,
             .overlayFonts = overlayFonts(),
             .overlay =
                 {
-                    .statisticsVisible = settings.overlayStatisticsVisible(),
+                    .statisticsMode = settings.overlayStatisticsMode(),
                     .reflex = settings.reflexMode(),
                     .lowestLatency = settings.lowestLatency(),
                     .microphoneMuted = settings.microphoneMuted(),

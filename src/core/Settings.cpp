@@ -76,6 +76,12 @@ constexpr Names<FrameGenerationMode, 2> kFrameGenerationNames{{
     {"2x", FrameGenerationMode::X2},
 }};
 
+constexpr Names<StatisticsMode, 3> kStatisticsModeNames{{
+    {"off", StatisticsMode::Off},
+    {"simple", StatisticsMode::Simple},
+    {"advanced", StatisticsMode::Advanced},
+}};
+
 constexpr Names<ConsoleView, 2> kConsoleViewNames{{
     {"grid", ConsoleView::Grid},
     {"list", ConsoleView::List},
@@ -296,8 +302,16 @@ OverlaySettings readOverlay(const Json& overlay)
         return settings;
     }
 
-    settings.statisticsVisible =
-        booleanAt(overlay, "statisticsVisible", settings.statisticsVisible);
+    if (overlay.contains("statisticsMode"))
+    {
+        settings.statisticsMode =
+            namedValue(kStatisticsModeNames, overlay, "statisticsMode", settings.statisticsMode);
+    }
+    else if (booleanAt(overlay, "statisticsVisible", false))
+    {
+        // The field before the modes existed: on meant the panel with everything.
+        settings.statisticsMode = StatisticsMode::Advanced;
+    }
 
     return settings;
 }
@@ -607,7 +621,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
          }},
         {"overlay",
          {
-             {"statisticsVisible", overlay.statisticsVisible},
+             {"statisticsMode", nameOf(kStatisticsModeNames, overlay.statisticsMode)},
          }},
         {"keyboardMouse",
          {

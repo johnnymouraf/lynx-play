@@ -37,6 +37,7 @@ add_executable(mfplay_tests
     render/OpticalFlowTests.cpp
     render/PresentGateTests.cpp
     render/ReflexTests.cpp
+    render/StatisticsLayoutTests.cpp
     render/TestPatternTests.cpp
     render/VideoSuperResolutionTests.cpp)
 

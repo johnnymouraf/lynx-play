@@ -263,10 +263,49 @@ struct KeyboardMouseSettings
                                                           KeyboardControl control,
                                                           std::string_view binding);
 
+// How much the in-stream statistics panel shows.
+enum class StatisticsMode
+{
+    Off,
+    Simple,
+    Advanced,
+};
+
+[[nodiscard]] constexpr std::string_view statisticsModeName(StatisticsMode mode)
+{
+    switch (mode)
+    {
+    case StatisticsMode::Off:
+        return "off";
+    case StatisticsMode::Simple:
+        return "simple";
+    case StatisticsMode::Advanced:
+        return "advanced";
+    }
+
+    return "off";
+}
+
+// The mode F2 switches to: Off, Simple, Advanced, then Off again.
+[[nodiscard]] constexpr StatisticsMode nextStatisticsMode(StatisticsMode mode)
+{
+    switch (mode)
+    {
+    case StatisticsMode::Off:
+        return StatisticsMode::Simple;
+    case StatisticsMode::Simple:
+        return StatisticsMode::Advanced;
+    case StatisticsMode::Advanced:
+        return StatisticsMode::Off;
+    }
+
+    return StatisticsMode::Off;
+}
+
 // What the in-stream overlay shows without being asked.
 struct OverlaySettings
 {
-    bool statisticsVisible = false;
+    StatisticsMode statisticsMode = StatisticsMode::Off;
 
     bool operator==(const OverlaySettings&) const = default;
 };

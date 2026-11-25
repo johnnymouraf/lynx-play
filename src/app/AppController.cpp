@@ -152,8 +152,8 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                  .overlayFonts = overlayFonts(),
                                                  .overlay =
                                                      {
-                                                         .statisticsVisible =
-                                                             settings_.overlayStatisticsVisible(),
+                                                         .statisticsMode =
+                                                             settings_.overlayStatisticsMode(),
                                                          .reflex = settings_.reflexMode(),
                                                          .lowestLatency =
                                                              settings_.lowestLatency(),
@@ -187,11 +187,11 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                          .microphoneMutedChanged =
                                                              [this](bool muted)
                                                          { settings_.setMicrophoneMuted(muted); },
-                                                         .statisticsVisibleChanged =
-                                                             [this](bool visible)
+                                                         .statisticsModeChanged =
+                                                             [this](core::StatisticsMode mode)
                                                          {
-                                                             settings_.setOverlayStatisticsVisible(
-                                                                 visible);
+                                                             settings_.setOverlayStatisticsMode(
+                                                                 mode);
                                                          },
                                                          .windowLayoutChanged =
                                                              [this](core::WindowMode mode,

@@ -44,7 +44,7 @@ TEST_CASE("Settings survive a write and a read")
         .opticalFlow = false,
         .frameGeneration = FrameGenerationMode::X2,
     };
-    settings.overlay.statisticsVisible = true;
+    settings.overlay.statisticsMode = StatisticsMode::Simple;
     settings.keyboardMouse.enabled = false;
     settings.psn.signedIn = true;
     settings.psn.tokenExpiry = 1'792'000'000;
@@ -68,6 +68,7 @@ TEST_CASE("Settings survive a write and a read")
     CHECK(readBack->rtx.frameGeneration == FrameGenerationMode::X2);
     CHECK_FALSE(readBack->rtx.opticalFlow);
     CHECK(readBack->overlay == settings.overlay);
+    CHECK(readBack->overlay.statisticsMode == StatisticsMode::Simple);
     CHECK(readBack->keyboardMouse == settings.keyboardMouse);
     CHECK_FALSE(readBack->keyboardMouse.enabled);
     CHECK(readBack->psn == settings.psn);
@@ -225,4 +226,29 @@ TEST_CASE("An old videoSuperResolution setting migrates to the upscaling choice"
     CHECK(withVsr->rtx.upscaling == Upscaling::Vsr);
     CHECK(withShader->rtx.upscaling == Upscaling::Shader);
     CHECK(withBoth->rtx.upscaling == Upscaling::Dlss);
+}
+
+TEST_CASE("F2 cycles the statistics through off, simple and advanced")
+{
+    CHECK(nextStatisticsMode(StatisticsMode::Off) == StatisticsMode::Simple);
+    CHECK(nextStatisticsMode(StatisticsMode::Simple) == StatisticsMode::Advanced);
+    CHECK(nextStatisticsMode(StatisticsMode::Advanced) == StatisticsMode::Off);
+}
+
+TEST_CASE("An old statisticsVisible setting migrates to the statistics mode")
+{
+    const auto shown = read(R"({"version": 1, "overlay": {"statisticsVisible": true}})");
+    const auto hidden = read(R"({"version": 1, "overlay": {"statisticsVisible": false}})");
+    const auto both = read(
+        R"({"version": 1, "overlay": {"statisticsMode": "simple", "statisticsVisible": true}})");
+    const auto unknown = read(R"({"version": 1, "overlay": {"statisticsMode": "huge"}})");
+
+    REQUIRE(shown.has_value());
+    REQUIRE(hidden.has_value());
+    REQUIRE(both.has_value());
+    REQUIRE(unknown.has_value());
+    CHECK(shown->overlay.statisticsMode == StatisticsMode::Advanced);
+    CHECK(hidden->overlay.statisticsMode == StatisticsMode::Off);
+    CHECK(both->overlay.statisticsMode == StatisticsMode::Simple);
+    CHECK(unknown->overlay.statisticsMode == StatisticsMode::Off);
 }

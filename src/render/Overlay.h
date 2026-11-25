@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -105,6 +106,9 @@ struct OverlayStats
     ReflexOverlayStats reflex;
 };
 
+// The sections of the advanced statistics panel, which it splits into columns.
+inline constexpr std::size_t kAdvancedStatisticsSections = 6;
+
 // The font files the overlay draws with; a missing one falls back to Dear
 // ImGui's built-in font.
 struct OverlayFonts
@@ -119,7 +123,7 @@ struct OverlayFonts
 // What the overlay starts with, before the player changes anything.
 struct OverlayOptions
 {
-    bool statisticsVisible = false;
+    core::StatisticsMode statisticsMode = core::StatisticsMode::Off;
     core::ReflexMode reflex = core::ReflexMode::On;
     // Presents with no sync interval, letting the display tear.
     bool lowestLatency = false;
@@ -147,7 +151,7 @@ struct OverlayActions
     std::function<void(core::FrameGenerationMode)> frameGenerationChanged;
     std::function<void(bool)> lowestLatencyChanged;
     std::function<void(bool)> microphoneMutedChanged;
-    std::function<void(bool)> statisticsVisibleChanged;
+    std::function<void(core::StatisticsMode)> statisticsModeChanged;
     std::function<void(bool)> menuOpenChanged;
     // The quick menu's window row: the layout the player cycled to.
     std::function<void(core::WindowMode, core::WindowSize)> windowLayoutChanged;
@@ -223,6 +227,7 @@ public:
 
     // Safe from the interface's thread; applied by the next frame.
     void toggleMenu();
+    // Cycles Off, Simple, Advanced.
     void toggleStatistics();
     // Safe from the window's thread; the quick menu's window row shows this
     // before the next frame.
@@ -266,14 +271,17 @@ private:
     bool hdrOutput_ = false;
     float sdrWhiteNits_ = 200.0F;
     std::atomic<bool> menuOpen_{false};
-    std::atomic<bool> statisticsVisible_{false};
+    std::atomic<core::StatisticsMode> statisticsMode_{core::StatisticsMode::Off};
     std::atomic<core::WindowMode> windowMode_{core::WindowMode::Fullscreen};
     std::atomic<core::WindowSize> windowSize_{core::kDefaultWindowSize};
     bool reportedMenuOpen_ = false;
-    bool reportedStatisticsVisible_ = false;
+    core::StatisticsMode reportedStatisticsMode_ = core::StatisticsMode::Off;
     core::ReflexMode reflex_ = core::ReflexMode::Off;
     bool lowestLatency_ = false;
     bool microphoneMuted_ = false;
+    // The height each section of the advanced panel took last frame, to split
+    // them into columns that fit the window.
+    std::array<float, kAdvancedStatisticsSections> advancedSectionHeights_{};
     // Paces the controller debug line written while the statistics are open.
     std::chrono::steady_clock::time_point nextControllerLog_{};
 };

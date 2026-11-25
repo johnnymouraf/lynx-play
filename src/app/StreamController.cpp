@@ -375,8 +375,8 @@ void StreamController::onFirstPicture(std::uint64_t session)
         { post([this, lowest] { settings_.setLowestLatency(lowest); }); },
         .microphoneMutedChanged = [this](bool muted)
         { post([this, muted] { settings_.setMicrophoneMuted(muted); }); },
-        .statisticsVisibleChanged = [this](bool visible)
-        { post([this, visible] { settings_.setOverlayStatisticsVisible(visible); }); },
+        .statisticsModeChanged = [this](core::StatisticsMode mode)
+        { post([this, mode] { settings_.setOverlayStatisticsMode(mode); }); },
         .menuOpenChanged = [this](bool open)
         {
             post(
@@ -426,7 +426,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
             .overlayFonts = overlayFonts(),
             .overlay =
                 {
-                    .statisticsVisible = settings_.overlayStatisticsVisible(),
+                    .statisticsMode = settings_.overlayStatisticsMode(),
                     .reflex = settings_.reflexMode(),
                     .lowestLatency = settings_.lowestLatency(),
                     .microphoneMuted = settings_.microphoneMuted(),

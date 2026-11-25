@@ -932,15 +932,15 @@ QString SettingsController::frameGenerationUnavailableReason() const
     return {};
 }
 
-bool SettingsController::overlayStatisticsVisible() const
+core::StatisticsMode SettingsController::overlayStatisticsMode() const
 {
-    return settings_.overlay.statisticsVisible;
+    return settings_.overlay.statisticsMode;
 }
 
-void SettingsController::setOverlayStatisticsVisible(bool visible)
+void SettingsController::setOverlayStatisticsMode(core::StatisticsMode mode)
 {
     core::OverlaySettings overlay = settings_.overlay;
-    overlay.statisticsVisible = visible;
+    overlay.statisticsMode = mode;
     applyOverlay(overlay);
 }
 
@@ -1292,7 +1292,8 @@ void SettingsController::applyOverlay(const core::OverlaySettings& overlay)
     }
 
     settings_.overlay = overlay;
-    spdlog::info("Overlay settings: statistics {}", overlay.statisticsVisible ? "shown" : "hidden");
+    spdlog::info("Overlay settings: statistics {}",
+                 core::statisticsModeName(overlay.statisticsMode));
     emit overlayChanged();
     save();
 }

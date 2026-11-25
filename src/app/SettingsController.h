@@ -71,8 +71,6 @@ class SettingsController : public QObject
     Q_PROPERTY(bool frameGenerationAvailable READ frameGenerationAvailable NOTIFY rtxChanged)
     Q_PROPERTY(QString frameGenerationUnavailableReason READ frameGenerationUnavailableReason NOTIFY
                    rtxChanged)
-    Q_PROPERTY(bool overlayStatisticsVisible READ overlayStatisticsVisible WRITE
-                   setOverlayStatisticsVisible NOTIFY overlayChanged)
     Q_PROPERTY(
         QString consoleView READ consoleView WRITE setConsoleView NOTIFY interfaceChanged)
     Q_PROPERTY(QVariantMap keyboardBindings READ keyboardBindings NOTIFY keyboardMouseChanged)
@@ -202,8 +200,8 @@ public:
     [[nodiscard]] bool reflexAvailable() const;
     [[nodiscard]] QString reflexUnavailableReason() const;
 
-    [[nodiscard]] bool overlayStatisticsVisible() const;
-    void setOverlayStatisticsVisible(bool visible);
+    [[nodiscard]] core::StatisticsMode overlayStatisticsMode() const;
+    void setOverlayStatisticsMode(core::StatisticsMode mode);
 
     // "grid" or "list", the Consoles screen's view.
     [[nodiscard]] QString consoleView() const;

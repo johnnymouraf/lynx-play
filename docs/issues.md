@@ -67,7 +67,7 @@
 ## Reflex reports no effective low-latency in --play-file
 
 - **Where:** `--play-file` playback with Reflex on.
-- **Steps:** run `mfplay.exe --play-file <file> --fps 60`, open F2, read the
+- **Steps:** run `mfplay.exe --play-file <file> --fps 60`, press F2 twice (advanced mode), read the
   Reflex section.
 - **Expected:** the driver reports the low-latency mode as effective, and
   `GetLatency` returns a valid report, as the "Teste de vídeo" window does.
