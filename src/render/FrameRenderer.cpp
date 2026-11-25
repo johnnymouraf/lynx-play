@@ -1968,6 +1968,20 @@ FrameRenderer::FrameTarget FrameRenderer::frameTarget(UINT bufferIndex, bool off
     };
 }
 
+// The back buffer is in the render target state. Each present draws the overlay
+// once, so Dear ImGui's per-frame buffers, which cycle over the swap chain's
+// buffer count, are reused only after the present that last used them.
+void FrameRenderer::recordPresentOverlay(ID3D12GraphicsCommandList& list, UINT bufferIndex)
+{
+    if (overlay_ == nullptr || !overlay_->visible())
+    {
+        return;
+    }
+
+    overlay_->render(list, swapChain_.renderTargetView(bufferIndex), overlayStats(),
+                     gamepadState());
+}
+
 std::expected<bool, std::string> FrameRenderer::presentGenerated(
     UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput, bool waitForFlow,
     bool reset, bool keepReal)
@@ -2024,10 +2038,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
                                      D3D12_RESOURCE_STATE_RENDER_TARGET);
     list.ResourceBarrier(1, &toTarget);
 
-    if (overlay_ != nullptr && overlay_->visible())
-    {
-        overlay_->render(list, swapChain_.renderTargetView(index), overlayStats(), gamepadState());
-    }
+    recordPresentOverlay(list, index);
 
     const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET,
                                       D3D12_RESOURCE_STATE_PRESENT);
@@ -2114,8 +2125,20 @@ std::expected<void, std::string> FrameRenderer::presentReal(std::uint64_t frameI
     list.ResourceBarrier(1, &toCopy);
     list.CopyResource(backBuffer, realPicture_.Get());
 
-    const auto toPresent = transition(backBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
-                                      D3D12_RESOURCE_STATE_PRESENT);
+    const bool overlayVisible = overlay_ != nullptr && overlay_->visible();
+
+    if (overlayVisible)
+    {
+        const auto toTarget = transition(backBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                                         D3D12_RESOURCE_STATE_RENDER_TARGET);
+        list.ResourceBarrier(1, &toTarget);
+        recordPresentOverlay(list, index);
+    }
+
+    const auto toPresent = transition(
+        backBuffer,
+        overlayVisible ? D3D12_RESOURCE_STATE_RENDER_TARGET : D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PRESENT);
     list.ResourceBarrier(1, &toPresent);
 
     const auto toShader = transition(realPicture_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
@@ -2397,7 +2420,10 @@ void FrameRenderer::recordShaderFrame(UINT bufferIndex, const FramePlan& plan,
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay_ != nullptr)
+    // With Frame Generation the target is the picture DLSS-G interpolates; the
+    // overlay is drawn once per present onto the back buffer instead, so it is
+    // neither interpolated nor layered twice. This stage then times nothing.
+    if (overlay_ != nullptr && target.resource != realPicture_.Get())
     {
         overlay_->render(*commandList_.Get(), targetView, overlayStats(), gamepadState());
     }
@@ -2593,7 +2619,10 @@ std::expected<void, std::string> FrameRenderer::recordDlssSuperResolutionFrame(
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay_ != nullptr)
+    // With Frame Generation the target is the picture DLSS-G interpolates; the
+    // overlay is drawn once per present onto the back buffer instead, so it is
+    // neither interpolated nor layered twice. This stage then times nothing.
+    if (overlay_ != nullptr && target.resource != realPicture_.Get())
     {
         overlay_->render(*commandList_.Get(), targetView, overlayStats(), gamepadState());
     }
@@ -2764,7 +2793,10 @@ std::expected<bool, std::string> FrameRenderer::recordVideoSuperResolutionFrame(
 
     timer_->beginStage(*commandList_.Get(), bufferIndex, EffectStage::Overlay);
 
-    if (overlay_ != nullptr)
+    // With Frame Generation the target is the picture DLSS-G interpolates; the
+    // overlay is drawn once per present onto the back buffer instead, so it is
+    // neither interpolated nor layered twice. This stage then times nothing.
+    if (overlay_ != nullptr && target.resource != realPicture_.Get())
     {
         overlay_->render(*commandList_.Get(), targetView, overlayStats(), gamepadState());
     }

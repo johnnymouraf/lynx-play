@@ -219,8 +219,10 @@ private:
     // The draw target for this frame: the swap chain when Frame Generation
     // is off, the retained real picture when it is on.
     [[nodiscard]] FrameTarget frameTarget(UINT bufferIndex, bool offscreen);
+    // Draws the overlay onto the back buffer, which must be a render target.
+    void recordPresentOverlay(ID3D12GraphicsCommandList& list, UINT bufferIndex);
     // Densifies the flow, evaluates DLSS-G, copies the generated picture
-    // into the current back buffer, draws the overlay over it and presents
+    // into the current back buffer, draws the overlay once over it and presents
     // it. False when the evaluation failed and the real picture is the only
     // one this frame can show.
     [[nodiscard]] std::expected<bool, std::string> presentGenerated(
