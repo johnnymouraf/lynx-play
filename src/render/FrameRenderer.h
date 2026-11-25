@@ -227,13 +227,36 @@ private:
     // one this frame can show.
     [[nodiscard]] std::expected<bool, std::string> presentGenerated(
         UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput,
-        bool waitForFlow, bool reset, bool keepReal);
+        const FrameGenerationPlan& plan);
     // Copies the retained real picture into the current back buffer and
     // presents it. `secondPresent` waits for the slot the generated picture
     // just took; the frame's first present uses the slot the render loop
     // already waited for.
     [[nodiscard]] std::expected<void, std::string> presentReal(std::uint64_t frameId,
                                                                bool secondPresent);
+    // Presents the retained real picture again with the overlay drawn over it,
+    // without running the scaling and the flow for a picture already composed.
+    [[nodiscard]] std::expected<void, std::string> presentOverlayRedraw();
+    // Whether the retained real picture still holds the frame on screen, as
+    // composed by the current path, so a redraw can present it as it is.
+    [[nodiscard]] bool canRepeatRealPicture() const;
+    // How long the render loop waits for a frame before it wakes anyway.
+    [[nodiscard]] DWORD waitTimeout() const;
+    // Asks for a redraw when the overlay is visible and no present has shown it
+    // for a while.
+    void requestIdleOverlayRedraw();
+    // The mailbox's frame when it has one, else `current`; a `current` frame
+    // it replaces is dropped.
+    [[nodiscard]] std::optional<VideoFrame> takeNewerFrame(std::optional<VideoFrame> current);
+    // A frame the pipeline will never show: the pairs around it are broken.
+    void countDroppedFrames(std::uint64_t dropped);
+    // The compare windows, the flow and the DLSS history start over.
+    void restartPairSequence();
+    // Reads the display's refresh rate about once a second and tells the
+    // schedule.
+    void updateDisplayRefresh();
+    // Logs once when the display can't show the generated pictures.
+    void logDisplayGuard();
     // Optical flow reads the SDR picture, so a PQ stream is tone-mapped for
     // it even when the display takes PQ.
     [[nodiscard]] ToneMapParameters flowToneMap() const;
@@ -399,6 +422,18 @@ private:
     // done with them.
     std::array<std::optional<VideoFrame>, SwapChain::kBufferCount> framesInFlight_;
     std::optional<VideoFrame> shownFrame_;
+    // A frame taken from the mailbox that waits for the next pass: the window
+    // can't show it yet or the swap chain had no free slot.
+    std::optional<VideoFrame> pendingFrame_;
+    // The real picture Frame Generation holds for a repeated source's repeat.
+    HeldRealPicture heldReal_;
+    // The retained real picture holds shownFrame_ as the current path
+    // composes it.
+    bool realPictureCurrent_ = false;
+    std::optional<std::chrono::steady_clock::time_point> lastPresentTime_;
+    std::optional<double> displayRefreshHertz_;
+    std::optional<std::chrono::steady_clock::time_point> displayCheckedAt_;
+    bool displayGuardLogged_ = false;
     ComPtr<ID3D12Fence> fence_;
     UINT64 lastSignaledFence_ = 0;
     core::UniqueHandle fenceEvent_;

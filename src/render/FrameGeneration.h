@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/FrameSchedule.h"
 #include "render/Layout.h"
 #include "render/NgxHost.h"
 
@@ -80,10 +81,11 @@ public:
     // One generated picture between the previous real picture and
     // `backbuffer` (both in NON_PIXEL_SHADER_RESOURCE). The motion vectors
     // are current-to-previous pixels at the extent, in
-    // NON_PIXEL_SHADER_RESOURCE.
+    // NON_PIXEL_SHADER_RESOURCE. The plan's reset and multi-frame counts go
+    // to the runtime as they are.
     [[nodiscard]] std::expected<void, std::string> evaluate(
         ID3D12GraphicsCommandList& commandList, ID3D12Resource& backbuffer,
-        ID3D12Resource& motionVectors, bool reset, std::uint64_t frameId);
+        ID3D12Resource& motionVectors, const FrameGenerationPlan& plan, std::uint64_t frameId);
 
     void generatedCopied();
 

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <string>
 
 namespace mfplay::render
@@ -51,6 +52,9 @@ public:
     [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE renderTargetView(UINT index) const;
     [[nodiscard]] SurfaceSize size() const;
     [[nodiscard]] DXGI_FORMAT format() const;
+    // The current refresh rate of the monitor that shows the window, in whole
+    // hertz; absent when Windows reports none.
+    [[nodiscard]] std::optional<double> displayRefreshHertz() const;
 
 private:
     SwapChain() = default;

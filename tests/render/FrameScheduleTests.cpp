@@ -170,3 +170,89 @@ TEST_CASE("A 15 fps source in a 30 fps stream holds the real picture for the rep
     CHECK(plan.presentGenerated);
     CHECK_FALSE(plan.presentReal);
 }
+
+TEST_CASE("A display below twice the game rate generates nothing under VSync")
+{
+    FrameSchedule schedule;
+    schedule.setCadence(60.0);
+    schedule.setDisplay(true, 60.0);
+
+    CHECK(schedule.displayTooSlow());
+
+    const FrameGenerationPlan plan = schedule.observe(Decision::Distinct);
+
+    CHECK_FALSE(plan.generate);
+    CHECK_FALSE(plan.presentGenerated);
+    CHECK(plan.presentReal);
+}
+
+TEST_CASE("A 60 Hz display fits a 30 fps game, and the reported 59 Hz still does")
+{
+    FrameSchedule schedule({.containerFramesPerSecond = 60.0});
+    schedule.setCadence(30.0);
+
+    schedule.setDisplay(true, 60.0);
+    CHECK_FALSE(schedule.displayTooSlow());
+
+    schedule.setDisplay(true, 59.0);
+    CHECK_FALSE(schedule.displayTooSlow());
+
+    schedule.setDisplay(true, 50.0);
+    CHECK(schedule.displayTooSlow());
+}
+
+TEST_CASE("The refresh guard needs a waiting present, a known refresh rate and a cadence")
+{
+    FrameSchedule schedule;
+
+    schedule.setDisplay(true, 30.0);
+    CHECK_FALSE(schedule.displayTooSlow());
+
+    schedule.setCadence(60.0);
+
+    schedule.setDisplay(false, 30.0);
+    CHECK_FALSE(schedule.displayTooSlow());
+
+    schedule.setDisplay(true, std::nullopt);
+    CHECK_FALSE(schedule.displayTooSlow());
+}
+
+TEST_CASE("Generation resumes with a reset once the display is fast enough")
+{
+    FrameSchedule schedule;
+    schedule.setCadence(60.0);
+    schedule.setDisplay(true, 60.0);
+    (void)schedule.observe(Decision::Distinct);
+
+    schedule.setDisplay(true, 144.0);
+    const FrameGenerationPlan plan = schedule.observe(Decision::Distinct);
+
+    CHECK(plan.generate);
+    CHECK(plan.reset);
+}
+
+TEST_CASE("A held real picture waits for its repeat until the stream stalls")
+{
+    using Clock = HeldRealPicture::Clock;
+    const Clock::time_point start{};
+    HeldRealPicture held;
+
+    CHECK_FALSE(held.waiting(start));
+
+    held.hold(start - std::chrono::milliseconds(2), start);
+
+    CHECK(held.waiting(start + std::chrono::milliseconds(16)));
+    CHECK_FALSE(held.waiting(start + HeldRealPicture::kStallAfter));
+}
+
+TEST_CASE("Releasing a held real picture gives back the distinct frame's decode time")
+{
+    using Clock = HeldRealPicture::Clock;
+    const Clock::time_point decoded{};
+    HeldRealPicture held;
+    held.hold(decoded, decoded + std::chrono::milliseconds(3));
+
+    CHECK(held.release() == decoded);
+    CHECK_FALSE(held.release().has_value());
+    CHECK_FALSE(held.waiting(decoded + std::chrono::milliseconds(4)));
+}

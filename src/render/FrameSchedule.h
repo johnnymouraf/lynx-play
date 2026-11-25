@@ -2,6 +2,7 @@
 
 #include "render/CadenceDetector.h"
 
+#include <chrono>
 #include <cstdint>
 #include <optional>
 
@@ -60,6 +61,15 @@ public:
     // The detector's published estimate; absent until two windows agree.
     void setCadence(std::optional<double> framesPerSecond);
 
+    // The display's refresh rate and whether presents wait for it. Absent
+    // when the system doesn't report one.
+    void setDisplay(bool vsync, std::optional<double> refreshHertz);
+
+    // The display refreshes too slowly to show a generated picture and a real
+    // one for every game picture, so nothing is generated. Only a waiting
+    // present is bound by the refresh; an immediate one is not.
+    [[nodiscard]] bool displayTooSlow() const;
+
     // Forgets the pair history: dropped frames, a resize, a source change or
     // the setting being turned on.
     void reset();
@@ -72,8 +82,36 @@ private:
 
     Options options_;
     std::optional<double> cadence_;
+    bool vsync_ = false;
+    std::optional<double> refreshHertz_;
     bool hasHistory_ = false;
     bool resetPending_ = false;
+};
+
+// The real picture a repeated source holds back: the generated picture took
+// the distinct frame's slot, and the real one waits for the repeat that
+// follows. A redraw must not present it early.
+class HeldRealPicture
+{
+public:
+    using Clock = std::chrono::steady_clock;
+
+    // The repeat that should release the picture never arrives when the
+    // stream stalls; after this long a redraw may show it.
+    static constexpr std::chrono::milliseconds kStallAfter{100};
+
+    // `decoded` is when the distinct frame came out of the decoder.
+    void hold(Clock::time_point decoded, Clock::time_point now);
+
+    // A picture is held and the repeat is still due.
+    [[nodiscard]] bool waiting(Clock::time_point now) const;
+
+    // The real picture reached the screen; the held frame's decode time.
+    std::optional<Clock::time_point> release();
+
+private:
+    std::optional<Clock::time_point> decoded_;
+    Clock::time_point heldAt_;
 };
 
 } // namespace mfplay::render

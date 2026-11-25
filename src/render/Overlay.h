@@ -92,6 +92,9 @@ struct OverlayStats
     // for the quick menu's toggles.
     core::Upscaling upscaling = core::Upscaling::Shader;
     core::FrameGenerationMode frameGeneration = core::FrameGenerationMode::Off;
+    // Frame Generation is on, but the display refreshes below twice the game's
+    // rate, so no picture is generated.
+    bool frameGenerationDisplayTooSlow = false;
 
     // The published cadence, once two windows agree.
     bool cadenceValid = false;

@@ -127,7 +127,9 @@ Out of scope for now: capture card input (planned for the future).
 - The in-stream overlay is Dear ImGui (vcpkg, DX12 + Win32 backends), brought
   in by 2.1 as a minimal statistics panel; 1.5 owns its final look.
 - Frame Generation detects the repeated frames of 30 fps games in the 60 fps
-  stream and interpolates between the distinct ones.
+  stream and interpolates between the distinct ones. Under VSync it generates
+  only when the display refreshes at twice the game's rate or more; on a 60 Hz
+  display that means games up to 30 fps.
 - Target displays: today an Acer 1080p 60 Hz monitor on the RTX (and the 240 Hz
   laptop panel on the Intel GPU); later a 1440p+ 120 Hz+ monitor. Every output
   resolution and refresh rate must work.

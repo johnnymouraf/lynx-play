@@ -214,11 +214,11 @@ std::string resultText(NVSDK_NGX_Result result)
 // A stationary synthetic camera: all the motion is in the vector picture,
 // but the runtime still wants consistent matrices and a lens.
 NVSDK_NGX_DLSSG_Opt_Eval_Params evaluationParameters(SurfaceSize extent, bool hdr,
-                                                      bool reset)
+                                                      const FrameGenerationPlan& plan)
 {
     NVSDK_NGX_DLSSG_Opt_Eval_Params parameters{};
-    parameters.multiFrameCount = 1;
-    parameters.multiFrameIndex = 1;
+    parameters.multiFrameCount = plan.multiFrameCount;
+    parameters.multiFrameIndex = plan.multiFrameIndex;
 
     for (int row = 0; row < 4; ++row)
     {
@@ -263,7 +263,7 @@ NVSDK_NGX_DLSSG_Opt_Eval_Params evaluationParameters(SurfaceSize extent, bool hd
     parameters.colorBuffersHDR = hdr;
     parameters.depthInverted = false;
     parameters.cameraMotionIncluded = true;
-    parameters.reset = reset;
+    parameters.reset = plan.reset;
     parameters.automodeOverrideReset = false;
     parameters.notRenderingGameFrames = false;
     parameters.orthoProjection = false;
@@ -648,13 +648,13 @@ DXGI_FORMAT FrameGeneration::format() const
 
 std::expected<void, std::string> FrameGeneration::evaluate(
     ID3D12GraphicsCommandList& commandList, ID3D12Resource& backbuffer,
-    ID3D12Resource& motionVectors, bool reset, std::uint64_t frameId)
+    ID3D12Resource& motionVectors, const FrameGenerationPlan& plan, std::uint64_t frameId)
 {
 #if !defined(MFPLAY_HAVE_NGX)
     (void)commandList;
     (void)backbuffer;
     (void)motionVectors;
-    (void)reset;
+    (void)plan;
     (void)frameId;
     return std::unexpected("the build has no NVIDIA NGX SDK");
 #else
@@ -682,7 +682,7 @@ std::expected<void, std::string> FrameGeneration::evaluate(
     resources.pOutputInterpFrame = impl.generated.Get();
 
     NVSDK_NGX_DLSSG_Opt_Eval_Params options =
-        evaluationParameters(impl.extent, impl.format == DXGI_FORMAT_R10G10B10A2_UNORM, reset);
+        evaluationParameters(impl.extent, impl.format == DXGI_FORMAT_R10G10B10A2_UNORM, plan);
     impl.parameters->Set(NVSDK_NGX_DLSSG_Parameter_BackbufferFrameID,
                          static_cast<unsigned long long>(frameId));
 

@@ -54,13 +54,15 @@ public:
     [[nodiscard]] std::uint64_t record(ID3D12GraphicsCommandList& commandList,
                                         const VideoFrame& current, const VideoFrame& previous);
 
-    // Reads a completed slot's sample, never waiting. Call it until it
-    // returns nullopt.
+    // Reads the oldest completed slot's sample, never waiting, so the samples
+    // come back in frame order. Call it until it returns nullopt.
     [[nodiscard]] std::optional<CadenceReadback> take();
 
     // Waits for the sample the frame with this fence value produced. Frame
     // generation needs the current frame's decision before it evaluates, so
     // it pays this one short GPU wait instead of guessing a frame late.
+    // The decision belongs to this frame, so a sample that doesn't arrive in
+    // time is dropped: reading it later would feed the detector out of order.
     [[nodiscard]] std::optional<CadenceReadback> wait(std::uint64_t fenceValue);
 
     [[nodiscard]] ID3D12Fence* fence() const;
@@ -78,6 +80,9 @@ private:
     };
 
     [[nodiscard]] std::optional<UINT> freeSlot();
+    [[nodiscard]] Slot* slotFor(std::uint64_t fenceValue);
+    // Maps a completed slot, copies its sample out and frees the slot.
+    [[nodiscard]] static std::optional<CadenceReadback> readSlot(Slot& slot);
     void writeLumaView(UINT slot, bool current, const VideoFrame& frame);
 
     Microsoft::WRL::ComPtr<ID3D12Device> device_;

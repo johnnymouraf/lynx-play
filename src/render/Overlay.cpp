@@ -502,6 +502,23 @@ void drawOpticalFlowRow(const Fonts& fonts, const OverlayStats& stats)
                                          : "—");
 }
 
+void drawFrameGenerationRow(const Fonts& fonts, const OverlayStats& stats)
+{
+    if (stats.frameGeneration != core::FrameGenerationMode::X2)
+    {
+        statRow(fonts, "Frame Generation", "Desligado", kTextSubtle);
+        return;
+    }
+
+    if (stats.frameGenerationDisplayTooSlow)
+    {
+        statRow(fonts, "Frame Generation", "Tela abaixo de 2× o jogo", kStandby);
+        return;
+    }
+
+    statRow(fonts, "Frame Generation", "Ligado 2x", kAccent);
+}
+
 void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
 {
     sectionHeading(fonts, "GPU POR ETAPA");
@@ -528,9 +545,7 @@ void drawGpuSection(const Fonts& fonts, const OverlayStats& stats)
 
     drawOpticalFlowRow(fonts, stats);
 
-    statRow(fonts, "Frame Generation",
-            stats.frameGeneration == core::FrameGenerationMode::X2 ? "Ligado 2x" : "Desligado",
-            stats.frameGeneration == core::FrameGenerationMode::X2 ? kAccent : kTextSubtle);
+    drawFrameGenerationRow(fonts, stats);
     statRow(fonts, "Total (sem espera)",
             stats.gpuTimingsValid ? millisecondsText(stats.totalMilliseconds, 2) : "—");
     statRow(fonts, "Espera",

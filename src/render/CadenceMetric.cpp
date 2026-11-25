@@ -361,31 +361,25 @@ std::uint64_t CadenceMetric::record(ID3D12GraphicsCommandList& commandList,
 
 std::optional<CadenceReadback> CadenceMetric::take()
 {
+    const std::uint64_t completed = fence_->GetCompletedValue();
+    Slot* oldest = nullptr;
+
     for (Slot& slot : slots_)
     {
-        if (slot.pending == 0 || fence_->GetCompletedValue() < slot.pending)
+        const bool done = slot.pending != 0 && slot.pending <= completed;
+
+        if (done && (oldest == nullptr || slot.pending < oldest->pending))
         {
-            continue;
+            oldest = &slot;
         }
-
-        void* mapped = nullptr;
-        const D3D12_RANGE range{.Begin = 0, .End = sizeof(CadenceReadback)};
-
-        if (const HRESULT result = slot.readback->Map(0, &range, &mapped); FAILED(result))
-        {
-            slot.pending = 0;
-            continue;
-        }
-
-        CadenceReadback sample;
-        std::memcpy(&sample, mapped, sizeof(sample));
-        slot.readback->Unmap(0, nullptr);
-        slot.pending = 0;
-
-        return sample;
     }
 
-    return std::nullopt;
+    if (oldest == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    return readSlot(*oldest);
 }
 
 std::optional<CadenceReadback> CadenceMetric::wait(std::uint64_t fenceValue)
@@ -397,52 +391,62 @@ std::optional<CadenceReadback> CadenceMetric::wait(std::uint64_t fenceValue)
         return std::nullopt;
     }
 
+    Slot* const slot = slotFor(fenceValue);
+
+    if (slot == nullptr)
+    {
+        return std::nullopt;
+    }
+
     if (fence_->GetCompletedValue() < fenceValue)
     {
-        if (samplesReadyEvent_ == nullptr)
-        {
-            return std::nullopt;
-        }
+        const bool arrived =
+            samplesReadyEvent_ != nullptr &&
+            SUCCEEDED(fence_->SetEventOnCompletion(fenceValue, samplesReadyEvent_.get())) &&
+            WaitForSingleObject(samplesReadyEvent_.get(), kWaitTimeoutMilliseconds) ==
+                WAIT_OBJECT_0;
 
-        if (const HRESULT result =
-                fence_->SetEventOnCompletion(fenceValue, samplesReadyEvent_.get());
-            FAILED(result))
+        if (!arrived)
         {
-            return std::nullopt;
-        }
-
-        if (WaitForSingleObject(samplesReadyEvent_.get(), kWaitTimeoutMilliseconds) !=
-            WAIT_OBJECT_0)
-        {
+            // The queue's order keeps a reused slot safe from the late copy.
+            slot->pending = 0;
             return std::nullopt;
         }
     }
 
+    return readSlot(*slot);
+}
+
+CadenceMetric::Slot* CadenceMetric::slotFor(std::uint64_t fenceValue)
+{
     for (Slot& slot : slots_)
     {
-        if (slot.pending != fenceValue)
+        if (slot.pending == fenceValue)
         {
-            continue;
+            return &slot;
         }
-
-        void* mapped = nullptr;
-        const D3D12_RANGE range{.Begin = 0, .End = sizeof(CadenceReadback)};
-
-        if (const HRESULT result = slot.readback->Map(0, &range, &mapped); FAILED(result))
-        {
-            slot.pending = 0;
-            return std::nullopt;
-        }
-
-        CadenceReadback sample;
-        std::memcpy(&sample, mapped, sizeof(sample));
-        slot.readback->Unmap(0, nullptr);
-        slot.pending = 0;
-
-        return sample;
     }
 
-    return std::nullopt;
+    return nullptr;
+}
+
+std::optional<CadenceReadback> CadenceMetric::readSlot(Slot& slot)
+{
+    void* mapped = nullptr;
+    const D3D12_RANGE range{.Begin = 0, .End = sizeof(CadenceReadback)};
+
+    if (const HRESULT result = slot.readback->Map(0, &range, &mapped); FAILED(result))
+    {
+        slot.pending = 0;
+        return std::nullopt;
+    }
+
+    CadenceReadback sample;
+    std::memcpy(&sample, mapped, sizeof(sample));
+    slot.readback->Unmap(0, nullptr);
+    slot.pending = 0;
+
+    return sample;
 }
 
 ID3D12Fence* CadenceMetric::fence() const

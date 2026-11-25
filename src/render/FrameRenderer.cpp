@@ -23,7 +23,13 @@ using Clock = std::chrono::steady_clock;
 // Long enough to never fire while frames flow; on expiry the frame is tried
 // again.
 constexpr std::chrono::milliseconds kFrameSlotTimeout{100};
+// How often an overlay that is on screen redraws when no picture arrives, and
+// the timeout that wakes the loop for it.
+constexpr DWORD kOverlayIdleRedrawMilliseconds = 40;
+constexpr std::chrono::milliseconds kOverlayIdleRedraw{kOverlayIdleRedrawMilliseconds};
+constexpr DWORD kGamepadPollMilliseconds = 16;
 constexpr std::chrono::seconds kStatisticsPeriod{5};
+constexpr std::chrono::seconds kDisplayRefreshCheckPeriod{1};
 
 constexpr std::array<float, 4> kBlack{0.0F, 0.0F, 0.0F, 1.0F};
 
@@ -575,11 +581,11 @@ try
 
     const std::stop_callback wakeOnStop(stop, [this] { SetEvent(wakeEvent_.get()); });
     const std::array events{mailbox_->frameReadyEvent(), wakeEvent_.get()};
-    const DWORD timeout = options_.gamepad ? 16 : INFINITE;
 
     while (true)
     {
-        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE, timeout);
+        WaitForMultipleObjects(static_cast<DWORD>(events.size()), events.data(), FALSE,
+                               waitTimeout());
 
         if (stop.stop_requested())
         {
@@ -594,6 +600,7 @@ try
         applyRequestedWindowLayout();
         applyOverlayToggles();
         pollGamepad();
+        requestIdleOverlayRedraw();
 
         if (auto frame = renderFrame(); !frame)
         {
@@ -605,12 +612,6 @@ try
             }
 
             break;
-        }
-
-        if (overlay_ != nullptr && overlay_->visible())
-        {
-            redrawRequested_.store(true);
-            SetEvent(wakeEvent_.get());
         }
 
         reportStatistics();
@@ -629,6 +630,69 @@ catch (...)
 {
     core::logUnhandledException("The render thread stopped on an unhandled exception");
     throw;
+}
+
+std::optional<VideoFrame> FrameRenderer::takeNewerFrame(std::optional<VideoFrame> current)
+{
+    std::optional<VideoFrame> taken = mailbox_->take();
+
+    if (!taken)
+    {
+        return current;
+    }
+
+    if (current)
+    {
+        countDroppedFrames(1);
+    }
+
+    return taken;
+}
+
+void FrameRenderer::countDroppedFrames(std::uint64_t dropped)
+{
+    droppedFrames_ += dropped;
+    restartPairSequence();
+}
+
+void FrameRenderer::restartPairSequence()
+{
+    cadence_.reset();
+    cadenceReferenceValid_ = false;
+    flowReferenceValid_ = false;
+    dlssResetPending_ = true;
+    frameSchedule_.reset();
+}
+
+DWORD FrameRenderer::waitTimeout() const
+{
+    const DWORD gamepadPoll = options_.gamepad ? kGamepadPollMilliseconds : INFINITE;
+    const bool overlayVisible = overlay_ != nullptr && overlay_->visible();
+
+    if (!overlayVisible && !redrawRequested_.load())
+    {
+        return gamepadPoll;
+    }
+
+    return std::min(gamepadPoll, kOverlayIdleRedrawMilliseconds);
+}
+
+void FrameRenderer::requestIdleOverlayRedraw()
+{
+    if (overlay_ == nullptr || !overlay_->visible())
+    {
+        return;
+    }
+
+    // Every new frame presents the overlay with it; only a stream that stopped
+    // delivering pictures needs the overlay redrawn on its own.
+    const bool idle = !lastPresentTime_ ||
+                      Clock::now() - *lastPresentTime_ >= kOverlayIdleRedraw;
+
+    if (idle)
+    {
+        redrawRequested_.store(true);
+    }
 }
 
 void FrameRenderer::applyOverlayToggles()
@@ -678,6 +742,7 @@ void FrameRenderer::pollGamepad()
 std::expected<void, std::string> FrameRenderer::renderFrame()
 {
     drainCadence();
+    updateDisplayRefresh();
 
     // A minimized window has an empty client area: presenting into it would
     // run the whole frame for a picture nobody sees, so the pipeline stays
@@ -692,7 +757,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
 
     presentGate_.setClientSize(client);
 
-    std::optional<VideoFrame> newest = mailbox_->take();
+    std::optional<VideoFrame> newest = takeNewerFrame(std::exchange(pendingFrame_, std::nullopt));
     const bool redraw = redrawRequested_.exchange(false);
 
     if (!presentGate_.mayPresent())
@@ -703,12 +768,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         }
 
         hidden_ = true;
-
-        if (newest)
-        {
-            shownFrame_ = std::move(newest);
-        }
-
+        pendingFrame_ = std::move(newest);
         redrawRequested_.store(true);
         return {};
     }
@@ -730,6 +790,14 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         return {};
     }
 
+    // The real picture is held for the repeat that completes the pair; a
+    // redraw now would show it a repeat early.
+    if (!newest && heldReal_.waiting(Clock::now()))
+    {
+        redrawRequested_.store(true);
+        return {};
+    }
+
     // The first new frame of this pass is accepted here, so its one sleep
     // comes before any of its work; a retry reuses the same id.
     if (newest && !reflexFrameId_)
@@ -741,21 +809,15 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     // after deciding to present.
     if (!swapChain_.waitForFrameSlot(kFrameSlotTimeout))
     {
-        if (newest)
-        {
-            shownFrame_ = std::move(newest);
-        }
-
+        // The frame is still new: the retry takes it through the whole path.
+        pendingFrame_ = std::move(newest);
         redrawRequested_.store(true);
         SetEvent(wakeEvent_.get());
         return {};
     }
 
     // A frame that arrived during the wait is newer still.
-    if (auto newer = mailbox_->take())
-    {
-        newest = std::move(newer);
-    }
+    newest = takeNewerFrame(std::move(newest));
 
     const bool showsNewFrame = newest.has_value();
 
@@ -772,12 +834,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         // picture is no longer the one the metric compares against.
         if (const std::uint64_t dropped = mailbox_->takeDroppedCount(); dropped > 0)
         {
-            droppedFrames_ += dropped;
-            cadence_.reset();
-            cadenceReferenceValid_ = false;
-            flowReferenceValid_ = false;
-            dlssResetPending_ = true;
-            frameSchedule_.reset();
+            countDroppedFrames(dropped);
         }
     }
 
@@ -794,6 +851,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         flowReferenceValid_ = false;
         flowSlotValid_.fill(false);
         dlssResetPending_ = true;
+        realPictureCurrent_ = false;
         frameSchedule_.reset();
         frameSchedule_.setCadence(std::nullopt);
     }
@@ -829,10 +887,20 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             flowReferenceValid_ = false;
             flowSlotValid_.fill(false);
             dlssResetPending_ = true;
+            realPictureCurrent_ = false;
             frameSchedule_.reset();
             frameSchedule_.setCadence(std::nullopt);
         }
     }
+
+    // Nothing new to compose: the overlay goes over the picture already
+    // composed, without the scaling and the flow running again.
+    if (!showsNewFrame && canRepeatRealPicture())
+    {
+        return presentOverlayRedraw();
+    }
+
+    realPictureCurrent_ = false;
 
     // The swap chain's current index is the present target; the source ring
     // advances once per decoded picture, since Frame Generation can present
@@ -975,6 +1043,9 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     }
 
     bool realPresented = false;
+    // The decode time of the frame whose real picture this present shows,
+    // when it waited for the repeat.
+    std::optional<Clock::time_point> heldDecodeTime;
 
     if (offscreen)
     {
@@ -984,6 +1055,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         {
             CadenceDetector::Decision decision = CadenceDetector::Decision::Ignored;
 
+            // This frame's decision says whether it generates, so the CPU waits
+            // for the GPU to finish the frame's cadence sample. A decision
+            // taken a frame late would generate from the wrong pair; the cost
+            // is that the CPU can't run ahead of the GPU while Frame
+            // Generation is on. A sample that misses the wait is dropped.
             if (cadenceFrameValue_ != 0 && cadenceMetric_ != nullptr)
             {
                 if (const auto sample = cadenceMetric_->wait(cadenceFrameValue_))
@@ -1010,6 +1086,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             }
 
             generation = frameSchedule_.observe(decision);
+            logDisplayGuard();
         }
 
         bool generatedPresented = false;
@@ -1017,8 +1094,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         if (showsNewFrame && generation.generate && flow.submitted)
         {
             const auto presented =
-                presentGenerated(sourceIndex, reflexFrameId, flow.output, true, generation.reset,
-                                 generation.presentReal);
+                presentGenerated(sourceIndex, reflexFrameId, flow.output, generation);
 
             if (!presented)
             {
@@ -1026,6 +1102,11 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             }
 
             generatedPresented = *presented;
+
+            if (generatedPresented && !generation.presentReal)
+            {
+                heldReal_.hold(shownFrame_->timestamp, Clock::now());
+            }
         }
         else if (generation.generate)
         {
@@ -1042,6 +1123,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
             }
 
             realPresented = true;
+            heldDecodeTime = heldReal_.release();
         }
     }
     else
@@ -1072,6 +1154,8 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     bufferShowedNewFrame_.at(sourceIndex) = showsNewFrame;
     framesInFlight_.at(sourceIndex) = shownFrame_;
 
+    realPictureCurrent_ = offscreen;
+
     if (shownFrame_)
     {
         cadenceReferenceValid_ = true;
@@ -1087,8 +1171,12 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
         showsNewFrame && lastNewFramePresentTime_
             ? std::optional(now - *lastNewFramePresentTime_)
             : std::nullopt;
+    // The picture a repeat presents is the distinct frame's: its time is
+    // counted from when that frame came out of the decoder.
     const std::optional<Clock::duration> readyToPresent =
-        showsNewFrame ? std::optional(now - shownFrame_->timestamp) : std::nullopt;
+        showsNewFrame ? std::optional(now - heldDecodeTime.value_or(shownFrame_->timestamp))
+                      : std::nullopt;
+    lastPresentTime_ = now;
 
     if (metrics_ != nullptr && realPresented)
     {
@@ -1098,7 +1186,7 @@ std::expected<void, std::string> FrameRenderer::renderFrame()
     if (showsNewFrame && realPresented)
     {
         lastNewFramePresentTime_ = now;
-        presented_.add(now - shownFrame_->timestamp);
+        presented_.add(*readyToPresent);
     }
 
     reflexFrameId_.reset();
@@ -1115,6 +1203,7 @@ std::expected<void, std::string> FrameRenderer::applyRequestedSize()
         return {};
     }
 
+    realPictureCurrent_ = false;
     waitForGpu();
     spdlog::debug("Resizing the swap chain to {}x{}", requested.width, requested.height);
 
@@ -1148,6 +1237,7 @@ void FrameRenderer::applyRequestedUpscaling()
     dlssFailed_ = false;
     dlssActive_ = false;
     dlssResetPending_ = true;
+    realPictureCurrent_ = false;
     dlssFallback_.clear();
     flowReferenceValid_ = false;
     flowSlotValid_.fill(false);
@@ -1220,6 +1310,11 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
                              presentation.toneMap != presentation_.toneMap ||
                              presentation.rtxVideoHdr != presentation_.rtxVideoHdr;
 
+    if (targetChanged || intermediateChanged || pathChanged)
+    {
+        realPictureCurrent_ = false;
+    }
+
     if (targetChanged || intermediateChanged)
     {
         waitForGpu();
@@ -1243,8 +1338,9 @@ std::expected<void, std::string> FrameRenderer::applyPresentation(
         }
 
         // The engine registered the old pictures: end its session first, then
-        // release the pictures it read, each under a guard.
-        opticalFlow_.reset();
+        // release the pictures it read, each under a guard. The session may
+        // not exist while the pictures do.
+        releaseOpticalFlow();
         presenter_.releasePictures();
         presenter_ = std::move(*created);
 
@@ -1448,6 +1544,7 @@ void FrameRenderer::applyRequestedOpticalFlow()
     flowReferenceValid_ = false;
     flowSlotValid_.fill(false);
     dlssResetPending_ = true;
+    realPictureCurrent_ = false;
     frameSchedule_.reset();
     spdlog::info("Optical flow: {}", requested ? "on" : "off");
 }
@@ -1464,6 +1561,7 @@ void FrameRenderer::applyRequestedFrameGeneration()
     requestedFrameGenerationApplied_ = requested;
     frameGenerationFailed_ = false;
     frameGenerationFailure_.clear();
+    realPictureCurrent_ = false;
     frameSchedule_.reset();
 
     if (requested == core::FrameGenerationMode::Off)
@@ -1514,6 +1612,8 @@ void FrameRenderer::releaseOpticalFlow()
 
 void FrameRenderer::releaseFrameGeneration()
 {
+    realPictureCurrent_ = false;
+    heldReal_ = {};
     frameGeneration_.reset();
     motionVectors_.reset();
     realPicture_.Reset();
@@ -1896,7 +1996,7 @@ bool FrameRenderer::prepareFrameGeneration(UINT bufferIndex)
 
     const auto warmed =
         frameGeneration_->evaluate(*generationCommandList_.Get(), *realPicture_.Get(),
-                                   *motionVectors_->texture(), true, 0);
+                                   *motionVectors_->texture(), FrameGenerationPlan{.reset = true}, 0);
 
     if (!warmed)
     {
@@ -1983,8 +2083,8 @@ void FrameRenderer::recordPresentOverlay(ID3D12GraphicsCommandList& list, UINT b
 }
 
 std::expected<bool, std::string> FrameRenderer::presentGenerated(
-    UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput, bool waitForFlow,
-    bool reset, bool keepReal)
+    UINT motionVectorsSlot, std::uint64_t frameId, std::uint64_t flowOutput,
+    const FrameGenerationPlan& plan)
 {
     if (!frameGeneration_ || !motionVectors_ || !realPicture_)
     {
@@ -1999,7 +2099,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
 
     ID3D12GraphicsCommandList& list = *generationCommandList_.Get();
 
-    if (waitForFlow && opticalFlow_)
+    if (opticalFlow_)
     {
         gpu_.queue->Wait(opticalFlow_->fence(), flowOutput);
     }
@@ -2007,7 +2107,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
     motionVectors_->record(list, motionVectorsSlot);
 
     const auto evaluated = frameGeneration_->evaluate(list, *realPicture_.Get(),
-                                                      *motionVectors_->texture(), reset, frameId);
+                                                      *motionVectors_->texture(), plan, frameId);
 
     if (!evaluated)
     {
@@ -2050,7 +2150,7 @@ std::expected<bool, std::string> FrameRenderer::presentGenerated(
     frameGeneration_->generatedCopied();
 
     const D3D12_RESOURCE_STATES realNext =
-        keepReal ? D3D12_RESOURCE_STATE_COPY_SOURCE : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        plan.presentReal ? D3D12_RESOURCE_STATE_COPY_SOURCE : D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     const auto realToNext =
         transition(realPicture_.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, realNext);
     list.ResourceBarrier(1, &realToNext);
@@ -2269,11 +2369,14 @@ void FrameRenderer::drainCadence()
                 blockSamples > 0.0 ? static_cast<double>(sample->sad) / blockSamples : 0.0,
         };
 
+        // The sample exists only once the GPU has finished the frame, so
+        // the cut shows here a frame after DLSS Super Resolution drew it: its
+        // history crosses the cut once, and the reset starts with the next
+        // frame. Waiting for the sample before drawing would stall the CPU
+        // on every frame.
         if (observeCadence(comparison) == CadenceDetector::Decision::SceneCut)
         {
-            dlssResetPending_ = true;
             frameSchedule_.reset();
-            spdlog::debug("Cadence: scene cut, window restarted");
         }
     }
 }
@@ -2281,6 +2384,13 @@ void FrameRenderer::drainCadence()
 CadenceDetector::Decision FrameRenderer::observeCadence(const CadenceSample& sample)
 {
     const CadenceDetector::Decision decision = cadence_.observe(sample);
+
+    if (decision == CadenceDetector::Decision::SceneCut)
+    {
+        // DLSS Super Resolution's history is from before the cut.
+        dlssResetPending_ = true;
+        spdlog::debug("Cadence: scene cut, window restarted");
+    }
 
     if (metrics_ != nullptr)
     {
@@ -2292,6 +2402,61 @@ CadenceDetector::Decision FrameRenderer::observeCadence(const CadenceSample& sam
     }
 
     return decision;
+}
+
+void FrameRenderer::updateDisplayRefresh()
+{
+    if (requestedFrameGenerationApplied_ != core::FrameGenerationMode::X2)
+    {
+        return;
+    }
+
+    const Clock::time_point now = Clock::now();
+
+    if (!displayCheckedAt_ || now - *displayCheckedAt_ >= kDisplayRefreshCheckPeriod)
+    {
+        displayRefreshHertz_ = swapChain_.displayRefreshHertz();
+        displayCheckedAt_ = now;
+    }
+
+    frameSchedule_.setDisplay(requestedTiming_.load() == PresentTiming::VSync,
+                              displayRefreshHertz_);
+}
+
+void FrameRenderer::logDisplayGuard()
+{
+    const bool tooSlow = frameSchedule_.displayTooSlow();
+
+    if (tooSlow && !displayGuardLogged_ && displayRefreshHertz_)
+    {
+        const auto& cadence = cadence_.estimate();
+        spdlog::info("Frame Generation: the display refreshes at {:.0f} Hz, below twice the "
+                     "game's {:.1f} fps; real pictures only until that changes",
+                     *displayRefreshHertz_, cadence ? cadence->framesPerSecond : 0.0);
+    }
+
+    displayGuardLogged_ = tooSlow;
+}
+
+bool FrameRenderer::canRepeatRealPicture() const
+{
+    return realPictureCurrent_ && realPicture_ && frameGeneration_ && shownFrame_ &&
+           requestedFrameGenerationApplied_ == core::FrameGenerationMode::X2 &&
+           !frameGenerationFailed_;
+}
+
+std::expected<void, std::string> FrameRenderer::presentOverlayRedraw()
+{
+    if (auto presented = presentReal(0, false); !presented)
+    {
+        return presented;
+    }
+
+    // The real picture is on screen, held or not.
+    heldReal_ = {};
+    lastPresentTime_ = Clock::now();
+
+    return {};
 }
 
 void FrameRenderer::timeOpticalFlow(UINT bufferIndex, std::uint64_t inputValue,
@@ -2912,6 +3077,7 @@ OverlayStats FrameRenderer::overlayStats()
     stats.dlss = dlssState();
     stats.upscaling = requestedUpscalingApplied_;
     stats.frameGeneration = requestedFrameGenerationApplied_;
+    stats.frameGenerationDisplayTooSlow = frameSchedule_.displayTooSlow();
 
     if (const auto& cadence = cadence_.estimate())
     {

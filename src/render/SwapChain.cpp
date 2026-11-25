@@ -141,6 +141,34 @@ DXGI_FORMAT SwapChain::format() const
     return format_;
 }
 
+std::optional<double> SwapChain::displayRefreshHertz() const
+{
+    const HMONITOR monitor = MonitorFromWindow(window_, MONITOR_DEFAULTTONEAREST);
+    MONITORINFOEXW monitorInfo{};
+    monitorInfo.cbSize = static_cast<DWORD>(sizeof(MONITORINFOEXW));
+
+    if (!GetMonitorInfoW(monitor, &monitorInfo))
+    {
+        return std::nullopt;
+    }
+
+    DEVMODEW mode{};
+    mode.dmSize = static_cast<WORD>(sizeof(DEVMODEW));
+
+    if (!EnumDisplaySettingsW(monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &mode))
+    {
+        return std::nullopt;
+    }
+
+    // 0 and 1 mean the hardware default, not a rate.
+    if (mode.dmDisplayFrequency <= 1)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<double>(mode.dmDisplayFrequency);
+}
+
 std::expected<void, std::string> SwapChain::createChain(SurfaceSize size, DXGI_FORMAT format)
 {
     const DXGI_SWAP_CHAIN_DESC1 description{
