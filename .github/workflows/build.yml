@@ -267,9 +267,30 @@ jobs:
           path: .vcpkg-cache
           key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
+      - name: Restore the Gradle cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-qt-6.10.3-${{ hashFiles('android/**') }}
+          restore-keys: gradle-qt-6.10.3-
+
       # Tests are host tests: they run in the Windows job, not on Android.
+      # Gradle fetches its plugins from Maven Central, which sometimes answers
+      # 429; a retry only reruns the packaging, Ninja keeps the compiled code.
       - name: Build the APK
-        run: cmake --build --preset android --target apk -- -k 0
+        run: |
+          for attempt in 1 2 3; do
+            if cmake --build --preset android --target apk -- -k 0; then
+              exit 0
+            fi
+
+            echo "Build attempt $attempt failed; retrying in 60 s" >&2
+            sleep 60
+          done
+
+          exit 1
 
       - name: Find the APK
         id: apk
