@@ -101,7 +101,10 @@ PsnLoginClient::PsnLoginClient(SettingsController& settings,
       store_(std::move(store)),
       network_(std::make_unique<QNetworkAccessManager>(this))
 {
-    settings_.clientDuid();
+    if (settings_.clientDuid().empty())
+    {
+        spdlog::warn("Without a client identifier the PSN connection can't be used");
+    }
 
     if (!store_)
     {
