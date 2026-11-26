@@ -274,7 +274,7 @@ jobs:
       - name: Find the APK
         id: apk
         run: |
-          mapfile -t apks < <(find build/android -name '*.apk' -not -path '*/intermediates/*')
+          mapfile -t apks < <(find build/android -name '*.apk' -path '*/build/outputs/apk/*')
 
           if (( ${#apks[@]} != 1 )); then
             printf 'Expected one APK, found %d:\n' "${#apks[@]}" >&2
