@@ -11,6 +11,7 @@
 #include <QTimer>
 #include <QUrl>
 
+#include <algorithm>
 #include <chrono>
 #include <format>
 #include <string>
@@ -31,6 +32,10 @@ constexpr int kRequestTimeoutMs = 15000;
 constexpr int kServerErrorStatus = 500;
 constexpr int kOkStatus = 200;
 constexpr int kBadRequestStatus = 400;
+// The access token is renewed this long before it expires.
+constexpr auto kRenewalMargin = std::chrono::minutes(5);
+// A renewal that has to wait for a sign-in in progress asks again in a minute.
+constexpr int kRenewalRetryMs = 60000;
 
 struct FailureText
 {
@@ -101,6 +106,9 @@ PsnLoginClient::PsnLoginClient(SettingsController& settings,
       store_(std::move(store)),
       network_(std::make_unique<QNetworkAccessManager>(this))
 {
+    renewal_.setSingleShot(true);
+    connect(&renewal_, &QTimer::timeout, this, &PsnLoginClient::renewDueToken);
+
     if (settings_.clientDuid().empty())
     {
         spdlog::warn("Without a client identifier the PSN connection can't be used");
@@ -124,6 +132,7 @@ PsnLoginClient::PsnLoginClient(SettingsController& settings,
     {
         spdlog::info("The stored PSN token is still valid until {}",
                      formatExpiry(*stored_.expiry).toStdString());
+        scheduleRenewal();
         return;
     }
 
@@ -239,6 +248,31 @@ void PsnLoginClient::refreshStoredTokens()
     abortPending();
     spdlog::info("Refreshing the PSN token");
     postToken(remoteplay::refreshTokenBody(stored_.refreshToken), attempt, true);
+}
+
+void PsnLoginClient::scheduleRenewal()
+{
+    if (!stored_.expiry || stored_.refreshToken.empty())
+    {
+        return;
+    }
+
+    const auto untilRenewal = std::chrono::duration_cast<std::chrono::milliseconds>(
+        *stored_.expiry - kRenewalMargin - remoteplay::Clock::now());
+    const auto wait = std::max(untilRenewal, std::chrono::milliseconds(0));
+    renewal_.start(static_cast<int>(wait.count()));
+}
+
+void PsnLoginClient::renewDueToken()
+{
+    // A sign-in in progress owns the pending requests; the renewal waits for it.
+    if (state_ == State::Waiting || state_ == State::Exchanging)
+    {
+        renewal_.start(kRenewalRetryMs);
+        return;
+    }
+
+    refreshStoredTokens();
 }
 
 void PsnLoginClient::exchangeCode(const std::string& code)
@@ -430,6 +464,7 @@ void PsnLoginClient::onRefreshedToken(std::string_view body)
     settings_.recordPsnSignIn(secondsOf(*stored_.expiry));
     spdlog::info("PSN token refreshed; the access token expires at {}",
                  formatExpiry(*stored_.expiry).toStdString());
+    scheduleRenewal();
     emit accessTokenChanged();
 }
 
@@ -513,6 +548,7 @@ void PsnLoginClient::succeed(const remoteplay::AccountId& accountId)
 
     spdlog::info("PSN sign-in completed; the access token expires at {}",
                  expiryText_.toStdString());
+    scheduleRenewal();
     setState(State::Succeeded);
     emit accessTokenChanged();
 }
