@@ -229,6 +229,9 @@ jobs:
           dir: ${{ runner.temp }}/qt-android
           cache: true
 
+      - name: Install Ninja
+        run: sudo apt-get install -y --no-install-recommends ninja-build
+
       - name: Set up vcpkg at the manifest baseline
         run: |
           baseline=$(jq -r '."builtin-baseline"' vcpkg.json)

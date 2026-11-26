@@ -1,5 +1,6 @@
 #include "remoteplay/Base64.h"
 #include "remoteplay/ConsoleStore.h"
+#include "remoteplay/SecretProtector.h"
 
 #include <sstream>
 #include <string>
@@ -93,7 +94,7 @@ TEST_CASE("The console store keeps the keys and the account ID encrypted on disk
     const ConsoleFile file = sampleFile();
     std::stringstream stream;
 
-    REQUIRE(writeConsoleFile(file, stream, passThroughProtector()));
+    REQUIRE(writeConsoleFile(file, stream, platformSecretProtector()));
     const std::string text = stream.str();
     const Credentials credentials = fakeCredentials();
 

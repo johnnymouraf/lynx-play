@@ -1,5 +1,6 @@
 #include "remoteplay/Base64.h"
 #include "remoteplay/PsnTokenStore.h"
+#include "remoteplay/SecretProtector.h"
 
 #include <span>
 #include <sstream>
@@ -67,7 +68,7 @@ TEST_CASE("The token store keeps the tokens and the expiry encrypted on disk")
     const PsnTokens tokens = fakeTokens();
     std::stringstream stream;
 
-    REQUIRE(writePsnTokens(tokens, stream, passThroughProtector()));
+    REQUIRE(writePsnTokens(tokens, stream, platformSecretProtector()));
     const std::string text = stream.str();
 
     CHECK(text.find("\"accessToken\"") != std::string::npos);
