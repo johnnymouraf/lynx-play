@@ -68,3 +68,9 @@ endif()
 
 # Keep chiaki's headers out of our strict warnings.
 set_target_properties(chiaki-lib PROPERTIES SYSTEM TRUE)
+
+# chiaki's holepunch.h uses INET6_ADDRSTRLEN without including the header that
+# defines it; Winsock brings it in on Windows, elsewhere every user needs it.
+if(NOT WIN32)
+    target_compile_options(chiaki-lib INTERFACE "SHELL:-include netinet/in.h")
+endif()
