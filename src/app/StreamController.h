@@ -51,6 +51,8 @@ class StreamController : public QObject
     Q_PROPERTY(QString failureHeading READ failureHeading NOTIFY changed)
     Q_PROPERTY(QString failureTitle READ failureTitle NOTIFY changed)
     Q_PROPERTY(QString failureMessage READ failureMessage NOTIFY changed)
+    Q_PROPERTY(QString connectionNote READ connectionNote NOTIFY changed)
+    Q_PROPERTY(bool signInNeeded READ signInNeeded NOTIFY changed)
 
 public:
     enum class Phase
@@ -75,6 +77,9 @@ public:
         std::optional<remoteplay::Credentials> credentials;
         // Set to reach the console through the PSN instead of `host`.
         std::optional<remoteplay::PsnTarget> psn;
+        // The PSN was reached because the console didn't answer the local
+        // network in time.
+        bool internetFallback = false;
     };
 
     StreamController(SettingsController& settings, InputController& input,
@@ -95,6 +100,16 @@ public:
     [[nodiscard]] std::optional<remoteplay::ConnectionStage> connectionStage() const;
     // Why the last PSN connection failed; absent when it didn't.
     [[nodiscard]] std::optional<remoteplay::PsnFailure> psnFailure() const;
+    // The route note for the connecting screen: the reconnection count, or
+    // the switch to the internet; empty otherwise.
+    [[nodiscard]] QString connectionNote() const;
+    // Whether the failure is an expired or refused PSN sign-in, which the
+    // error screen answers by signing in again.
+    [[nodiscard]] bool signInNeeded() const;
+
+    // Where the PSN connections get the sign-in's current access token; empty
+    // once the sign-in has expired.
+    void setAccessTokenSource(std::function<std::string()> source);
 
     // Ends any session and connects to the target; a console that isn't
     // paired fails at once.
@@ -113,6 +128,10 @@ signals:
 
 private:
     void startSession();
+    // Gives the PSN target the sign-in's current token; false when there is
+    // none left.
+    [[nodiscard]] bool renewAccessToken();
+    void scheduleReconnect();
     void onConnected(std::uint64_t session);
 #if defined(_WIN32)
     void onFirstPicture(std::uint64_t session);
@@ -145,6 +164,11 @@ private:
     std::optional<remoteplay::PsnFailure> psnFailure_;
     // Counts sessions, so events of one already stopped are ignored.
     std::uint64_t sessionNumber_ = 0;
+    // Whether the current session reached the console.
+    bool sessionConnected_ = false;
+    // The reconnections made since the last connection, for the drop at hand.
+    int psnRetries_ = 0;
+    std::function<std::string()> accessTokenSource_;
 #if defined(_WIN32)
     std::optional<render::GpuDevice> gpu_;
     std::shared_ptr<render::FrameMailbox> mailbox_;

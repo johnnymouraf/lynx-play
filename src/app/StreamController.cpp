@@ -5,6 +5,7 @@
 #include "core/ReflexMode.h"
 #include "input/GamepadManager.h"
 #include "input/KeyboardMouse.h"
+#include "remoteplay/PsnPolicy.h"
 
 #if defined(_WIN32)
 #include "app/Fonts.h"
@@ -14,8 +15,11 @@
 #endif
 
 #include <QGuiApplication>
+#include <QTimer>
 #include <QWindow>
 
+#include <chrono>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -29,6 +33,10 @@ namespace
 
 using namespace Qt::StringLiterals;
 using remoteplay::SessionEnd;
+
+// The pause before a reconnection, as chiaki-ng waits, so the network can
+// come back first.
+constexpr auto kReconnectWait = std::chrono::seconds(5);
 
 struct FailureText
 {
@@ -83,7 +91,8 @@ FailureText textFor(const remoteplay::PsnFailure& failure)
                 u"como o ponto de acesso do celular."_s};
     case PsnFailureKind::Rejected:
         return {u"A PSN recusou o login"_s,
-                u"O login expirou ou foi recusado. Entre na PSN de novo em Rede."_s};
+                u"O login expirou ou foi recusado. Entre de novo na PSN para jogar pela "
+                u"internet."_s};
     case PsnFailureKind::InvalidDevice:
         return {u"A PSN não reconhece este console"_s,
                 u"O PS5 não está na lista da sua conta. Confira se ele usa a mesma conta da "
@@ -158,6 +167,57 @@ FailureText textFor(SessionEnd end)
     }
 
     return {u"Não foi possível conectar"_s, logsHint()};
+}
+
+FailureText droppedText(int retries)
+{
+    if (retries < remoteplay::kMaxPsnRetries)
+    {
+        return {u"A conexão pela internet caiu"_s, u"Confira a rede e tente de novo."_s};
+    }
+
+    return {u"A conexão pela internet caiu"_s,
+            u"Não foi possível reconectar depois de %1 tentativas. "
+            u"Confira a rede e tente de novo."_s.arg(remoteplay::kMaxPsnRetries)};
+}
+
+// A session that ended over the PSN gets its own wording where the local
+// network's would mislead, such as "na mesma rede que este PC".
+FailureText textForEnd(SessionEnd end, const std::optional<remoteplay::PsnFailure>& failure,
+                       bool overInternet, int retries)
+{
+    if (end == SessionEnd::PsnFailed && failure)
+    {
+        return textFor(*failure);
+    }
+
+    if (!overInternet)
+    {
+        return textFor(end);
+    }
+
+    if (end == SessionEnd::Disconnected || end == SessionEnd::Unknown)
+    {
+        return droppedText(retries);
+    }
+
+    if (end == SessionEnd::ConsoleNotFound)
+    {
+        return textFor(remoteplay::PsnFailure{.kind = remoteplay::PsnFailureKind::ConsoleOffline});
+    }
+
+    return textFor(end);
+}
+
+std::optional<remoteplay::PsnFailureKind> kindOf(
+    const std::optional<remoteplay::PsnFailure>& failure)
+{
+    if (!failure)
+    {
+        return std::nullopt;
+    }
+
+    return failure->kind;
 }
 
 #if defined(_WIN32)
@@ -291,6 +351,32 @@ std::optional<remoteplay::PsnFailure> StreamController::psnFailure() const
     return psnFailure_;
 }
 
+QString StreamController::connectionNote() const
+{
+    if (psnRetries_ > 0)
+    {
+        return u"Reconectando (%1 de %2)"_s.arg(psnRetries_).arg(remoteplay::kMaxPsnRetries);
+    }
+
+    if (target_ && target_->internetFallback)
+    {
+        return u"Sem resposta na rede local; conectando pela internet"_s;
+    }
+
+    return {};
+}
+
+bool StreamController::signInNeeded() const
+{
+    return phase_ == Phase::Failed && psnFailure_ &&
+           psnFailure_->kind == remoteplay::PsnFailureKind::Rejected;
+}
+
+void StreamController::setAccessTokenSource(std::function<std::string()> source)
+{
+    accessTokenSource_ = std::move(source);
+}
+
 void StreamController::play(Target target)
 {
     spdlog::info("Play requested on {}", target.key.toStdString());
@@ -298,6 +384,7 @@ void StreamController::play(Target target)
     mainWindow_ = focusedWindow();
 #endif
     target_ = std::move(target);
+    psnRetries_ = 0;
     startSession();
 }
 
@@ -315,6 +402,7 @@ void StreamController::cancel()
     }
 
     stop();
+    psnRetries_ = 0;
     setPhase(Phase::Idle);
 }
 
@@ -322,6 +410,7 @@ void StreamController::retry()
 {
     if (target_)
     {
+        psnRetries_ = 0;
         startSession();
     }
 }
@@ -333,12 +422,26 @@ void StreamController::startSession()
     const Target& target = *target_;
     connectionStage_.reset();
     psnFailure_.reset();
+    sessionConnected_ = false;
     setPhase(Phase::Connecting);
 
     if (!target.credentials)
     {
         spdlog::warn("Cannot play on {}: it isn't paired", target.key.toStdString());
         const FailureText text = notPairedText();
+        fail(text.title, text.message);
+        return;
+    }
+
+    if (target.psn && !renewAccessToken())
+    {
+        spdlog::warn("The PSN sign-in has expired");
+        psnFailure_ = remoteplay::PsnFailure{
+            .stage = remoteplay::ConnectionStage::SigningIn,
+            .kind = remoteplay::PsnFailureKind::Rejected,
+            .detail = "the PSN sign-in has expired",
+        };
+        const FailureText text = textFor(*psnFailure_);
         fail(text.title, text.message);
         return;
     }
@@ -464,6 +567,8 @@ void StreamController::onConnected(std::uint64_t session)
         return;
     }
 
+    sessionConnected_ = true;
+    psnRetries_ = 0;
     setPhase(Phase::StartingVideo);
 }
 
@@ -629,7 +734,16 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
         return;
     }
 
+    const bool overPsn = overInternet();
     stop();
+
+    const bool recovering = sessionConnected_ || psnRetries_ > 0;
+
+    if (overPsn && shouldRetryPsn(end, kindOf(psnFailure_), recovering, psnRetries_))
+    {
+        scheduleReconnect();
+        return;
+    }
 
     if (end == SessionEnd::Stopped || end == SessionEnd::EndedByConsole)
     {
@@ -638,9 +752,48 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
         return;
     }
 
-    const FailureText text = end == SessionEnd::PsnFailed && psnFailure_ ? textFor(*psnFailure_)
-                                                                          : textFor(end);
+    const FailureText text = textForEnd(end, psnFailure_, overPsn, psnRetries_);
     fail(text.title, text.message);
+}
+
+void StreamController::scheduleReconnect()
+{
+    ++psnRetries_;
+    spdlog::warn("The PSN connection dropped; reconnecting ({} of {})", psnRetries_,
+                 remoteplay::kMaxPsnRetries);
+    setPhase(Phase::Connecting);
+    emit changed();
+
+    const std::uint64_t pending = sessionNumber_;
+    QTimer::singleShot(kReconnectWait, this,
+                       [this, pending]
+                       {
+                           // A cancel or a new play in the wait moves the session on.
+                           if (pending != sessionNumber_ || phase_ != Phase::Connecting)
+                           {
+                               return;
+                           }
+
+                           startSession();
+                       });
+}
+
+bool StreamController::renewAccessToken()
+{
+    if (!target_ || !target_->psn || !accessTokenSource_)
+    {
+        return true;
+    }
+
+    std::string token = accessTokenSource_();
+
+    if (token.empty())
+    {
+        return false;
+    }
+
+    target_->psn->accessToken = std::move(token);
+    return true;
 }
 
 #if defined(_WIN32)
