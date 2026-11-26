@@ -14,6 +14,12 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(MFPLAY_BUILD_TESTS "Build the unit tests" ON)
 
+# The NDK's libc++ 18 keeps std::jthread and std::stop_token (header-only)
+# behind its experimental switch.
+if(ANDROID)
+    add_compile_definitions(_LIBCPP_ENABLE_EXPERIMENTAL)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(MFPlayWarnings)
 include(ChiakiLib)
