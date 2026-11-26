@@ -100,9 +100,18 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
     - The owner checks the real connection over the phone's hotspot.
   - [ ] **4.2 Automatic**: LAN → PSN fallback, reconnection, errors that name
         the cause (blocked NAT, console off, expired login).
+    - "Jogar" tries the LAN first; when the console doesn't answer there in a
+      few seconds and is reachable through PSN, it goes through PSN alone.
+    - A dropped PSN session retries up to 3 times, showing "Reconectando".
+    - An expired or refused login offers "Entrar de novo".
   - [ ] **4.3 Remote registration**: pair a console through PSN away from home.
+    - "Parear pela internet" for a PS5 on the PSN account that isn't paired
+      here, through chiaki-lib's `auto_regist` session over PSN: no PIN, the
+      PSN login vouches for the account.
   - [ ] **4.4 Manual address**: VPN (Tailscale/ZeroTier) or port forwarding,
         with the internet bitrate.
+    - The Rede page's remote address row becomes active; sessions to it use the
+      internet bitrate.
 
 - [ ] **5. Android**: the same app on Android phones, tablets and Android TV,
       from the same repository, built and signed in CI. Built before 4.2–4.4.
@@ -178,9 +187,10 @@ Out of scope for now: capture card input (planned for the future).
   the in-stream overlay is QML over the video. arm64-v8a only. The APK is
   signed in CI with one fixed key kept in GitHub secrets, so updates install
   over the old version. The owner installs and tests the APK by hand.
-- Phase 5 is built by Haiku subagents at xhigh effort, one per delivery, on
-  `auto/<step>`; CI runs once at the end of each milestone, not after every
-  delivery.
+- Phases 4.2–4.4 and 5 are built by Haiku subagents at xhigh effort, one per
+  delivery: 4.2–4.4 on `auto/4.2` (a separate worktree), 5.1 on `auto/5.1`.
+  CI runs once, after all of it is merged together, never per delivery or
+  milestone.
 - Phase 4 is built by Sonnet subagents at low effort, one per delivery, on
   `auto/<step>`; the orchestrator reviews each diff and fast-forwards
   `master` once CI is green.

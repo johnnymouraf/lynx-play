@@ -9,12 +9,23 @@ FocusScope {
     required property StreamController stream
     required property AppController controller
 
+    // The error screen asks to sign in to the PSN again.
+    signal signInRequested
+
     readonly property bool failed: page.stream.phase === StreamController.Failed
     readonly property bool startingVideo: page.stream.phase === StreamController.StartingVideo
+    readonly property string connectingHeading: page.stream.registering
+                                                ? "Pareando pela internet…"
+                                                : "Conectando…"
 
     function focusAction() {
         if (page.failed) {
-            retryButton.forceActiveFocus(Qt.TabFocusReason);
+            if (page.stream.signInNeeded) {
+                signInButton.forceActiveFocus(Qt.TabFocusReason);
+            } else {
+                retryButton.forceActiveFocus(Qt.TabFocusReason);
+            }
+
             return;
         }
 
@@ -80,7 +91,7 @@ FocusScope {
 
                     Icon {
                         anchors.verticalCenter: parent.verticalCenter
-                        name: page.stream.overInternet ? "globe" : "house-wifi"
+                        name: page.stream.overInternet ? "network" : "house-wifi"
                         size: 16
                         color: Theme.textMuted
                     }
@@ -118,7 +129,7 @@ FocusScope {
 
                     AppText {
                         Layout.alignment: Qt.AlignHCenter
-                        text: page.failed ? page.stream.failureHeading : "Conectando…"
+                        text: page.failed ? page.stream.failureHeading : page.connectingHeading
                         textStyle: "display"
                         Accessible.role: Accessible.Heading
                         Accessible.name: text
@@ -150,6 +161,14 @@ FocusScope {
                                 }
                             }
                         }
+                    }
+
+                    AppText {
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: page.stream.connectionNote.length > 0
+                        text: page.stream.connectionNote
+                        textStyle: "labelMedium"
+                        color: Theme.text
                     }
 
                     AppText {
@@ -226,10 +245,21 @@ FocusScope {
                     ActionButton {
                         id: retryButton
 
+                        visible: !page.stream.signInNeeded
                         variant: "primary"
                         iconName: "rotate-ccw"
                         text: "Tentar de novo"
                         onClicked: page.stream.retry()
+                    }
+
+                    ActionButton {
+                        id: signInButton
+
+                        visible: page.stream.signInNeeded
+                        variant: "primary"
+                        iconName: "log-in"
+                        text: "Entrar de novo"
+                        onClicked: page.signInRequested()
                     }
                 }
             }

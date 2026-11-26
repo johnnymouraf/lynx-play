@@ -21,11 +21,14 @@ struct ConsoleRow
     QString activity;
     bool saved = false;
     bool paired = false;
-    // The PSN lists this paired console, so it can be reached over the
+    // The PSN lists this console: a paired one can be reached over the
     // internet.
     bool psnReachable = false;
     // A direct query of its address is in progress.
     bool searching = false;
+    // A PS5 the PSN lists that nothing here is paired with: it is offered for
+    // pairing over the internet.
+    bool psnOnly = false;
 
     bool operator==(const ConsoleRow&) const = default;
 };
@@ -54,6 +57,7 @@ public:
         PairedRole,
         PsnReachableRole,
         SearchingRole,
+        PsnOnlyRole,
     };
 
     using QAbstractListModel::QAbstractListModel;

@@ -109,3 +109,18 @@ TEST_CASE("An address added by hand for a console already saved joins that conso
     CHECK(result.entries.size() == 1);
     CHECK(result.savedChanged);
 }
+
+TEST_CASE("A console that answers at its remote address keeps its local address")
+{
+    SavedConsole console = pairedConsole();
+    console.remoteHost = "ps5-casa.example.net";
+    DiscoveredHost remote = answeringHost("001122334455", "203.0.113.7");
+    remote.queriedHost = "ps5-casa.example.net";
+
+    const auto result = mergeConsoles({console}, {remote}, kNow);
+
+    REQUIRE(result.saved.size() == 1);
+    CHECK(result.saved[0].address == "192.168.0.25");
+    CHECK(result.saved[0].lastSeen == kNow);
+    CHECK_FALSE(result.savedChanged);
+}

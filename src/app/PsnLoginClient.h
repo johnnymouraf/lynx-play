@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QTimer>
 #include <QtQmlIntegration>
 
 #include <cstdint>
@@ -90,6 +91,10 @@ signals:
 
 private:
     void refreshStoredTokens();
+    // Renews the token shortly before it expires, so a reconnection after a
+    // long session still finds a valid one.
+    void scheduleRenewal();
+    void renewDueToken();
     void exchangeCode(const std::string& code);
     void postToken(std::string body, std::uint64_t attempt, bool refresh);
     void fetchUserId(std::uint64_t attempt);
@@ -109,6 +114,7 @@ private:
     std::optional<remoteplay::PsnTokenStore> store_;
     remoteplay::PsnTokens stored_;
     std::unique_ptr<QNetworkAccessManager> network_;
+    QTimer renewal_;
     QPointer<QNetworkReply> pending_;
     QString accountId_;
     QString expiryText_;

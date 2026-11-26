@@ -23,7 +23,9 @@ add_executable(mfplay_tests
     remoteplay/PinTests.cpp
     remoteplay/PsnConnectionTests.cpp
     remoteplay/PsnDevicesTests.cpp
+    remoteplay/PsnPairingTests.cpp
     remoteplay/PsnLoginTests.cpp
+    remoteplay/PsnPolicyTests.cpp
     remoteplay/PsnTokenStoreTests.cpp
     remoteplay/StreamSessionTests.cpp)
 

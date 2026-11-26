@@ -5,6 +5,10 @@
 #include "remoteplay/ConsoleDiscovery.h"
 #include "remoteplay/ConsoleWake.h"
 #include "remoteplay/HostAddress.h"
+#include "remoteplay/PsnPairing.h"
+#include "remoteplay/PsnPolicy.h"
+
+#include <QPointer>
 
 #include <algorithm>
 #include <utility>
@@ -23,11 +27,35 @@ using remoteplay::ConsoleEntry;
 using remoteplay::DiscoveredHost;
 using remoteplay::HostAddressError;
 using remoteplay::HostState;
+using remoteplay::PsnDevice;
 using remoteplay::SavedConsole;
 
 constexpr auto kSearchDuration = std::chrono::seconds(6);
 constexpr auto kClockInterval = std::chrono::seconds(30);
 constexpr auto kWakeTimeout = std::chrono::seconds(45);
+
+// The card key of a PS5 the PSN lists and nothing here is paired with. It is
+// the device's place in that list: the DUID stays out, since logs print keys.
+QString psnCardKey(std::size_t index)
+{
+    return u"psn:%1"_s.arg(index);
+}
+
+ConsoleRow psnRow(std::size_t index, const PsnDevice& device)
+{
+    return ConsoleRow{
+        .key = psnCardKey(index),
+        .name = fromUtf8(device.name),
+        .address = {},
+        .status = u"unpaired"_s,
+        .activity = u"Na sua conta PSN"_s,
+        .saved = false,
+        .paired = false,
+        .psnReachable = true,
+        .searching = false,
+        .psnOnly = true,
+    };
+}
 
 std::string_view stateName(HostState state)
 {
@@ -107,6 +135,8 @@ ConsolesController::ConsolesController(bool remotePlayReady,
             &ConsolesController::psnSignedInChanged);
     connect(&psnClient_, &PsnDevicesClient::devicesListed, this,
             &ConsolesController::onPsnDevicesListed);
+
+    stream_.setAccessTokenSource([this] { return psnLogin_.validAccessToken(); });
 
     clockTimer_.setInterval(kClockInterval);
     connect(&clockTimer_, &QTimer::timeout, this, &ConsolesController::refreshModel);
@@ -283,8 +313,135 @@ void ConsolesController::forget(const QString& key)
 
 void ConsolesController::play(const QString& key)
 {
+    route(key, false);
+}
+
+void ConsolesController::route(const QString& key, bool waited)
+{
+    endLocalWait(key.toStdString());
+
     const SavedConsole* console = findSaved(key);
-    const DiscoveredHost* host = findDiscovered(key);
+    const remoteplay::PlayFacts facts{
+        .answersLocally = answersOnLan(key),
+        .waited = waited,
+        .hasRemoteAddress = console != nullptr && !console->remoteHost.empty(),
+        .answersRemotely = answersAtRemote(key),
+        .internetReady = psnTargetFor(key).has_value(),
+    };
+
+    switch (remoteplay::playRouteFor(facts))
+    {
+    case remoteplay::PlayRoute::Local:
+        playLocal(key);
+        break;
+    case remoteplay::PlayRoute::WaitForLocal:
+        waitForLocal(key);
+        break;
+    case remoteplay::PlayRoute::Remote:
+        startRemote(key);
+        break;
+    case remoteplay::PlayRoute::Internet:
+        startInternet(key, true);
+        break;
+    }
+
+    refreshModel();
+}
+
+void ConsolesController::waitForLocal(const QString& key)
+{
+    const std::string wanted = key.toStdString();
+    const std::uint64_t timer = ++timerGeneration_;
+    localWaits_[wanted] = timer;
+    markSearching(wanted);
+    spdlog::info("{} doesn't answer on the local network yet; waiting for it", wanted);
+
+    QTimer::singleShot(remoteplay::kLocalAnswerWait, this,
+                       [this, wanted, timer] { expireLocalWait(wanted, timer); });
+}
+
+void ConsolesController::endLocalWait(const std::string& key)
+{
+    localWaits_.erase(key);
+    searching_.erase(key);
+}
+
+void ConsolesController::expireLocalWait(const std::string& key, std::uint64_t timer)
+{
+    const auto wait = localWaits_.find(key);
+
+    if (wait == localWaits_.end() || wait->second != timer)
+    {
+        return;
+    }
+
+    spdlog::info("{} didn't answer on the local network in time", key);
+    route(fromUtf8(key), true);
+}
+
+void ConsolesController::finishLocalWaits()
+{
+    std::vector<QString> answered;
+
+    for (const auto& wait : localWaits_)
+    {
+        if (answersOnLan(fromUtf8(wait.first)))
+        {
+            answered.push_back(fromUtf8(wait.first));
+        }
+    }
+
+    for (const QString& key : answered)
+    {
+        spdlog::info("{} answers on the local network now", key.toStdString());
+        route(key, false);
+    }
+}
+
+const DiscoveredHost* ConsolesController::localAnswer(const QString& key)
+{
+    const std::string wanted = key.toStdString();
+    const SavedConsole* console = findSaved(key);
+    const std::string remoteHost = console != nullptr ? console->remoteHost : std::string();
+
+    for (const DiscoveredHost& host : discovered_)
+    {
+        if (host.hostId == wanted && !remoteplay::isRemoteAnswer(host, remoteHost))
+        {
+            return &host;
+        }
+    }
+
+    return nullptr;
+}
+
+bool ConsolesController::answersOnLan(const QString& key)
+{
+    const DiscoveredHost* host = localAnswer(key);
+    return host != nullptr && host->state == HostState::Ready;
+}
+
+bool ConsolesController::answersAtRemote(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return false;
+    }
+
+    const std::string wanted = key.toStdString();
+
+    return std::ranges::any_of(discovered_, [&wanted, console](const DiscoveredHost& host) {
+        return host.hostId == wanted && host.state == HostState::Ready &&
+               remoteplay::isRemoteAnswer(host, console->remoteHost);
+    });
+}
+
+void ConsolesController::playLocal(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+    const DiscoveredHost* host = localAnswer(key);
 
     StreamController::Target target{
         .key = key,
@@ -316,12 +473,137 @@ bool ConsolesController::psnSignedIn() const
 
 bool ConsolesController::playOverInternet(const QString& key)
 {
+    // The explicit choice ends a wait for the local network, if one runs.
+    endLocalWait(key.toStdString());
+    refreshModel();
+    return startInternet(key, false);
+}
+
+void ConsolesController::pairOverInternet(const QString& key)
+{
+    const PsnDevice* device = findUnpairedPsn(key);
+
+    if (device == nullptr)
+    {
+        spdlog::warn("Cannot pair {}: the PSN doesn't list it as unpaired",
+                     key.toStdString());
+        return;
+    }
+
+    const std::string token = psnLogin_.validAccessToken();
+    const std::optional<remoteplay::AccountId> psnAccount = psnAccountId();
+
+    if (token.empty() || !psnAccount)
+    {
+        spdlog::warn("Cannot pair {} over the internet: no valid PSN sign-in",
+                     key.toStdString());
+        emit notice(u"danger"_s, u"Entre na PSN para parear pela internet"_s,
+                    u"Entre na PSN em Rede e tente de novo."_s);
+        return;
+    }
+
+    spdlog::info("Pairing {} over the internet", key.toStdString());
+    stream_.pairOverInternet(
+        {
+            .key = key,
+            .name = fromUtf8(device->name),
+            .host = {},
+            .ps5 = true,
+            .credentials = std::nullopt,
+            .psn = remoteplay::PsnTarget{
+                .duid = device->duid,
+                .accessToken = token,
+                .accountId = *psnAccount,
+            },
+        },
+        [self = QPointer<ConsolesController>(this), deviceName = device->name,
+         accountId = *psnAccount](const remoteplay::PairedConsole& paired)
+        {
+            if (self)
+            {
+                self->storeRegistration(paired, deviceName, accountId);
+            }
+        });
+}
+
+void ConsolesController::storeRegistration(const remoteplay::PairedConsole& paired,
+                                           const std::string& deviceName,
+                                           const remoteplay::AccountId& accountId)
+{
+    const std::string hostId = remoteplay::hostIdFromMac(paired.serverMac);
+    const auto saved = std::ranges::find(file_.consoles, hostId, &SavedConsole::hostId);
+
+    if (saved != file_.consoles.end())
+    {
+        *saved = remoteplay::withPsnRegistration(std::move(*saved), paired, deviceName);
+    }
+    else
+    {
+        file_.consoles.push_back(
+            remoteplay::withPsnRegistration(SavedConsole{}, paired, deviceName));
+    }
+
+    file_.accountId = accountId;
+    emit savedAccountIdChanged();
+    saveFile();
+    refreshModel();
+
+    emit notice(u"ready"_s, u"%1 pareado"_s.arg(fromUtf8(deviceName)),
+                u"Ele já aparece na lista de consoles e pode ser jogado pela internet."_s);
+}
+
+std::optional<remoteplay::AccountId> ConsolesController::psnAccountId() const
+{
+    // The sign-in's token lists the devices of its own account, so its ID wins.
+    const auto signedIn = remoteplay::parseAccountId(psnLogin_.accountId().toStdString());
+
+    if (signedIn)
+    {
+        return *signedIn;
+    }
+
+    return file_.accountId;
+}
+
+const PsnDevice* ConsolesController::findUnpairedPsn(const QString& key) const
+{
+    for (std::size_t index = 0; index < unpairedPsn_.size(); ++index)
+    {
+        if (psnCardKey(index) == key)
+        {
+            return &unpairedPsn_[index];
+        }
+    }
+
+    return nullptr;
+}
+
+std::optional<remoteplay::PsnTarget> ConsolesController::psnTargetFor(const QString& key)
+{
     const SavedConsole* console = findSaved(key);
     const std::optional<std::string> duid = psnDuid(key);
     std::string token = psnLogin_.validAccessToken();
 
-    if (console == nullptr || !console->credentials || !duid || token.empty() ||
-        !file_.accountId)
+    const std::optional<remoteplay::AccountId> accountId = psnAccountId();
+
+    if (console == nullptr || !console->credentials || !duid || token.empty() || !accountId)
+    {
+        return std::nullopt;
+    }
+
+    return remoteplay::PsnTarget{
+        .duid = *duid,
+        .accessToken = std::move(token),
+        .accountId = *accountId,
+    };
+}
+
+bool ConsolesController::startInternet(const QString& key, bool fallback)
+{
+    const SavedConsole* console = findSaved(key);
+    std::optional<remoteplay::PsnTarget> psn = psnTargetFor(key);
+
+    if (console == nullptr || !psn)
     {
         spdlog::warn("Cannot play over the internet on {}: the console isn't ready for it",
                      key.toStdString());
@@ -334,14 +616,31 @@ bool ConsolesController::playOverInternet(const QString& key)
         .host = {},
         .ps5 = console->ps5,
         .credentials = console->credentials,
-        .psn = remoteplay::PsnTarget{
-            .duid = *duid,
-            .accessToken = std::move(token),
-            .accountId = *file_.accountId,
-        },
+        .psn = std::move(psn),
+        .internetFallback = fallback,
     });
 
     return true;
+}
+
+void ConsolesController::startRemote(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return;
+    }
+
+    stream_.play({
+        .key = key,
+        .name = consoleName({.saved = console, .discovered = nullptr}),
+        .host = console->remoteHost,
+        .ps5 = console->ps5,
+        .credentials = console->credentials,
+        .remote = true,
+        .internetFallback = true,
+    });
 }
 
 void ConsolesController::markPlayed(const QString& key)
@@ -381,7 +680,7 @@ void ConsolesController::wake(const QString& key)
         return;
     }
 
-    spdlog::info("Wake-up sent to {} at {}", key.toStdString(), address);
+    spdlog::info("Wake-up sent to {}", key.toStdString());
     const std::string wakingKey = key.toStdString();
     const std::uint64_t timer = ++timerGeneration_;
     waking_[wakingKey] = timer;
@@ -435,7 +734,7 @@ QString ConsolesController::addByAddress(const QString& text)
 
     if (const ConsoleEntry* existing = findEntryByAddress(*address); existing != nullptr)
     {
-        spdlog::info("{} is already listed", *address);
+        spdlog::info("The typed address is already listed");
         emit notice(u"info"_s, u"Esse console já está na lista"_s,
                     u"O endereço %1 já é de um dos consoles."_s.arg(fromUtf8(*address)));
         return fromUtf8(existing->key);
@@ -445,13 +744,60 @@ QString ConsolesController::addByAddress(const QString& text)
     console.manualHost = *address;
     const std::string key = remoteplay::consoleKey(console);
     file_.consoles.push_back(std::move(console));
-    spdlog::info("Console added by address {}", *address);
+    spdlog::info("Console added by a typed address");
 
     saveFile();
     markSearching(key);
     refreshModel();
 
     return fromUtf8(key);
+}
+
+bool ConsolesController::setRemoteAddress(const QString& key, const QString& text)
+{
+    SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        spdlog::warn("Cannot set the remote address of {}: it isn't saved", key.toStdString());
+        return false;
+    }
+
+    const std::string typed = text.trimmed().toStdString();
+    std::string remoteHost;
+
+    if (!typed.empty())
+    {
+        const auto address = remoteplay::normalizeHostAddress(typed);
+
+        if (!address)
+        {
+            return false;
+        }
+
+        remoteHost = *address;
+    }
+
+    // The address itself stays out of the logs: it may not be on the local network.
+    spdlog::info("Remote address of {} {}", key.toStdString(),
+                 remoteHost.empty() ? "removed" : "saved");
+    console->remoteHost = std::move(remoteHost);
+    saveFile();
+    refreshModel();
+
+    return true;
+}
+
+QString ConsolesController::remoteAddressOf(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return {};
+    }
+
+    return fromUtf8(console->remoteHost);
 }
 
 void ConsolesController::startDiscovery()
@@ -506,6 +852,7 @@ void ConsolesController::onHostsDiscovered(std::vector<DiscoveredHost> hosts)
     logChanges(hosts);
     discovered_ = std::move(hosts);
     finishWakes();
+    finishLocalWaits();
     refreshModel();
 }
 
@@ -518,8 +865,11 @@ void ConsolesController::logChanges(const std::vector<DiscoveredHost>& hosts) co
 
         if (isNew || previous->state != host.state || previous->address != host.address)
         {
-            spdlog::info("Console {} ({}) answers from {}, {}", host.name, host.hostId,
-                         host.address, stateName(host.state));
+            // Only a broadcast names its address: a typed one may not be on the local network.
+            const std::string answer =
+                host.queriedHost.empty() ? "from " + host.address : "at a typed address";
+            spdlog::info("Console {} ({}) answers {}, {}", host.name, host.hostId, answer,
+                         stateName(host.state));
         }
     }
 
@@ -572,6 +922,7 @@ void ConsolesController::refreshModel()
 
     syncManualHosts();
     psnMatches_ = remoteplay::matchPsnDevices(psnDevices_, file_.consoles);
+    unpairedPsn_ = remoteplay::unpairedPsnDevices(psnDevices_, file_.consoles, discovered_);
 
     const QDateTime now = QDateTime::currentDateTime();
     std::vector<ConsoleRow> rows;
@@ -580,6 +931,11 @@ void ConsolesController::refreshModel()
     for (const ConsoleEntry& entry : entries_)
     {
         rows.push_back(rowFor(entry, now));
+    }
+
+    for (std::size_t index = 0; index < unpairedPsn_.size(); ++index)
+    {
+        rows.push_back(psnRow(index, unpairedPsn_[index]));
     }
 
     model_.setRows(std::move(rows));
@@ -623,6 +979,11 @@ void ConsolesController::syncManualHosts()
         if (!console.manualHost.empty())
         {
             hosts.push_back(console.manualHost);
+        }
+
+        if (!console.remoteHost.empty())
+        {
+            hosts.push_back(console.remoteHost);
         }
     }
 

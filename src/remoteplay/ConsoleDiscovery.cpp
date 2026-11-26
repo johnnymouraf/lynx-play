@@ -306,7 +306,8 @@ std::expected<void, std::string> ConsoleDiscovery::State::startManual(Service& s
     }
 
     service.running = true;
-    spdlog::info("Querying {} directly", service.queriedHost);
+    // The typed address is not logged: it may be one that isn't on the local network.
+    spdlog::info("Querying a typed address directly");
     return {};
 }
 
@@ -432,7 +433,7 @@ void ConsoleDiscovery::setManualHosts(const std::vector<std::string>& hosts)
         if (auto started = state_->startManual(*service); !started)
         {
             const std::string host = service->queriedHost;
-            spdlog::error("Cannot query {}: {}", host, started.error());
+            spdlog::error("Cannot query a typed address: {}", started.error());
 
             const std::scoped_lock lock(state_->mutex);
             state_->manual.erase(host);

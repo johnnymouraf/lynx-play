@@ -7,6 +7,7 @@
 #include "remoteplay/ConsoleMerge.h"
 #include "remoteplay/ConsoleRegistration.h"
 #include "remoteplay/ConsoleStore.h"
+#include "remoteplay/PsnConnection.h"
 
 #include <QDateTime>
 #include <QObject>
@@ -92,12 +93,17 @@ public:
     // Saves a console that wasn't; an empty name shows the console's own.
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
-    // Connects to a paired console and plays on it.
+    // Plays a paired console: over the local network when it answers there. When
+    // it doesn't answer within a few seconds, over its remote address if that
+    // answers, else over the PSN when the PSN reaches it.
     Q_INVOKABLE void play(const QString& key);
-    // Connects to a paired console through the PSN. False, without trying,
-    // when the console isn't paired, isn't on the account's PS5 list, there
-    // is no valid PSN sign-in or no account ID is saved.
+    // Connects to a paired console through the PSN at once. False, without
+    // trying, when the console isn't paired, isn't on the account's PS5 list,
+    // there is no valid PSN sign-in or no account ID is saved.
     Q_INVOKABLE bool playOverInternet(const QString& key);
+    // Pairs a PS5 of the account that nothing here is paired with yet, over
+    // the internet and with no PIN. The key is the card's, from the PSN list.
+    Q_INVOKABLE void pairOverInternet(const QString& key);
     // Sends the wake-up packet to a paired console in rest mode; its card shows
     // it turning on until it answers ready or the wait runs out.
     Q_INVOKABLE void wake(const QString& key);
@@ -108,6 +114,11 @@ public:
     // Saves a console by its address and queries that address directly.
     // Returns the key of its card, which already existed for a known address.
     Q_INVOKABLE QString addByAddress(const QString& text);
+    // Sets the address a saved console is reached at away from home, as typed;
+    // an empty text removes it. False when the text isn't a valid address.
+    Q_INVOKABLE bool setRemoteAddress(const QString& key, const QString& text);
+    // The address set for playing away from home, as typed; empty when none.
+    Q_INVOKABLE QString remoteAddressOf(const QString& key);
 
 signals:
     void discoveryStatusChanged();
@@ -138,6 +149,36 @@ private:
     void finishWakes();
     // Remembers when the console was last played on.
     void markPlayed(const QString& key);
+    // Plays on the route that the console's answer and the wait allow.
+    void route(const QString& key, bool waited);
+    void playLocal(const QString& key);
+    // Shows the card as searching while the local network has its chance.
+    void waitForLocal(const QString& key);
+    // Forgets a wait for the local network and the searching it showed.
+    void endLocalWait(const std::string& key);
+    // Gives up on the local network for a console that didn't answer in time.
+    void expireLocalWait(const std::string& key, std::uint64_t timer);
+    // Plays the consoles that answered while they were waited for.
+    void finishLocalWaits();
+    // The console's answer on the local network: from the broadcast, or from a
+    // typed address other than its remote one.
+    [[nodiscard]] const remoteplay::DiscoveredHost* localAnswer(const QString& key);
+    [[nodiscard]] bool answersOnLan(const QString& key);
+    // Whether the console's remote address answers now, as a ready console.
+    [[nodiscard]] bool answersAtRemote(const QString& key);
+    // Plays a paired console at its remote address, over the internet.
+    void startRemote(const QString& key);
+    // The PSN route to a paired console, when it can be used now.
+    [[nodiscard]] std::optional<remoteplay::PsnTarget> psnTargetFor(const QString& key);
+    // False when the PSN route can't be used.
+    bool startInternet(const QString& key, bool fallback);
+    // The account the PSN routes use: the one the sign-in gave, else the saved one.
+    [[nodiscard]] std::optional<remoteplay::AccountId> psnAccountId() const;
+    [[nodiscard]] const remoteplay::PsnDevice* findUnpairedPsn(const QString& key) const;
+    // Saves a console registered over the PSN, as paired, under its MAC.
+    void storeRegistration(const remoteplay::PairedConsole& paired,
+                           const std::string& deviceName,
+                           const remoteplay::AccountId& accountId);
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
@@ -161,10 +202,14 @@ private:
     PsnDevicesClient psnClient_{this};
     std::vector<remoteplay::PsnDevice> psnDevices_;
     std::vector<remoteplay::PsnMatch> psnMatches_;
+    // The PS5s to pair over the internet, in the PSN's order.
+    std::vector<remoteplay::PsnDevice> unpairedPsn_;
     // The consoles being searched for or turned on, with the timer that ends
     // the wait.
     std::map<std::string, std::uint64_t> searching_;
     std::map<std::string, std::uint64_t> waking_;
+    // The consoles a Play press waits for on the local network.
+    std::map<std::string, std::uint64_t> localWaits_;
     std::uint64_t timerGeneration_ = 0;
     QTimer clockTimer_;
     DiscoveryStatus discoveryStatus_ = DiscoveryStatus::Unavailable;
