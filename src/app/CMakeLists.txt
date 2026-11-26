@@ -226,7 +226,11 @@ target_link_libraries(mfplay PRIVATE
     Qt6::Svg)
 mfplay_set_warnings(mfplay)
 
-install(TARGETS mfplay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# Android builds the executable as a module library that androiddeployqt packs
+# into the APK, so the portable install rule does not apply there.
+if(NOT ANDROID)
+    install(TARGETS mfplay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 install(FILES ${mfplay_licenses} DESTINATION licenses)
 
 if(WIN32)
