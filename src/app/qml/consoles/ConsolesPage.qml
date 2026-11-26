@@ -414,6 +414,15 @@ FocusScope {
         }
 
         MenuRow {
+            text: "Endereço fora de casa…"
+            iconName: "network"
+            visible: !cardMenu.consolePsnOnly
+            height: visible ? implicitHeight : 0
+            enabled: cardMenu.consoleSaved
+            onTriggered: remoteAddressDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
+        }
+
+        MenuRow {
             text: "Esquecer"
             iconName: "trash"
             danger: true
@@ -426,6 +435,12 @@ FocusScope {
         id: renameDialog
 
         onRenameRequested: (key, name) => page.consoles.rename(key, name)
+    }
+
+    RemoteAddressDialog {
+        id: remoteAddressDialog
+
+        consoles: page.consoles
     }
 
     ForgetDialog {

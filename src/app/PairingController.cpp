@@ -198,7 +198,8 @@ void PairingController::start(const QString& key, const QString& accountId, cons
         return;
     }
 
-    spdlog::info("Pairing with {} at {}", key.toStdString(), target->address);
+    // The address is left out: a console found at its remote address isn't on the local network.
+    spdlog::info("Pairing with {}", key.toStdString());
     registration_ = std::move(*registration);
     watchdog_.start();
     setState(State::Pairing);

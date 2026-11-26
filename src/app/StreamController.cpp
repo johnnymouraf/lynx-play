@@ -338,17 +338,22 @@ QString StreamController::consoleName() const
 
 bool StreamController::overInternet() const
 {
-    return target_ && target_->psn;
+    return target_ && (target_->psn || target_->remote);
 }
 
 QString StreamController::connectionStageText() const
 {
-    if (!connectionStage_)
+    if (connectionStage_)
     {
-        return overInternet() ? stageText(remoteplay::ConnectionStage::SigningIn) : QString();
+        return stageText(*connectionStage_);
     }
 
-    return stageText(*connectionStage_);
+    if (target_ && target_->remote)
+    {
+        return u"Conectando pelo endereço fora de casa"_s;
+    }
+
+    return overInternet() ? stageText(remoteplay::ConnectionStage::SigningIn) : QString();
 }
 
 QString StreamController::failureHeading() const
@@ -517,6 +522,7 @@ void StreamController::startSession()
 
     const remoteplay::SessionRequest request{
         .host = target.host,
+        .remote = target.remote,
         .ps5 = target.ps5,
         .credentials = target.credentials.value_or(remoteplay::Credentials{}),
         .video = settings_.video(),
@@ -837,7 +843,7 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
 void StreamController::scheduleReconnect()
 {
     ++psnRetries_;
-    spdlog::warn("The PSN connection dropped; reconnecting ({} of {})", psnRetries_,
+    spdlog::warn("The connection dropped; reconnecting ({} of {})", psnRetries_,
                  remoteplay::kMaxPsnRetries);
     setPhase(Phase::Connecting);
     emit changed();

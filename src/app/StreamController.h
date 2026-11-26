@@ -73,14 +73,18 @@ public:
     {
         QString key;
         QString name;
+        // The console's local address, or the remote address the user gave
+        // when `remote` is set.
         std::string host;
         bool ps5 = true;
         // Absent when the console isn't paired.
         std::optional<remoteplay::Credentials> credentials;
         // Set to reach the console through the PSN instead of `host`.
         std::optional<remoteplay::PsnTarget> psn;
-        // The PSN was reached because the console didn't answer the local
-        // network in time.
+        // Set to reach `host`, a remote address, over the internet.
+        bool remote = false;
+        // The console didn't answer the local network in time, so the session
+        // goes over the internet (the remote address or the PSN).
         bool internetFallback = false;
     };
 
@@ -93,10 +97,11 @@ public:
 
     [[nodiscard]] Phase phase() const;
     [[nodiscard]] QString consoleName() const;
-    // Whether the connection goes through the PSN instead of the local network.
+    // Whether the connection goes over the internet (the PSN or a remote
+    // address) instead of the local network.
     [[nodiscard]] bool overInternet() const;
-    // What the PSN connection is doing now, for the connecting screen; empty
-    // on the local network.
+    // What the connection is doing now, for the connecting screen; empty on
+    // the local network.
     [[nodiscard]] QString connectionStageText() const;
     [[nodiscard]] QString failureHeading() const;
     [[nodiscard]] QString failureTitle() const;

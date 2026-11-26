@@ -40,7 +40,8 @@ public:
 
     // While on, spdlog gets only a notice that a warning or error was
     // withheld, and nothing else: chiaki's messages can carry the console's
-    // address, which over the PSN is not on the local network.
+    // address, which over the PSN or at a remote address is not on the local
+    // network.
     void setRedacted(bool redacted);
 
 private:

@@ -67,8 +67,12 @@ struct VideoProfile
 
 struct SessionRequest
 {
-    // The console's address on the local network; unused with `psn`.
+    // The console's address on the local network, or the remote address the
+    // user gave with `remote`; unused with `psn`.
     std::string host;
+    // `host` is a remote address, reached over the internet: the session takes
+    // the internet bitrate, and its logs keep the address out.
+    bool remote = false;
     bool ps5 = true;
     Credentials credentials;
     core::VideoSettings video;

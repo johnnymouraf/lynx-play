@@ -8,25 +8,60 @@ using namespace mfplay::remoteplay;
 
 TEST_CASE("A console that answers on the local network is played there")
 {
-    CHECK(playRouteFor(true, false, true) == PlayRoute::Local);
-    CHECK(playRouteFor(true, true, true) == PlayRoute::Local);
-    CHECK(playRouteFor(true, false, false) == PlayRoute::Local);
+    CHECK(playRouteFor({.answersLocally = true}) == PlayRoute::Local);
+    CHECK(playRouteFor({.answersLocally = true, .waited = true, .internetReady = true}) ==
+          PlayRoute::Local);
+    CHECK(playRouteFor({.answersLocally = true,
+                        .hasRemoteAddress = true,
+                        .answersRemotely = true,
+                        .waited = true,
+                        .internetReady = true}) == PlayRoute::Local);
 }
 
-TEST_CASE("Without a PSN route the local network is tried at once")
+TEST_CASE("Without another route the local network is tried at once")
 {
-    CHECK(playRouteFor(false, false, false) == PlayRoute::Local);
-    CHECK(playRouteFor(false, true, false) == PlayRoute::Local);
+    CHECK(playRouteFor({}) == PlayRoute::Local);
+    CHECK(playRouteFor({.waited = true}) == PlayRoute::Local);
 }
 
 TEST_CASE("A console that doesn't answer is waited for before the internet")
 {
-    CHECK(playRouteFor(false, false, true) == PlayRoute::WaitForLocal);
+    CHECK(playRouteFor({.internetReady = true}) == PlayRoute::WaitForLocal);
 }
 
 TEST_CASE("The internet takes over once the local wait has run out")
 {
-    CHECK(playRouteFor(false, true, true) == PlayRoute::Internet);
+    CHECK(playRouteFor({.waited = true, .internetReady = true}) == PlayRoute::Internet);
+}
+
+TEST_CASE("A saved remote address is waited for, without a PSN route")
+{
+    CHECK(playRouteFor({.hasRemoteAddress = true}) == PlayRoute::WaitForLocal);
+}
+
+TEST_CASE("A remote answer before the local wait ends still waits for the local network")
+{
+    CHECK(playRouteFor({.hasRemoteAddress = true,
+                        .answersRemotely = true,
+                        .internetReady = true}) == PlayRoute::WaitForLocal);
+}
+
+TEST_CASE("A remote answer after the local wait is played over the internet")
+{
+    CHECK(playRouteFor({.hasRemoteAddress = true,
+                        .answersRemotely = true,
+                        .waited = true}) == PlayRoute::Remote);
+    CHECK(playRouteFor({.hasRemoteAddress = true,
+                        .answersRemotely = true,
+                        .waited = true,
+                        .internetReady = true}) == PlayRoute::Remote);
+}
+
+TEST_CASE("A silent remote address gives way to the PSN, and then to the local network")
+{
+    CHECK(playRouteFor({.hasRemoteAddress = true, .waited = true, .internetReady = true}) ==
+          PlayRoute::Internet);
+    CHECK(playRouteFor({.hasRemoteAddress = true, .waited = true}) == PlayRoute::Local);
 }
 
 TEST_CASE("A session the user stops is never retried")

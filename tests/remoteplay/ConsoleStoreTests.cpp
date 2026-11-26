@@ -39,6 +39,7 @@ ConsoleFile sampleFile()
 
     SavedConsole manual;
     manual.manualHost = "ps5.local";
+    manual.remoteHost = "ps5-casa.example.net";
 
     ConsoleFile file;
     file.accountId = AccountId{1, 2, 3, 4, 5, 6, 7, 8};

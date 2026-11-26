@@ -131,6 +131,23 @@ ChiakiConnectVideoProfile chiakiProfileOf(const VideoProfile& profile)
     return chiaki;
 }
 
+// The session's destination, as the logs say it. A remote address is never
+// printed: it isn't on the local network.
+std::string destinationOf(const SessionRequest& request)
+{
+    if (request.psn)
+    {
+        return "over the PSN";
+    }
+
+    if (request.remote)
+    {
+        return "at the remote address";
+    }
+
+    return "with " + request.host;
+}
+
 } // namespace
 
 VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5, bool overInternet)
@@ -156,6 +173,8 @@ struct StreamSession::State
 {
     Events events;
     std::string host;
+    // Where the session goes, as the logs name it; never a remote address.
+    std::string destination;
     ChiakiLogSink logSink;
     std::unique_ptr<media::VideoDecoding> decoder;
     std::shared_ptr<core::StreamMetrics> metrics;
@@ -771,7 +790,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
     switch (event.type)
     {
     case CHIAKI_EVENT_CONNECTED:
-        spdlog::info("Session connected{}", overPsn ? " over the PSN" : " to " + host);
+        spdlog::info("Session connected {}", destination);
         connectMicrophone();
         events.onConnected();
         return;
@@ -914,6 +933,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     auto state = std::make_unique<State>();
     state->events = std::move(events);
     state->host = request.host;
+    state->destination = destinationOf(request);
     state->gamepads = request.gamepads;
     state->keyboardMouse = request.keyboardMouse;
     state->metrics = request.metrics;
@@ -933,8 +953,14 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
         state->overPsn = true;
         state->psn = *request.psn;
         state->autoRegist = request.autoRegist;
-        state->logSink.setRedacted(true);
         chiaki_log_init(&state->holepunchLog, 0, discardChiakiLog, nullptr);
+    }
+
+    // Chiaki's messages can name the console's address, which is not on the
+    // local network over the PSN nor at a remote address.
+    if (request.psn || request.remote)
+    {
+        state->logSink.setRedacted(true);
     }
 
     if (request.autoRegist && !duid)
@@ -942,7 +968,8 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
         return std::unexpected("registering a console needs the PSN");
     }
 
-    const VideoProfile profile = videoProfileFor(request.video, request.ps5, request.psn.has_value());
+    const bool overInternet = request.psn.has_value() || request.remote;
+    const VideoProfile profile = videoProfileFor(request.video, request.ps5, overInternet);
     auto decoder = makeDecoder(profile.codec, profile.hdr);
 
     if (!decoder)
@@ -1000,9 +1027,9 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
         return std::unexpected(started.error());
     }
 
-    spdlog::info("Session started {}: {}x{} at {} fps, {}, {} kbps",
-                 duid ? "over the PSN" : "with " + request.host, profile.width, profile.height,
-                 profile.framesPerSecond, core::codecName(profile.codec), profile.bitrateKbps);
+    spdlog::info("Session started {}: {}x{} at {} fps, {}, {} kbps", state->destination,
+                 profile.width, profile.height, profile.framesPerSecond,
+                 core::codecName(profile.codec), profile.bitrateKbps);
 
     if (profile.hdr)
     {

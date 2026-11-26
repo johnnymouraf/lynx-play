@@ -93,9 +93,9 @@ public:
     // Saves a console that wasn't; an empty name shows the console's own.
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
-    // Plays a paired console: over the local network when it answers there,
-    // and over the PSN when it doesn't answer within a few seconds and the PSN
-    // reaches it.
+    // Plays a paired console: over the local network when it answers there. When
+    // it doesn't answer within a few seconds, over its remote address if that
+    // answers, else over the PSN when the PSN reaches it.
     Q_INVOKABLE void play(const QString& key);
     // Connects to a paired console through the PSN at once. False, without
     // trying, when the console isn't paired, isn't on the account's PS5 list,
@@ -114,6 +114,11 @@ public:
     // Saves a console by its address and queries that address directly.
     // Returns the key of its card, which already existed for a known address.
     Q_INVOKABLE QString addByAddress(const QString& text);
+    // Sets the address a saved console is reached at away from home, as typed;
+    // an empty text removes it. False when the text isn't a valid address.
+    Q_INVOKABLE bool setRemoteAddress(const QString& key, const QString& text);
+    // The address set for playing away from home, as typed; empty when none.
+    Q_INVOKABLE QString remoteAddressOf(const QString& key);
 
 signals:
     void discoveryStatusChanged();
@@ -155,7 +160,14 @@ private:
     void expireLocalWait(const std::string& key, std::uint64_t timer);
     // Plays the consoles that answered while they were waited for.
     void finishLocalWaits();
-    [[nodiscard]] bool answersNow(const QString& key) const;
+    // The console's answer on the local network: from the broadcast, or from a
+    // typed address other than its remote one.
+    [[nodiscard]] const remoteplay::DiscoveredHost* localAnswer(const QString& key);
+    [[nodiscard]] bool answersOnLan(const QString& key);
+    // Whether the console's remote address answers now, as a ready console.
+    [[nodiscard]] bool answersAtRemote(const QString& key);
+    // Plays a paired console at its remote address, over the internet.
+    void startRemote(const QString& key);
     // The PSN route to a paired console, when it can be used now.
     [[nodiscard]] std::optional<remoteplay::PsnTarget> psnTargetFor(const QString& key);
     // False when the PSN route can't be used.

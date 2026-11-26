@@ -245,15 +245,6 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Endereço fora de casa"
-        description: "IP da VPN (Tailscale, ZeroTier) ou endereço com redirecionamento de portas. Chega com o jogo pela internet."
-        enabled: false
-        opacity: 0.5
-
-        InputField {
-            width: 300
-            enabled: false
-            label: ""
-            placeholderText: "Ex.: ps5-casa.minha-vpn"
-        }
+        description: "Defina em cada console, no menu do card. Usa o bitrate pela internet."
     }
 }

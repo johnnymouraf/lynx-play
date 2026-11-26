@@ -320,15 +320,25 @@ void ConsolesController::route(const QString& key, bool waited)
 {
     endLocalWait(key.toStdString());
 
-    const bool internetReady = psnTargetFor(key).has_value();
+    const SavedConsole* console = findSaved(key);
+    const remoteplay::PlayFacts facts{
+        .answersLocally = answersOnLan(key),
+        .waited = waited,
+        .hasRemoteAddress = console != nullptr && !console->remoteHost.empty(),
+        .answersRemotely = answersAtRemote(key),
+        .internetReady = psnTargetFor(key).has_value(),
+    };
 
-    switch (remoteplay::playRouteFor(answersNow(key), waited, internetReady))
+    switch (remoteplay::playRouteFor(facts))
     {
     case remoteplay::PlayRoute::Local:
         playLocal(key);
         break;
     case remoteplay::PlayRoute::WaitForLocal:
         waitForLocal(key);
+        break;
+    case remoteplay::PlayRoute::Remote:
+        startRemote(key);
         break;
     case remoteplay::PlayRoute::Internet:
         startInternet(key, true);
@@ -375,7 +385,7 @@ void ConsolesController::finishLocalWaits()
 
     for (const auto& wait : localWaits_)
     {
-        if (answersNow(fromUtf8(wait.first)))
+        if (answersOnLan(fromUtf8(wait.first)))
         {
             answered.push_back(fromUtf8(wait.first));
         }
@@ -388,16 +398,50 @@ void ConsolesController::finishLocalWaits()
     }
 }
 
-bool ConsolesController::answersNow(const QString& key) const
+const DiscoveredHost* ConsolesController::localAnswer(const QString& key)
 {
-    const DiscoveredHost* host = findDiscovered(key);
+    const std::string wanted = key.toStdString();
+    const SavedConsole* console = findSaved(key);
+    const std::string remoteHost = console != nullptr ? console->remoteHost : std::string();
+
+    for (const DiscoveredHost& host : discovered_)
+    {
+        if (host.hostId == wanted && !remoteplay::isRemoteAnswer(host, remoteHost))
+        {
+            return &host;
+        }
+    }
+
+    return nullptr;
+}
+
+bool ConsolesController::answersOnLan(const QString& key)
+{
+    const DiscoveredHost* host = localAnswer(key);
     return host != nullptr && host->state == HostState::Ready;
+}
+
+bool ConsolesController::answersAtRemote(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return false;
+    }
+
+    const std::string wanted = key.toStdString();
+
+    return std::ranges::any_of(discovered_, [&wanted, console](const DiscoveredHost& host) {
+        return host.hostId == wanted && host.state == HostState::Ready &&
+               remoteplay::isRemoteAnswer(host, console->remoteHost);
+    });
 }
 
 void ConsolesController::playLocal(const QString& key)
 {
     const SavedConsole* console = findSaved(key);
-    const DiscoveredHost* host = findDiscovered(key);
+    const DiscoveredHost* host = localAnswer(key);
 
     StreamController::Target target{
         .key = key,
@@ -579,6 +623,26 @@ bool ConsolesController::startInternet(const QString& key, bool fallback)
     return true;
 }
 
+void ConsolesController::startRemote(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return;
+    }
+
+    stream_.play({
+        .key = key,
+        .name = consoleName({.saved = console, .discovered = nullptr}),
+        .host = console->remoteHost,
+        .ps5 = console->ps5,
+        .credentials = console->credentials,
+        .remote = true,
+        .internetFallback = true,
+    });
+}
+
 void ConsolesController::markPlayed(const QString& key)
 {
     SavedConsole* console = findSaved(key);
@@ -616,7 +680,7 @@ void ConsolesController::wake(const QString& key)
         return;
     }
 
-    spdlog::info("Wake-up sent to {} at {}", key.toStdString(), address);
+    spdlog::info("Wake-up sent to {}", key.toStdString());
     const std::string wakingKey = key.toStdString();
     const std::uint64_t timer = ++timerGeneration_;
     waking_[wakingKey] = timer;
@@ -670,7 +734,7 @@ QString ConsolesController::addByAddress(const QString& text)
 
     if (const ConsoleEntry* existing = findEntryByAddress(*address); existing != nullptr)
     {
-        spdlog::info("{} is already listed", *address);
+        spdlog::info("The typed address is already listed");
         emit notice(u"info"_s, u"Esse console já está na lista"_s,
                     u"O endereço %1 já é de um dos consoles."_s.arg(fromUtf8(*address)));
         return fromUtf8(existing->key);
@@ -680,13 +744,60 @@ QString ConsolesController::addByAddress(const QString& text)
     console.manualHost = *address;
     const std::string key = remoteplay::consoleKey(console);
     file_.consoles.push_back(std::move(console));
-    spdlog::info("Console added by address {}", *address);
+    spdlog::info("Console added by a typed address");
 
     saveFile();
     markSearching(key);
     refreshModel();
 
     return fromUtf8(key);
+}
+
+bool ConsolesController::setRemoteAddress(const QString& key, const QString& text)
+{
+    SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        spdlog::warn("Cannot set the remote address of {}: it isn't saved", key.toStdString());
+        return false;
+    }
+
+    const std::string typed = text.trimmed().toStdString();
+    std::string remoteHost;
+
+    if (!typed.empty())
+    {
+        const auto address = remoteplay::normalizeHostAddress(typed);
+
+        if (!address)
+        {
+            return false;
+        }
+
+        remoteHost = *address;
+    }
+
+    // The address itself stays out of the logs: it may not be on the local network.
+    spdlog::info("Remote address of {} {}", key.toStdString(),
+                 remoteHost.empty() ? "removed" : "saved");
+    console->remoteHost = std::move(remoteHost);
+    saveFile();
+    refreshModel();
+
+    return true;
+}
+
+QString ConsolesController::remoteAddressOf(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+
+    if (console == nullptr)
+    {
+        return {};
+    }
+
+    return fromUtf8(console->remoteHost);
 }
 
 void ConsolesController::startDiscovery()
@@ -754,8 +865,11 @@ void ConsolesController::logChanges(const std::vector<DiscoveredHost>& hosts) co
 
         if (isNew || previous->state != host.state || previous->address != host.address)
         {
-            spdlog::info("Console {} ({}) answers from {}, {}", host.name, host.hostId,
-                         host.address, stateName(host.state));
+            // Only a broadcast names its address: a typed one may not be on the local network.
+            const std::string answer =
+                host.queriedHost.empty() ? "from " + host.address : "at a typed address";
+            spdlog::info("Console {} ({}) answers {}, {}", host.name, host.hostId, answer,
+                         stateName(host.state));
         }
     }
 
@@ -865,6 +979,11 @@ void ConsolesController::syncManualHosts()
         if (!console.manualHost.empty())
         {
             hosts.push_back(console.manualHost);
+        }
+
+        if (!console.remoteHost.empty())
+        {
+            hosts.push_back(console.remoteHost);
         }
     }
 

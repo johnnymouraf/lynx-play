@@ -65,6 +65,9 @@ struct SavedConsole
     std::string address;
     // The address typed in "Adicionar pelo IP", queried directly.
     std::string manualHost;
+    // The address set for playing away from home (a VPN or a port-forwarded
+    // address), queried directly; empty when none is set.
+    std::string remoteHost;
     bool ps5 = true;
     int target = 0;
     std::string systemVersion;

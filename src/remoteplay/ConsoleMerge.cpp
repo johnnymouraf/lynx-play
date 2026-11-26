@@ -32,11 +32,13 @@ const DiscoveredHost* findByQuery(const std::vector<DiscoveredHost>& discovered,
 // Copies what the console now reports; true when something changed.
 bool refresh(SavedConsole& console, const DiscoveredHost& host)
 {
-    const bool changed = console.address != host.address || console.hostName != host.name ||
+    const std::string& address =
+        isRemoteAnswer(host, console.remoteHost) ? console.address : host.address;
+    const bool changed = console.address != address || console.hostName != host.name ||
                          console.ps5 != host.ps5 || console.target != host.target ||
                          console.systemVersion != host.systemVersion;
 
-    console.address = host.address;
+    console.address = address;
     console.hostName = host.name;
     console.ps5 = host.ps5;
     console.target = host.target;
@@ -123,6 +125,11 @@ std::vector<ConsoleEntry> unsavedEntries(const std::vector<SavedConsole>& saved,
 }
 
 } // namespace
+
+bool isRemoteAnswer(const DiscoveredHost& host, std::string_view remoteHost)
+{
+    return !remoteHost.empty() && host.queriedHost == remoteHost;
+}
 
 MergeResult mergeConsoles(std::vector<SavedConsole> saved,
                           const std::vector<DiscoveredHost>& discovered, Clock::time_point now)

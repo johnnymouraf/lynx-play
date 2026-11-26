@@ -33,10 +33,16 @@ struct MergeResult
     bool savedChanged = false;
 };
 
+// Whether the host answered a direct query of the console's remote address,
+// rather than the local network. Such an answer carries an address that is
+// not on the local network, so it never replaces the saved one.
+[[nodiscard]] bool isRemoteAnswer(const DiscoveredHost& host, std::string_view remoteHost);
+
 // Matches the consoles that answer with the saved ones: by host ID, or, for
 // an address typed by hand that never answered before, by that address. The
 // saved consoles that answer get their address, name and version refreshed
-// and `now` as their last-seen time.
+// and `now` as their last-seen time. A remote answer refreshes everything but
+// the address.
 [[nodiscard]] MergeResult mergeConsoles(std::vector<SavedConsole> saved,
                                         const std::vector<DiscoveredHost>& discovered,
                                         Clock::time_point now);

@@ -27,14 +27,31 @@ bool isTransient(PsnFailureKind kind)
 
 } // namespace
 
-PlayRoute playRouteFor(bool answers, bool waited, bool internetReady)
+PlayRoute playRouteFor(const PlayFacts& facts)
 {
-    if (answers || !internetReady)
+    if (facts.answersLocally)
     {
         return PlayRoute::Local;
     }
 
-    return waited ? PlayRoute::Internet : PlayRoute::WaitForLocal;
+    const bool otherRouteExists = facts.hasRemoteAddress || facts.internetReady;
+
+    if (!otherRouteExists)
+    {
+        return PlayRoute::Local;
+    }
+
+    if (!facts.waited)
+    {
+        return PlayRoute::WaitForLocal;
+    }
+
+    if (facts.answersRemotely)
+    {
+        return PlayRoute::Remote;
+    }
+
+    return facts.internetReady ? PlayRoute::Internet : PlayRoute::Local;
 }
 
 bool shouldRetryPsn(SessionEnd end, std::optional<PsnFailureKind> failure, bool recovering,

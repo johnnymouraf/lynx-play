@@ -83,6 +83,7 @@ qt_add_qml_module(mfplay
         qml/consoles/EmptyState.qml
         qml/consoles/ForgetDialog.qml
         qml/consoles/PairingDialog.qml
+        qml/consoles/RemoteAddressDialog.qml
         qml/consoles/RenameDialog.qml
         qml/controls/ActionButton.qml
         qml/controls/AppRail.qml
