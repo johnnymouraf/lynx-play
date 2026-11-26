@@ -159,37 +159,13 @@ Out of scope for now: capture card input (planned for the future).
 
 ## Current: 4.1 PSN connection
 
-**Goal:** away from home, a paired PS5's card offers "Jogar pela internet";
-it connects through PSN (holepunch, no tunnel) and streams at the internet
-bitrate.
-
-**Guardrails:** the shared ones below; no automatic fallback, remote
-registration or manual address (4.2–4.4); never log DUIDs or tokens; bump the
-version on every delivery.
-
-**Success criteria:**
-
-1. CI is green on `auto/4.1` and `master` is fast-forwarded to it.
-2. The client DUID is generated once, saved and reused (unit test).
-3. With a PSN login, the account's PS5s are listed off the UI thread and
-   matched to saved paired consoles by `hostName` (unit test of the match);
-   the log gives only the count.
-4. A paired console the LAN search doesn't find shows "Jogar pela internet" on
-   its card and in its menu with a PSN login, and a hint to sign in on Rede
-   without one (checked by running the app here).
-5. A PSN session punches the holes and connects, and Conectando shows its
-   stages (owner checks, over the phone's hotspot).
-6. "Bitrate pela internet" is active, 15 Mbps by default, saved and applied to
-   PSN sessions; the remote address row stays disabled.
-7. A failure at any stage shows a Portuguese error without a crash, and cancel
-   works.
-
-**Deliveries:**
-
-1. Client DUID, PSN device listing and the match to saved consoles, with tests.
-2. The holepunch path in `StreamSession`, with its stage events.
-3. The card's button and menu entry; Conectando's stages and errors.
-4. The internet bitrate, active and applied.
+Built (1.0.13); every criterion is checked except the real connection, which
+the owner checks over the phone's hotspot: from outside the LAN, the paired
+PS5's card shows "Jogar pela internet", Conectando walks through its stages and
+the stream plays at the internet bitrate. Allow `mfplay.exe` through the
+Windows firewall (public networks too) before the test. If the holes don't
+open, the first thing to try is chiaki-ng's port guessing
+(`chiaki_holepunch_session_force_port_guessing`), left off for now.
 
 ## Auto mode
 
