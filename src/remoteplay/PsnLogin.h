@@ -25,8 +25,11 @@ inline constexpr std::string_view kPsnAuthorizeUrl =
 inline constexpr std::string_view kPsnTokenUrl =
     "https://auth.api.sonyentertainmentnetwork.com/2.0/oauth/token";
 
-// The page the system browser opens to sign in, with chiaki-ng's query.
-[[nodiscard]] std::string psnAuthorizeUrl();
+// The page the system browser opens to sign in, with chiaki-ng's query. The
+// client's DUID goes in the query, so the token it issues works for the PSN
+// connection; an empty one leaves it out. The URL carries the DUID: don't log
+// it.
+[[nodiscard]] std::string psnAuthorizeUrl(std::string_view clientDuid);
 
 // "Basic <Base64 of client id and secret>", for the token endpoints.
 [[nodiscard]] std::string psnBasicAuthHeader();

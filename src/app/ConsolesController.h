@@ -90,6 +90,10 @@ public:
     Q_INVOKABLE void forget(const QString& key);
     // Connects to a paired console and plays on it.
     Q_INVOKABLE void play(const QString& key);
+    // Connects to a paired console through the PSN. False, without trying,
+    // when the console isn't paired, isn't on the account's PS5 list, there
+    // is no valid PSN sign-in or no account ID is saved.
+    Q_INVOKABLE bool playOverInternet(const QString& key);
     // Sends the wake-up packet to a paired console in rest mode; its card shows
     // it turning on until it answers ready or the wait runs out.
     Q_INVOKABLE void wake(const QString& key);

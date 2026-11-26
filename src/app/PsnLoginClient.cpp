@@ -172,8 +172,8 @@ void PsnLoginClient::start()
     accountId_.clear();
     expiryText_.clear();
 
-    const std::string url = remoteplay::psnAuthorizeUrl();
-    spdlog::info("Opening the PSN sign-in page: {}", url);
+    const std::string url = remoteplay::psnAuthorizeUrl(settings_.clientDuid());
+    spdlog::info("Opening the PSN sign-in page");
 
     if (!QDesktopServices::openUrl(QUrl(QString::fromStdString(url))))
     {

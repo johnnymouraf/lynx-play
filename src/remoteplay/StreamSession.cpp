@@ -15,6 +15,8 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <expected>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -25,6 +27,7 @@
 #include <chiaki/opusdecoder.h>
 #include <chiaki/opusencoder.h>
 #include <chiaki/packetstats.h>
+#include <chiaki/remote/holepunch.h>
 #include <chiaki/session.h>
 #include <spdlog/spdlog.h>
 
@@ -92,6 +95,24 @@ SessionEnd sessionEndOf(ChiakiQuitReason reason)
     }
 
     return SessionEnd::Unknown;
+}
+
+PsnFailure failureAt(ConnectionStage stage, ChiakiErrorCode error)
+{
+    return {.stage = stage, .kind = psnFailureKindOf(error), .detail = chiaki_error_string(error)};
+}
+
+// The offer carries this PC's network information to the console.
+ChiakiErrorCode startPsnSession(ChiakiHolepunchSession session, const DuidBytes& duid,
+                                ChiakiHolepunchConsoleType consoleType)
+{
+    if (const ChiakiErrorCode result = holepunch_session_create_offer(session);
+        result != CHIAKI_ERR_SUCCESS)
+    {
+        return result;
+    }
+
+    return chiaki_holepunch_session_start(session, duid.data(), consoleType);
 }
 
 ChiakiConnectVideoProfile chiakiProfileOf(const VideoProfile& profile)
@@ -175,6 +196,19 @@ struct StreamSession::State
     std::atomic<int> triggerIntensity{::Strong};
     std::jthread inputThread;
 
+    bool overPsn = false;
+    PsnTarget psn;
+    // The log chiaki's holepunch writes to; it would print addresses and the
+    // device identifier, so nothing of it is kept.
+    ChiakiLog holepunchLog{};
+    // `holepunch` belongs to chiaki's session once chiaki_session_init took it
+    // (which frees it too when it fails).
+    std::mutex holepunchMutex;
+    ChiakiHolepunchSession holepunch = nullptr;
+    std::atomic<bool> cancelRequested{false};
+    std::atomic<ConnectionStage> stage{ConnectionStage::SigningIn};
+    std::jthread connectThread;
+
     State() = default;
     State(const State&) = delete;
     State& operator=(const State&) = delete;
@@ -187,7 +221,14 @@ struct StreamSession::State
     void handle(const ChiakiEvent& event);
     void reportEnd(SessionEnd end, std::string detail);
     void reportNotice(std::string title, std::string message);
+    void reportPsnFailure(const PsnFailure& failure);
     [[nodiscard]] SessionEnd endOf(ChiakiQuitReason reason) const;
+
+    [[nodiscard]] std::expected<void, std::string> startChiaki(ChiakiConnectInfo& info);
+    void connectOverPsn(ChiakiConnectInfo info, const DuidBytes& duid, bool ps5);
+    [[nodiscard]] std::optional<PsnFailure> openControlChannel(const DuidBytes& duid, bool ps5);
+    void enterStage(ConnectionStage next);
+    void cancelHolepunch();
 
     void startInput();
     void inputLoop(const std::stop_token& stop);
@@ -207,6 +248,10 @@ struct StreamSession::State
 
 StreamSession::State::~State()
 {
+    cancelRequested = true;
+    cancelHolepunch();
+    connectThread = std::jthread{};
+
     inputThread.request_stop();
     inputThread = std::jthread{};
 
@@ -238,6 +283,12 @@ StreamSession::State::~State()
         chiaki_session_fini(&session);
         initialized = false;
     }
+    else if (holepunch != nullptr)
+    {
+        chiaki_holepunch_session_fini(holepunch);
+    }
+
+    holepunch = nullptr;
 
     if (opusEncoderReady)
     {
@@ -359,6 +410,171 @@ void StreamSession::State::onHapticsFrame(std::uint8_t* buffer, std::size_t size
     {
         state.haptics->push({buffer, size});
     }
+}
+
+std::expected<void, std::string> StreamSession::State::startChiaki(ChiakiConnectInfo& info)
+{
+    const ChiakiErrorCode initResult = chiaki_session_init(&session, &info, logSink.log());
+
+    if (initResult != CHIAKI_ERR_SUCCESS)
+    {
+        const std::scoped_lock lock(holepunchMutex);
+        holepunch = nullptr;
+
+        return std::unexpected(std::string("chiaki_session_init failed: ") +
+                               chiaki_error_string(initResult));
+    }
+
+    initialized = true;
+
+    chiaki_opus_decoder_init(&opusDecoder, logSink.log());
+    opusDecoderReady = true;
+    chiaki_opus_decoder_set_cb(&opusDecoder, &State::onAudioSettings, &State::onAudioFrame, this);
+    ChiakiAudioSink audioSink{};
+    chiaki_opus_decoder_get_sink(&opusDecoder, &audioSink);
+    chiaki_session_set_audio_sink(&session, &audioSink);
+
+    ChiakiAudioSink hapticsSink{};
+    hapticsSink.user = this;
+    hapticsSink.frame_cb = &State::onHapticsFrame;
+    chiaki_session_set_haptics_sink(&session, &hapticsSink);
+
+    chiaki_opus_encoder_init(&opusEncoder, logSink.log());
+    opusEncoderReady = true;
+    ChiakiAudioHeader microphoneHeader{};
+    chiaki_audio_header_set(&microphoneHeader, kMicrophoneChannels, static_cast<std::uint8_t>(16),
+                            kMicrophoneRate, kMicrophoneFrameSize);
+    chiaki_opus_encoder_header(&microphoneHeader, &opusEncoder, &session);
+
+    chiaki_session_set_video_sample_cb(&session, &State::onVideoSample, this);
+    chiaki_session_set_event_cb(&session, &State::onEvent, this);
+
+    if (const ChiakiErrorCode result = chiaki_session_start(&session); result != CHIAKI_ERR_SUCCESS)
+    {
+        return std::unexpected(std::string("chiaki_session_start failed: ") +
+                               chiaki_error_string(result));
+    }
+
+    started = true;
+    startInput();
+    spdlog::info("Input: the controller state is sampled right before each send, every 4 ms");
+
+    return {};
+}
+
+void StreamSession::State::connectOverPsn(ChiakiConnectInfo info, const DuidBytes& duid, bool ps5)
+{
+    if (const std::optional<PsnFailure> failure = openControlChannel(duid, ps5))
+    {
+        reportPsnFailure(*failure);
+        return;
+    }
+
+    if (cancelRequested)
+    {
+        return;
+    }
+
+    info.holepunch_session = holepunch;
+    std::ranges::copy(psn.accountId, info.psn_account_id);
+
+    if (const auto started = startChiaki(info); !started)
+    {
+        reportPsnFailure({.stage = stage.load(),
+                          .kind = PsnFailureKind::Unknown,
+                          .detail = started.error()});
+    }
+}
+
+// Runs the holepunch up to the control channel; chiaki's session punches the
+// data channel itself once the control one answers.
+std::optional<PsnFailure> StreamSession::State::openControlChannel(const DuidBytes& duid,
+                                                                   bool ps5)
+{
+    struct Step
+    {
+        ConnectionStage stage;
+        std::function<ChiakiErrorCode()> run;
+    };
+
+    enterStage(ConnectionStage::SigningIn);
+    const ChiakiHolepunchSession created =
+        chiaki_holepunch_session_init(psn.accessToken.c_str(), &holepunchLog);
+
+    if (created == nullptr)
+    {
+        return failureAt(ConnectionStage::SigningIn, CHIAKI_ERR_MEMORY);
+    }
+
+    {
+        const std::scoped_lock lock(holepunchMutex);
+        holepunch = created;
+    }
+
+    const ChiakiHolepunchConsoleType consoleType =
+        ps5 ? CHIAKI_HOLEPUNCH_CONSOLE_TYPE_PS5 : CHIAKI_HOLEPUNCH_CONSOLE_TYPE_PS4;
+    const std::array<Step, 4> steps{{
+        {ConnectionStage::SigningIn, [created] { return chiaki_holepunch_upnp_discover(created); }},
+        {ConnectionStage::CreatingSession,
+         [created] { return chiaki_holepunch_session_create(created); }},
+        {ConnectionStage::StartingSession,
+         [created, &duid, consoleType] { return startPsnSession(created, duid, consoleType); }},
+        {ConnectionStage::PunchingControl,
+         [created]
+         { return chiaki_holepunch_session_punch_hole(created, CHIAKI_HOLEPUNCH_PORT_TYPE_CTRL); }},
+    }};
+
+    for (const Step& step : steps)
+    {
+        enterStage(step.stage);
+        const ChiakiErrorCode result = cancelRequested ? CHIAKI_ERR_CANCELED : step.run();
+
+        if (result != CHIAKI_ERR_SUCCESS)
+        {
+            return failureAt(step.stage, result);
+        }
+    }
+
+    return std::nullopt;
+}
+
+void StreamSession::State::enterStage(ConnectionStage next)
+{
+    stage = next;
+    spdlog::info("PSN connection: {}", stageName(next));
+
+    if (events.onStage)
+    {
+        events.onStage(next);
+    }
+}
+
+void StreamSession::State::cancelHolepunch()
+{
+    const std::scoped_lock lock(holepunchMutex);
+
+    // Once the channels are open, chiaki's own shutdown closes the PSN session.
+    if (holepunch != nullptr && stage.load() != ConnectionStage::Connecting)
+    {
+        chiaki_holepunch_main_thread_cancel(holepunch, true);
+    }
+}
+
+void StreamSession::State::reportPsnFailure(const PsnFailure& failure)
+{
+    if (cancelRequested || endReported.exchange(true))
+    {
+        return;
+    }
+
+    spdlog::warn("PSN connection failed while {}: {}", stageName(failure.stage), failure.detail);
+
+    if (events.onPsnFailed)
+    {
+        events.onPsnFailed(failure);
+    }
+
+    events.onEnded(SessionEnd::PsnFailed, failure.detail);
 }
 
 void StreamSession::State::startInput()
@@ -544,7 +760,7 @@ void StreamSession::State::handle(const ChiakiEvent& event)
     switch (event.type)
     {
     case CHIAKI_EVENT_CONNECTED:
-        spdlog::info("Session connected to {}", host);
+        spdlog::info("Session connected{}", overPsn ? " over the PSN" : " to " + host);
         connectMicrophone();
         events.onConnected();
         return;
@@ -605,8 +821,22 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         chiaki_session_stop(&session);
         return;
 
+    case CHIAKI_EVENT_HOLEPUNCH:
+        enterStage(event.data_holepunch.finished ? ConnectionStage::Connecting
+                                                 : ConnectionStage::PunchingData);
+        return;
+
     case CHIAKI_EVENT_QUIT:
     {
+        if (overPsn && stage.load() == ConnectionStage::PunchingData &&
+            event.quit.reason != CHIAKI_QUIT_REASON_STOPPED)
+        {
+            reportPsnFailure({.stage = ConnectionStage::PunchingData,
+                              .kind = PsnFailureKind::Unknown,
+                              .detail = chiaki_quit_reason_string(event.quit.reason)});
+            return;
+        }
+
         const std::string detail = event.quit.reason_str != nullptr ? event.quit.reason_str : "";
         spdlog::info("Session ended: {}{}{}", chiaki_quit_reason_string(event.quit.reason),
                      detail.empty() ? "" : ", ", detail);
@@ -656,6 +886,23 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     state->metrics = request.metrics;
     state->microphoneMuted = request.audio.microphoneMuted;
 
+    std::optional<DuidBytes> duid;
+
+    if (request.psn)
+    {
+        duid = parseDuid(request.psn->duid);
+
+        if (!duid)
+        {
+            return std::unexpected("the console's PSN identifier is invalid");
+        }
+
+        state->overPsn = true;
+        state->psn = *request.psn;
+        state->logSink.setRedacted(true);
+        chiaki_log_init(&state->holepunchLog, 0, discardChiakiLog, nullptr);
+    }
+
     const VideoProfile profile = videoProfileFor(request.video, request.ps5);
     auto decoder = media::VideoDecoder::create(gpu, profile.codec, std::move(mailbox),
                                                request.metrics, profile.hdr);
@@ -704,53 +951,19 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     info.packet_loss_max = kPacketLossMax;
     info.enable_idr_on_fec_failure = true;
 
-    if (const ChiakiErrorCode result =
-            chiaki_session_init(&state->session, &info, state->logSink.log());
-        result != CHIAKI_ERR_SUCCESS)
+    if (duid)
     {
-        return std::unexpected(std::string("chiaki_session_init failed: ") +
-                               chiaki_error_string(result));
+        state->connectThread = std::jthread([raw, info, bytes = *duid, ps5 = request.ps5]
+                                            { raw->connectOverPsn(info, bytes, ps5); });
+    }
+    else if (const auto started = state->startChiaki(info); !started)
+    {
+        return std::unexpected(started.error());
     }
 
-    state->initialized = true;
-
-    chiaki_opus_decoder_init(&state->opusDecoder, state->logSink.log());
-    state->opusDecoderReady = true;
-    chiaki_opus_decoder_set_cb(&state->opusDecoder, &State::onAudioSettings, &State::onAudioFrame,
-                                raw);
-    ChiakiAudioSink audioSink{};
-    chiaki_opus_decoder_get_sink(&state->opusDecoder, &audioSink);
-    chiaki_session_set_audio_sink(&state->session, &audioSink);
-
-    ChiakiAudioSink hapticsSink{};
-    hapticsSink.user = raw;
-    hapticsSink.frame_cb = &State::onHapticsFrame;
-    chiaki_session_set_haptics_sink(&state->session, &hapticsSink);
-
-    chiaki_opus_encoder_init(&state->opusEncoder, state->logSink.log());
-    state->opusEncoderReady = true;
-    ChiakiAudioHeader microphoneHeader{};
-    chiaki_audio_header_set(&microphoneHeader, kMicrophoneChannels,
-                            static_cast<std::uint8_t>(16), kMicrophoneRate,
-                            kMicrophoneFrameSize);
-    chiaki_opus_encoder_header(&microphoneHeader, &state->opusEncoder, &state->session);
-
-    chiaki_session_set_video_sample_cb(&state->session, &State::onVideoSample, raw);
-    chiaki_session_set_event_cb(&state->session, &State::onEvent, raw);
-
-    if (const ChiakiErrorCode result = chiaki_session_start(&state->session);
-        result != CHIAKI_ERR_SUCCESS)
-    {
-        return std::unexpected(std::string("chiaki_session_start failed: ") +
-                               chiaki_error_string(result));
-    }
-
-    state->started = true;
-    state->startInput();
-    spdlog::info("Input: the controller state is sampled right before each send, every 4 ms");
-    spdlog::info("Session started with {}: {}x{} at {} fps, {}, {} kbps", request.host,
-                 profile.width, profile.height, profile.framesPerSecond,
-                 core::codecName(profile.codec), profile.bitrateKbps);
+    spdlog::info("Session started {}: {}x{} at {} fps, {}, {} kbps",
+                 duid ? "over the PSN" : "with " + request.host, profile.width, profile.height,
+                 profile.framesPerSecond, core::codecName(profile.codec), profile.bitrateKbps);
 
     if (profile.hdr)
     {

@@ -3,6 +3,7 @@
 #include "core/Settings.h"
 #include "core/StreamMetrics.h"
 #include "remoteplay/Console.h"
+#include "remoteplay/PsnConnection.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 
@@ -10,6 +11,7 @@
 #include <expected>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace mfplay::input
@@ -40,6 +42,8 @@ enum class SessionEnd
     LoginPinRequired,
     // The pictures don't decode.
     VideoFailed,
+    // The connection through the PSN failed; Events::onPsnFailed said where.
+    PsnFailed,
     Unknown,
 };
 
@@ -61,7 +65,7 @@ struct VideoProfile
 
 struct SessionRequest
 {
-    // The console's address on the local network.
+    // The console's address on the local network; unused with `psn`.
     std::string host;
     bool ps5 = true;
     Credentials credentials;
@@ -73,6 +77,10 @@ struct SessionRequest
     input::KeyboardMouseInput* keyboardMouse = nullptr;
     // The decoder and session counters the overlay reads.
     std::shared_ptr<core::StreamMetrics> metrics;
+    // When set, the session reaches the console through the PSN instead of
+    // `host`; the holepunch runs on the session's own thread, after `start`
+    // returns.
+    std::optional<PsnTarget> psn;
 };
 
 // A Remote Play session with a paired console, through chiaki-lib, its video
@@ -85,6 +93,10 @@ public:
     {
         std::function<void()> onConnected;
         std::function<void()> onFirstPicture;
+        // A PSN connection moved to this stage.
+        std::function<void(ConnectionStage stage)> onStage;
+        // A PSN connection failed; `onEnded` follows with SessionEnd::PsnFailed.
+        std::function<void(PsnFailure failure)> onPsnFailed;
         std::function<void(SessionEnd end, std::string detail)> onEnded;
         // The microphone changed state on its own (it was lost, or could not
         // open); the interface keeps its toggle in sync.
@@ -102,8 +114,9 @@ public:
     StreamSession(StreamSession&&) = delete;
     StreamSession& operator=(StreamSession&&) = delete;
 
-    // Stops the session if it still runs and waits for chiaki's threads. Never
-    // call it from an event.
+    // Stops the session if it still runs and waits for chiaki's threads; a PSN
+    // connection still opening its channels is canceled first. Never call it
+    // from an event.
     ~StreamSession();
 
     // Applies the interface's microphone toggle to the running console

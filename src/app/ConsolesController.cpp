@@ -307,6 +307,36 @@ void ConsolesController::play(const QString& key)
     stream_.play(std::move(target));
 }
 
+bool ConsolesController::playOverInternet(const QString& key)
+{
+    const SavedConsole* console = findSaved(key);
+    const std::optional<std::string> duid = psnDuid(key);
+    std::string token = psnLogin_.validAccessToken();
+
+    if (console == nullptr || !console->credentials || !duid || token.empty() ||
+        !file_.accountId)
+    {
+        spdlog::warn("Cannot play over the internet on {}: the console isn't ready for it",
+                     key.toStdString());
+        return false;
+    }
+
+    stream_.play({
+        .key = key,
+        .name = consoleName({.saved = console, .discovered = nullptr}),
+        .host = {},
+        .ps5 = console->ps5,
+        .credentials = console->credentials,
+        .psn = remoteplay::PsnTarget{
+            .duid = *duid,
+            .accessToken = std::move(token),
+            .accountId = *file_.accountId,
+        },
+    });
+
+    return true;
+}
+
 void ConsolesController::markPlayed(const QString& key)
 {
     SavedConsole* console = findSaved(key);

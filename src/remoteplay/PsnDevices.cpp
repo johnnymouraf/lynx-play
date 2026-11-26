@@ -1,5 +1,6 @@
 #include "remoteplay/PsnDevices.h"
 
+#include "remoteplay/ChiakiLogSink.h"
 #include "remoteplay/ConsoleMerge.h"
 
 #include <algorithm>
@@ -16,9 +17,6 @@ namespace
 {
 
 constexpr int kListAttempts = 3;
-
-// Everything chiaki-lib would log here could carry the token.
-void discardLog(ChiakiLogLevel /*level*/, const char* /*message*/, void* /*user*/) {}
 
 std::string toHex(const uint8_t* bytes, std::size_t size)
 {
@@ -48,7 +46,7 @@ std::expected<std::vector<PsnDevice>, std::string> listPsnDevices(std::string_vi
     const std::string token(accessToken);
 
     ChiakiLog log;
-    chiaki_log_init(&log, 0, discardLog, nullptr);
+    chiaki_log_init(&log, 0, discardChiakiLog, nullptr);
 
     ChiakiHolepunchDeviceInfo* infos = nullptr;
     std::size_t count = 0;

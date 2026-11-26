@@ -88,6 +88,8 @@ FailureText textFor(SessionEnd end)
         return {u"O vídeo não pôde ser decodificado"_s,
                 u"A GPU não decodifica esse vídeo. Tente o codec H.264 em "
                 u"Configurações › Vídeo."_s};
+    case SessionEnd::PsnFailed:
+        return {u"Não foi possível conectar pela internet"_s, logsHint()};
     case SessionEnd::Stopped:
     case SessionEnd::EndedByConsole:
     case SessionEnd::Unknown:
@@ -199,6 +201,16 @@ QString StreamController::failureMessage() const
     return failureMessage_;
 }
 
+std::optional<remoteplay::ConnectionStage> StreamController::connectionStage() const
+{
+    return connectionStage_;
+}
+
+std::optional<remoteplay::PsnFailure> StreamController::psnFailure() const
+{
+    return psnFailure_;
+}
+
 void StreamController::play(Target target)
 {
     spdlog::info("Play requested on {}", target.key.toStdString());
@@ -237,6 +249,8 @@ void StreamController::startSession()
     stop();
     const std::uint64_t session = ++sessionNumber_;
     const Target& target = *target_;
+    connectionStage_.reset();
+    psnFailure_.reset();
     setPhase(Phase::Connecting);
 
     if (!target.credentials)
@@ -279,6 +293,7 @@ void StreamController::startSession()
         .gamepads = input_.gamepads(),
         .keyboardMouse = keyboardMouse_.get(),
         .metrics = metrics_,
+        .psn = target.psn,
     };
     auto started = remoteplay::StreamSession::start(*gpu, *mailbox, request, eventsFor(session));
 
@@ -300,6 +315,10 @@ remoteplay::StreamSession::Events StreamController::eventsFor(std::uint64_t sess
     return {
         .onConnected = [this, session] { post([this, session] { onConnected(session); }); },
         .onFirstPicture = [this, session] { post([this, session] { onFirstPicture(session); }); },
+        .onStage = [this, session](remoteplay::ConnectionStage stage)
+        { post([this, session, stage] { onStage(session, stage); }); },
+        .onPsnFailed = [this, session](remoteplay::PsnFailure failure)
+        { post([this, session, failure = std::move(failure)] { onPsnFailed(session, failure); }); },
         .onEnded = [this, session](SessionEnd end, const std::string&)
         { post([this, session, end] { onEnded(session, end); }); },
         .onMicrophoneMuted = [this, session](bool muted)
@@ -343,6 +362,27 @@ void StreamController::onConnected(std::uint64_t session)
     }
 
     setPhase(Phase::StartingVideo);
+}
+
+void StreamController::onStage(std::uint64_t session, remoteplay::ConnectionStage stage)
+{
+    if (session != sessionNumber_)
+    {
+        return;
+    }
+
+    connectionStage_ = stage;
+    emit changed();
+}
+
+void StreamController::onPsnFailed(std::uint64_t session, remoteplay::PsnFailure failure)
+{
+    if (session != sessionNumber_)
+    {
+        return;
+    }
+
+    psnFailure_ = std::move(failure);
 }
 
 void StreamController::onFirstPicture(std::uint64_t session)

@@ -66,6 +66,8 @@ public:
         bool ps5 = true;
         // Absent when the console isn't paired.
         std::optional<remoteplay::Credentials> credentials;
+        // Set to reach the console through the PSN instead of `host`.
+        std::optional<remoteplay::PsnTarget> psn;
     };
 
     StreamController(SettingsController& settings, InputController& input,
@@ -77,6 +79,10 @@ public:
     [[nodiscard]] QString failureHeading() const;
     [[nodiscard]] QString failureTitle() const;
     [[nodiscard]] QString failureMessage() const;
+    // The PSN connection's current stage; absent on the local network.
+    [[nodiscard]] std::optional<remoteplay::ConnectionStage> connectionStage() const;
+    // Why the last PSN connection failed; absent when it didn't.
+    [[nodiscard]] std::optional<remoteplay::PsnFailure> psnFailure() const;
 
     // Ends any session and connects to the target; a console that isn't
     // paired fails at once.
@@ -98,6 +104,8 @@ private:
     void onConnected(std::uint64_t session);
     void onFirstPicture(std::uint64_t session);
     void onEnded(std::uint64_t session, remoteplay::SessionEnd end);
+    void onStage(std::uint64_t session, remoteplay::ConnectionStage stage);
+    void onPsnFailed(std::uint64_t session, remoteplay::PsnFailure failure);
     void onWindowClosed(std::uint64_t session, render::CloseReason reason);
     [[nodiscard]] remoteplay::StreamSession::Events eventsFor(std::uint64_t session);
     // Runs `work` on the interface thread; chiaki calls in from its own.
@@ -115,6 +123,8 @@ private:
     QString failureHeading_;
     QString failureTitle_;
     QString failureMessage_;
+    std::optional<remoteplay::ConnectionStage> connectionStage_;
+    std::optional<remoteplay::PsnFailure> psnFailure_;
     // Counts sessions, so events of one already stopped are ignored.
     std::uint64_t sessionNumber_ = 0;
     std::optional<render::GpuDevice> gpu_;

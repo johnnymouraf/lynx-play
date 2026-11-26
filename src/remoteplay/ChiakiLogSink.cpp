@@ -18,6 +18,7 @@ constexpr std::string_view kTargetBitrateKey = "target_bitrate=";
 constexpr auto kQualityInterval = std::chrono::seconds(5);
 constexpr auto kRepeatInterval = std::chrono::minutes(1);
 constexpr std::size_t kMaxRememberedMessages = 256;
+constexpr std::string_view kWithheld = "a message was withheld: it may carry addresses";
 
 spdlog::level::level_enum toSpdlogLevel(ChiakiLogLevel level)
 {
@@ -56,6 +57,10 @@ long targetBitrateOf(std::string_view report)
 
 } // namespace
 
+void discardChiakiLog(ChiakiLogLevel /*level*/, const char* /*message*/, void* /*user*/)
+{
+}
+
 ChiakiLogSink::ChiakiLogSink(Observer observer) : observer_(std::move(observer))
 {
     chiaki_log_init(&log_, kLoggedLevels, &ChiakiLogSink::forward, this);
@@ -64,6 +69,11 @@ ChiakiLogSink::ChiakiLogSink(Observer observer) : observer_(std::move(observer))
 ChiakiLog* ChiakiLogSink::log()
 {
     return &log_;
+}
+
+void ChiakiLogSink::setRedacted(bool redacted)
+{
+    redacted_ = redacted;
 }
 
 void ChiakiLogSink::forward(ChiakiLogLevel level, const char* message, void* user)
@@ -82,12 +92,21 @@ void ChiakiLogSink::forward(ChiakiLogLevel level, const char* message, void* use
         sink.observer_(level, text);
     }
 
-    if (sink.isRepeat(text))
+    const bool withheld = sink.redacted_;
+
+    if (withheld && level != CHIAKI_LOG_WARNING && level != CHIAKI_LOG_ERROR)
     {
         return;
     }
 
-    spdlog::log(toSpdlogLevel(level), "[chiaki] {}", text);
+    const std::string logged = withheld ? std::string(kWithheld) : text;
+
+    if (sink.isRepeat(logged))
+    {
+        return;
+    }
+
+    spdlog::log(toSpdlogLevel(level), "[chiaki] {}", logged);
 }
 
 void ChiakiLogSink::logConnectionQuality(const std::string& message)

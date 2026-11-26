@@ -125,13 +125,16 @@ std::optional<std::string_view> parametersOf(std::string_view url)
 
 } // namespace
 
-std::string psnAuthorizeUrl()
+std::string psnAuthorizeUrl(std::string_view clientDuid)
 {
+    const std::string duid =
+        clientDuid.empty() ? std::string() : std::format("duid={}&", clientDuid);
+
     return std::format(
         "{}?service_entity=urn:service-entity:psn&response_type=code&client_id={}"
         "&redirect_uri={}&scope={}&request_locale=en_US&ui=pr&service_logo=ps"
-        "&layout_type=popup&smcid=remoteplay&prompt=always&PlatformPrivacyWs1=minimal&",
-        kPsnAuthorizeUrl, kPsnClientId, kPsnRedirectUri, kPsnScope);
+        "&layout_type=popup&smcid=remoteplay&prompt=always&PlatformPrivacyWs1=minimal&{}",
+        kPsnAuthorizeUrl, kPsnClientId, kPsnRedirectUri, kPsnScope, duid);
 }
 
 std::string psnBasicAuthHeader()

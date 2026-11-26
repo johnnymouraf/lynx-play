@@ -27,6 +27,8 @@ add_library(mfplay_remoteplay STATIC
     HostAddress.h
     Pin.cpp
     Pin.h
+    PsnConnection.cpp
+    PsnConnection.h
     PsnDevices.cpp
     PsnDevices.h
     PsnLogin.cpp
@@ -39,7 +41,7 @@ add_library(mfplay_remoteplay STATIC
 add_library(MFPlay::remoteplay ALIAS mfplay_remoteplay)
 
 target_link_libraries(mfplay_remoteplay
-    PUBLIC MFPlay::core MFPlay::render
-    PRIVATE MFPlay::audio MFPlay::input MFPlay::media chiaki-lib nlohmann_json::nlohmann_json
+    PUBLIC MFPlay::core MFPlay::render chiaki-lib
+    PRIVATE MFPlay::audio MFPlay::input MFPlay::media nlohmann_json::nlohmann_json
             crypt32 iphlpapi ws2_32)
 mfplay_set_warnings(mfplay_remoteplay)

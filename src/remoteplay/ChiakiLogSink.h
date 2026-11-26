@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <mutex>
@@ -11,6 +12,10 @@
 
 namespace mfplay::remoteplay
 {
+
+// A ChiakiLog callback that drops every message, for the calls whose logs
+// could carry tokens or addresses.
+void discardChiakiLog(ChiakiLogLevel level, const char* message, void* user);
 
 // A ChiakiLog that sends chiaki-lib's info, warnings and errors to spdlog,
 // without its verbose hexdumps, except the console's "connection quality"
@@ -33,12 +38,18 @@ public:
 
     [[nodiscard]] ChiakiLog* log();
 
+    // While on, spdlog gets only a notice that a warning or error was
+    // withheld, and nothing else: chiaki's messages can carry the console's
+    // address, which over the PSN is not on the local network.
+    void setRedacted(bool redacted);
+
 private:
     static void forward(ChiakiLogLevel level, const char* message, void* user);
     void logConnectionQuality(const std::string& message);
     [[nodiscard]] bool isRepeat(const std::string& message);
 
     Observer observer_;
+    std::atomic<bool> redacted_ = false;
     ChiakiLog log_{};
     std::mutex mutex_;
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> lastLogged_;

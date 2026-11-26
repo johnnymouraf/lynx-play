@@ -17,7 +17,7 @@ constexpr std::string_view kRedirectPrefix =
 
 TEST_CASE("The PSN sign-in page is chiaki's authorize URL")
 {
-    const std::string url = psnAuthorizeUrl();
+    const std::string url = psnAuthorizeUrl("");
 
     CHECK(url ==
           "https://auth.api.sonyentertainmentnetwork.com/2.0/oauth/authorize"
@@ -32,6 +32,15 @@ TEST_CASE("The PSN sign-in page is chiaki's authorize URL")
     CHECK(url.starts_with(kPsnAuthorizeUrl));
     CHECK(url.find("prompt=always") != std::string::npos);
     CHECK(url.find("response_type=code") != std::string::npos);
+}
+
+TEST_CASE("The sign-in page carries the client's DUID when there is one")
+{
+    const std::string url = psnAuthorizeUrl("0123abcd");
+
+    CHECK(url.ends_with("&PlatformPrivacyWs1=minimal&duid=0123abcd&"));
+    CHECK(url.find("duid=") == url.rfind("duid="));
+    CHECK(psnAuthorizeUrl("").find("duid=") == std::string::npos);
 }
 
 TEST_CASE("The token requests use the client id and secret as Basic auth")
