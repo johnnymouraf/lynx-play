@@ -28,7 +28,6 @@ Item {
     readonly property bool signInHint: card.lanMissing && !card.psnReachable && !card.psnSignedIn
 
     signal playRequested
-    signal playOverInternetRequested
     signal wakeRequested
     signal pairRequested
     signal refreshRequested
@@ -48,7 +47,7 @@ Item {
             break;
         case "offline":
             if (card.internetOffered) {
-                card.playOverInternetRequested();
+                card.playRequested();
                 break;
             }
 

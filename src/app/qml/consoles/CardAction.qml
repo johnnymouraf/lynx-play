@@ -9,7 +9,8 @@ Item {
 
     property string status: "offline"
     property bool searching: false
-    // An offline console the PSN reaches offers playing over the internet.
+    // An offline console the PSN reaches: its "Jogar" waits for the local
+    // network, then plays over the internet.
     property bool overInternet: false
     property string consoleName
     property real wakeProgress: 0
@@ -19,11 +20,10 @@ Item {
         standby: { label: "Ligar e jogar", icon: "power", variant: "primary" },
         unpaired: { label: "Parear", icon: "link-2", variant: "secondary" },
         offline: { label: "Procurar de novo", icon: "refresh-cw", variant: "secondary" },
-        waking: { label: "", icon: "", variant: "secondary" },
-        internet: { label: "Jogar pela internet", icon: "network", variant: "primary" }
+        waking: { label: "", icon: "", variant: "secondary" }
     })
-    readonly property var button: action.buttons[action.internetOffered ? "internet" : action.status]
     readonly property bool internetOffered: action.overInternet && action.status === "offline"
+    readonly property var button: action.buttons[action.internetOffered ? "ready" : action.status]
     readonly property bool waking: action.status === "waking"
 
     signal triggered
@@ -57,10 +57,10 @@ Item {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         visible: !action.waking
-        enabled: !action.searching || action.internetOffered
+        enabled: !action.searching
         variant: action.button.variant
-        iconName: action.searching && !action.internetOffered ? "loader-circle" : action.button.icon
-        text: action.searching && !action.internetOffered ? "Procurando…" : action.button.label
+        iconName: action.searching ? "loader-circle" : action.button.icon
+        text: action.searching ? "Procurando…" : action.button.label
         focusPolicy: Qt.NoFocus
         Accessible.description: action.consoleName
         onClicked: action.triggered()

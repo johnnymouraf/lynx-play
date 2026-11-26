@@ -7,6 +7,7 @@
 #include "remoteplay/ConsoleMerge.h"
 #include "remoteplay/ConsoleRegistration.h"
 #include "remoteplay/ConsoleStore.h"
+#include "remoteplay/PsnConnection.h"
 
 #include <QDateTime>
 #include <QObject>
@@ -92,11 +93,13 @@ public:
     // Saves a console that wasn't; an empty name shows the console's own.
     Q_INVOKABLE void rename(const QString& key, const QString& name);
     Q_INVOKABLE void forget(const QString& key);
-    // Connects to a paired console and plays on it.
+    // Plays a paired console: over the local network when it answers there,
+    // and over the PSN when it doesn't answer within a few seconds and the PSN
+    // reaches it.
     Q_INVOKABLE void play(const QString& key);
-    // Connects to a paired console through the PSN. False, without trying,
-    // when the console isn't paired, isn't on the account's PS5 list, there
-    // is no valid PSN sign-in or no account ID is saved.
+    // Connects to a paired console through the PSN at once. False, without
+    // trying, when the console isn't paired, isn't on the account's PS5 list,
+    // there is no valid PSN sign-in or no account ID is saved.
     Q_INVOKABLE bool playOverInternet(const QString& key);
     // Sends the wake-up packet to a paired console in rest mode; its card shows
     // it turning on until it answers ready or the wait runs out.
@@ -138,6 +141,22 @@ private:
     void finishWakes();
     // Remembers when the console was last played on.
     void markPlayed(const QString& key);
+    // Plays on the route that the console's answer and the wait allow.
+    void route(const QString& key, bool waited);
+    void playLocal(const QString& key);
+    // Shows the card as searching while the local network has its chance.
+    void waitForLocal(const QString& key);
+    // Forgets a wait for the local network and the searching it showed.
+    void endLocalWait(const std::string& key);
+    // Gives up on the local network for a console that didn't answer in time.
+    void expireLocalWait(const std::string& key, std::uint64_t timer);
+    // Plays the consoles that answered while they were waited for.
+    void finishLocalWaits();
+    [[nodiscard]] bool answersNow(const QString& key) const;
+    // The PSN route to a paired console, when it can be used now.
+    [[nodiscard]] std::optional<remoteplay::PsnTarget> psnTargetFor(const QString& key);
+    // False when the PSN route can't be used.
+    bool startInternet(const QString& key, bool fallback);
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
@@ -165,6 +184,8 @@ private:
     // the wait.
     std::map<std::string, std::uint64_t> searching_;
     std::map<std::string, std::uint64_t> waking_;
+    // The consoles a Play press waits for on the local network.
+    std::map<std::string, std::uint64_t> localWaits_;
     std::uint64_t timerGeneration_ = 0;
     QTimer clockTimer_;
     DiscoveryStatus discoveryStatus_ = DiscoveryStatus::Unavailable;

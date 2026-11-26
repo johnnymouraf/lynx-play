@@ -334,7 +334,6 @@ FocusScope {
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
                             psnSignedIn: page.consoles.psnSignedIn
                             onPlayRequested: page.consoles.play(consoleCard.key)
-                            onPlayOverInternetRequested: page.consoles.playOverInternet(consoleCard.key)
                             onWakeRequested: page.consoles.wake(consoleCard.key)
                             onCancelWakeRequested: page.consoles.cancelWake(consoleCard.key)
                             onPairRequested: pairingDialog.openFor(consoleCard.key, consoleCard.name)
