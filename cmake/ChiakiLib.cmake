@@ -38,6 +38,12 @@ endforeach()
 
 set(CHIAKI_LIB_ENABLE_OPUS ON CACHE BOOL "" FORCE)
 
+# A cross build (Android) searches programs inside the target sysroot, where
+# vcpkg's host protoc isn't; chiaki-ng's find_program keeps a preset PROTOC.
+find_program(PROTOC protoc
+    HINTS "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/protobuf"
+    NO_CMAKE_FIND_ROOT_PATH)
+
 add_subdirectory("${CHIAKI_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/chiaki-ng" EXCLUDE_FROM_ALL)
 
 # gf-complete calls __cpuidex without including <intrin.h> on MSVC-compatible
