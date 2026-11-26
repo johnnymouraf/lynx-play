@@ -9,6 +9,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 
 - [Phases](#phases)
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
+- [Current: 4.1 PSN connection](#current-41-psn-connection)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Decisions to review](#decisions-to-review)
@@ -85,10 +86,22 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
     shown disabled, saying they arrive with internet play; its PSN account
     login saves the Account ID that pairing then fills in.
 - [ ] **4. Internet**: play away from home.
-  - [ ] **4.1 Manual address and network profiles**: VPN (Tailscale/ZeroTier) or
-        port forwarding; separate LAN and internet bitrates.
-  - [ ] **4.2 PSN remote connection**: PSN login, NAT traversal without router
-        setup, automatic LAN → PSN fallback.
+  - [ ] **4.1 PSN connection**: client DUID, the account's PS5s matched to the
+        saved consoles, holepunch session, "Jogar pela internet" on the card,
+        Conectando stages, the internet bitrate active.
+    - The console must already be paired at home; remote registration is 4.3.
+    - The option shows on the card of a paired console the LAN search doesn't
+      find, and in its menu; it becomes automatic in 4.2.
+    - The Rede page's "Bitrate pela internet" becomes active (15 Mbps by
+      default) and applies to PSN sessions; the remote address stays off.
+    - New states use the existing components; no design pass. The handoff
+      names what drifts from the design file.
+    - The owner checks the real connection over the phone's hotspot.
+  - [ ] **4.2 Automatic**: LAN → PSN fallback, reconnection, errors that name
+        the cause (blocked NAT, console off, expired login).
+  - [ ] **4.3 Remote registration**: pair a console through PSN away from home.
+  - [ ] **4.4 Manual address**: VPN (Tailscale/ZeroTier) or port forwarding,
+        with the internet bitrate.
 
 Out of scope for now: capture card input (planned for the future).
 
@@ -133,9 +146,50 @@ Out of scope for now: capture card input (planned for the future).
 - Target displays: today an Acer 1080p 60 Hz monitor on the RTX (and the 240 Hz
   laptop panel on the Intel GPU); later a 1440p+ 120 Hz+ monitor. Every output
   resolution and refresh rate must work.
-- Internet: PSN NAT traversal plus a manual address.
+- Internet: PSN NAT traversal plus a manual address. chiaki-ng's holepunch
+  (`lib/src/remote`) is already built and linked, with json-c, miniupnpc and
+  curl from vcpkg; the PSN login's OAuth scope already covers Remote Play
+  sessions. PSN devices match saved consoles by the console's reported name
+  (`SavedConsole::hostName`), as chiaki-ng matches them by nickname.
+- Phase 4 is built by Sonnet subagents at low effort, one per delivery, on
+  `auto/<step>`; the orchestrator reviews each diff and fast-forwards
+  `master` once CI is green.
 - Builds only in GitHub Actions; the app is tested by running the downloaded
   artifact on the owner's machine.
+
+## Current: 4.1 PSN connection
+
+**Goal:** away from home, a paired PS5's card offers "Jogar pela internet";
+it connects through PSN (holepunch, no tunnel) and streams at the internet
+bitrate.
+
+**Guardrails:** the shared ones below; no automatic fallback, remote
+registration or manual address (4.2–4.4); never log DUIDs or tokens; bump the
+version on every delivery.
+
+**Success criteria:**
+
+1. CI is green on `auto/4.1` and `master` is fast-forwarded to it.
+2. The client DUID is generated once, saved and reused (unit test).
+3. With a PSN login, the account's PS5s are listed off the UI thread and
+   matched to saved paired consoles by `hostName` (unit test of the match);
+   the log gives only the count.
+4. A paired console the LAN search doesn't find shows "Jogar pela internet" on
+   its card and in its menu with a PSN login, and a hint to sign in on Rede
+   without one (checked by running the app here).
+5. A PSN session punches the holes and connects, and Conectando shows its
+   stages (owner checks, over the phone's hotspot).
+6. "Bitrate pela internet" is active, 15 Mbps by default, saved and applied to
+   PSN sessions; the remote address row stays disabled.
+7. A failure at any stage shows a Portuguese error without a crash, and cancel
+   works.
+
+**Deliveries:**
+
+1. Client DUID, PSN device listing and the match to saved consoles, with tests.
+2. The holepunch path in `StreamSession`, with its stage events.
+3. The card's button and menu entry; Conectando's stages and errors.
+4. The internet bitrate, active and applied.
 
 ## Auto mode
 
