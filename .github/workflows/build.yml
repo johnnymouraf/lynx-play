@@ -269,7 +269,7 @@ jobs:
 
       # Tests are host tests: they run in the Windows job, not on Android.
       - name: Build the APK
-        run: cmake --build --preset android --target apk
+        run: cmake --build --preset android --target apk -- -k 0
 
       - name: Find the APK
         id: apk
