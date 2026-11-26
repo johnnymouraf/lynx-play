@@ -478,11 +478,11 @@ void StreamSession::State::connectOverPsn(ChiakiConnectInfo info, const DuidByte
     info.holepunch_session = holepunch;
     std::ranges::copy(psn.accountId, info.psn_account_id);
 
-    if (const auto started = startChiaki(info); !started)
+    if (const auto result = startChiaki(info); !result)
     {
         reportPsnFailure({.stage = stage.load(),
                           .kind = PsnFailureKind::Unknown,
-                          .detail = started.error()});
+                          .detail = result.error()});
     }
 }
 
