@@ -55,6 +55,8 @@ FailureText notPairedText()
             u"Pareie o PS5 com este PC pelo menu do card e tente de novo."_s};
 }
 
+#if defined(_WIN32)
+
 FailureText noGpuText()
 {
     return {u"Nenhuma GPU pode mostrar o vídeo"_s,
@@ -70,6 +72,8 @@ FailureText renderFailedText()
 {
     return {u"O vídeo parou"_s, u"A GPU deixou de responder. "_s + logsHint()};
 }
+
+#endif
 
 FailureText textFor(const remoteplay::PsnFailure& failure)
 {
