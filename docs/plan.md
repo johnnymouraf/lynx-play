@@ -9,8 +9,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 
 - [Phases](#phases)
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
-- [Current: 4.1 PSN connection](#current-41-psn-connection)
-- [Current: 5.1 Platform split and the Android build](#current-51-platform-split-and-the-android-build)
+- [Current: owner checks for 4.1–4.4 and 5.1](#current-owner-checks-for-4144-and-51)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Decisions to review](#decisions-to-review)
@@ -197,49 +196,30 @@ Out of scope for now: capture card input (planned for the future).
 - Builds only in GitHub Actions; the app is tested by running the downloaded
   artifact on the owner's machine.
 
-## Current: 4.1 PSN connection
+## Current: owner checks for 4.1–4.4 and 5.1
 
-Built (1.0.13); every criterion is checked except the real connection, which
-the owner checks over the phone's hotspot: from outside the LAN, the paired
-PS5's card shows "Jogar pela internet", Conectando walks through its stages and
-the stream plays at the internet bitrate. Allow `mfplay.exe` through the
-Windows firewall (public networks too) before the test. If the holes don't
-open, the first thing to try is chiaki-ng's port guessing
-(`chiaki_holepunch_session_force_port_guessing`), left off for now.
+Built (1.4.0) and green in CI on Windows and Android; the APK is signed with
+the fixed key (SHA-256
+`97:AF:28:23:80:8F:96:B6:39:C4:64:13:9D:06:A2:63:28:78:64:09:A9:34:FA:DE:81:F4:72:86:9D:95:85:00`)
+and released next to the Windows package. What only the owner can check:
 
-## Current: 5.1 Platform split and the Android build
+1. Over the phone's hotspot, with `mfplay.exe` allowed through the Windows
+   firewall (public networks too) and the PS5 in rest mode: "Jogar" on the
+   paired PS5 waits about 5 s for the LAN, then connects through PSN; the
+   stream plays at the internet bitrate (4.1, 4.2). If the holes don't open,
+   try chiaki-ng's port guessing
+   (`chiaki_holepunch_session_force_port_guessing`), left off for now.
+2. Dropping the network mid-stream shows "Reconectando (n de 3)" (4.2).
+3. A PS5 on the PSN account that isn't paired here offers "Parear pela
+   internet" and pairs without a PIN (4.3). Watch whether the console's LAN
+   name matches its PSN name; if not, the PSN link is lost once the LAN sees
+   it.
+4. A console with "Endereço fora de casa" set (card menu) connects through it
+   when the LAN doesn't answer (4.4).
+5. The APK installs on the phone and opens on the Consoles page with no RTX
+   page (5.1). Discovery, pairing and streaming on Android are 5.2–5.3.
 
-**Goal:** the same repository builds Windows as today and an arm64 Android APK
-signed in CI, which installs and opens on the Consoles page; no streaming yet.
-
-**Guardrails:** the shared ones below; Windows behavior unchanged; the
-keystore and its password stay in GitHub secrets (`ANDROID_KEYSTORE_BASE64`,
-`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`), never in the repository or
-logs; one CI round at the end; bump the version.
-
-**Success criteria:**
-
-1. The Windows job is green with its tests, and the app runs here as before.
-2. The Android job is green and uploads `mfplay-android-arm64`; CI's
-   `apksigner verify --print-certs` shows the fixed certificate (SHA-256
-   `97:AF:28:23:80:8F:96:B6:39:C4:64:13:9D:06:A2:63:28:78:64:09:A9:34:FA:DE:81:F4:72:86:9D:95:85:00`).
-3. The D3D12 renderer, NVAPI, NGX, the D3D12VA decoder, `WindowFrame` and DPAPI
-   compile only on Windows; Android builds `core`, `input`, `audio`,
-   `remoteplay` and the QML app.
-4. The interface hides what the platform lacks: the RTX page and the window
-   mode.
-5. The release job attaches the APK next to the Windows package.
-6. The APK installs on the owner's phone and opens on the Consoles page with no
-   RTX page (owner checks).
-
-**Deliveries:**
-
-1. The CMake platform split, Windows untouched.
-2. The `arm64-android` vcpkg triplet, Qt for Android and a CI job building the
-   APK.
-3. Signing with the secrets' key and the APK in the release.
-4. The Android manifest (package `io.github.johnnymouraf.mfplay`, network and
-   multicast permissions, icon) and the interface hiding Windows-only parts.
+Once these pass, mark 4 and 5.1 done and remove this section; 5.2 is next.
 
 ## Auto mode
 
