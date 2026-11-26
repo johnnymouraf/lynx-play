@@ -258,6 +258,7 @@ jobs:
           cmake --preset android
           -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
           -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DCMAKE_FIND_ROOT_PATH="$QT_ROOT_DIR"
 
       - name: Save the vcpkg binary cache
         if: always() && steps.vcpkg-cache.outcome == 'success'
