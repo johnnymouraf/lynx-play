@@ -105,8 +105,9 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
     - A dropped PSN session retries up to 3 times, showing "Reconectando".
     - An expired or refused login offers "Entrar de novo".
   - [ ] **4.3 Remote registration**: pair a console through PSN away from home.
-    - "Parear pela internet" in the pairing dialog, through chiaki-ng's
-      holepunch registration; the PIN still shows on the console's screen.
+    - "Parear pela internet" for a PS5 on the PSN account that isn't paired
+      here, through chiaki-lib's `auto_regist` session over PSN: no PIN, the
+      PSN login vouches for the account.
   - [ ] **4.4 Manual address**: VPN (Tailscale/ZeroTier) or port forwarding,
         with the internet bitrate.
     - The Rede page's remote address row becomes active; sessions to it use the
