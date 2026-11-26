@@ -38,6 +38,8 @@ std::string_view stageName(ConnectionStage stage)
         return "starting the session";
     case ConnectionStage::PunchingControl:
         return "opening the control channel";
+    case ConnectionStage::Registering:
+        return "registering the console";
     case ConnectionStage::PunchingData:
         return "opening the data channel";
     case ConnectionStage::Connecting:

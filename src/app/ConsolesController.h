@@ -101,6 +101,9 @@ public:
     // trying, when the console isn't paired, isn't on the account's PS5 list,
     // there is no valid PSN sign-in or no account ID is saved.
     Q_INVOKABLE bool playOverInternet(const QString& key);
+    // Pairs a PS5 of the account that nothing here is paired with yet, over
+    // the internet and with no PIN. The key is the card's, from the PSN list.
+    Q_INVOKABLE void pairOverInternet(const QString& key);
     // Sends the wake-up packet to a paired console in rest mode; its card shows
     // it turning on until it answers ready or the wait runs out.
     Q_INVOKABLE void wake(const QString& key);
@@ -157,6 +160,13 @@ private:
     [[nodiscard]] std::optional<remoteplay::PsnTarget> psnTargetFor(const QString& key);
     // False when the PSN route can't be used.
     bool startInternet(const QString& key, bool fallback);
+    // The account the PSN routes use: the one the sign-in gave, else the saved one.
+    [[nodiscard]] std::optional<remoteplay::AccountId> psnAccountId() const;
+    [[nodiscard]] const remoteplay::PsnDevice* findUnpairedPsn(const QString& key) const;
+    // Saves a console registered over the PSN, as paired, under its MAC.
+    void storeRegistration(const remoteplay::PairedConsole& paired,
+                           const std::string& deviceName,
+                           const remoteplay::AccountId& accountId);
 
     [[nodiscard]] remoteplay::SavedConsole* findSaved(const QString& key);
     [[nodiscard]] const remoteplay::DiscoveredHost* findDiscovered(const QString& key) const;
@@ -180,6 +190,8 @@ private:
     PsnDevicesClient psnClient_{this};
     std::vector<remoteplay::PsnDevice> psnDevices_;
     std::vector<remoteplay::PsnMatch> psnMatches_;
+    // The PS5s to pair over the internet, in the PSN's order.
+    std::vector<remoteplay::PsnDevice> unpairedPsn_;
     // The consoles being searched for or turned on, with the timer that ends
     // the wait.
     std::map<std::string, std::uint64_t> searching_;

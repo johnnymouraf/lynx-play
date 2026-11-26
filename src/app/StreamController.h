@@ -1,6 +1,7 @@
 #pragma once
 
 #include "remoteplay/Console.h"
+#include "remoteplay/ConsoleRegistration.h"
 #include "remoteplay/StreamSession.h"
 
 #include "core/StreamMetrics.h"
@@ -53,6 +54,7 @@ class StreamController : public QObject
     Q_PROPERTY(QString failureMessage READ failureMessage NOTIFY changed)
     Q_PROPERTY(QString connectionNote READ connectionNote NOTIFY changed)
     Q_PROPERTY(bool signInNeeded READ signInNeeded NOTIFY changed)
+    Q_PROPERTY(bool registering READ registering NOTIFY changed)
 
 public:
     enum class Phase
@@ -82,6 +84,9 @@ public:
         bool internetFallback = false;
     };
 
+    // Gets the pairing a registration over the PSN made.
+    using PairedHandler = std::function<void(const remoteplay::PairedConsole& paired)>;
+
     StreamController(SettingsController& settings, InputController& input,
                      QObject* parent = nullptr);
     ~StreamController() override;
@@ -106,6 +111,8 @@ public:
     // Whether the failure is an expired or refused PSN sign-in, which the
     // error screen answers by signing in again.
     [[nodiscard]] bool signInNeeded() const;
+    // Whether the session pairs a console instead of streaming from it.
+    [[nodiscard]] bool registering() const;
 
     // Where the PSN connections get the sign-in's current access token; empty
     // once the sign-in has expired.
@@ -114,6 +121,11 @@ public:
     // Ends any session and connects to the target; a console that isn't
     // paired fails at once.
     void play(Target target);
+
+    // Registers this PC with a PS5 of the PSN account, with no PIN: the
+    // connecting screen shows it, and `onPaired` gets the pairing once the
+    // console accepts it. The target carries the PSN route, not credentials.
+    void pairOverInternet(Target target, PairedHandler onPaired);
 
     // Stops connecting or leaves the failure, back to the consoles.
     Q_INVOKABLE void cancel();
@@ -139,6 +151,7 @@ private:
     void onEnded(std::uint64_t session, remoteplay::SessionEnd end);
     void onStage(std::uint64_t session, remoteplay::ConnectionStage stage);
     void onPsnFailed(std::uint64_t session, remoteplay::PsnFailure failure);
+    void onRegistered(std::uint64_t session, const remoteplay::PairedConsole& paired);
 #if defined(_WIN32)
     void onWindowClosed(std::uint64_t session, render::CloseReason reason);
 #endif
@@ -168,6 +181,11 @@ private:
     bool sessionConnected_ = false;
     // The reconnections made since the last connection, for the drop at hand.
     int psnRetries_ = 0;
+    // The session registers the console instead of streaming, and the
+    // registration succeeded.
+    bool registering_ = false;
+    bool registered_ = false;
+    PairedHandler onPaired_;
     std::function<std::string()> accessTokenSource_;
 #if defined(_WIN32)
     std::optional<render::GpuDevice> gpu_;

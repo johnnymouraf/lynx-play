@@ -19,6 +19,7 @@ Item {
     required property bool paired
     required property bool psnReachable
     required property bool searching
+    required property bool psnOnly
     property bool listMode: false
     property bool focused: false
     property bool psnSignedIn: false
@@ -30,6 +31,7 @@ Item {
     signal playRequested
     signal wakeRequested
     signal pairRequested
+    signal pairOverInternetRequested
     signal refreshRequested
     signal cancelWakeRequested
     signal menuRequested(Item anchor)
@@ -43,6 +45,11 @@ Item {
             card.wakeRequested();
             break;
         case "unpaired":
+            if (card.psnOnly) {
+                card.pairOverInternetRequested();
+                break;
+            }
+
             card.pairRequested();
             break;
         case "offline":
@@ -181,6 +188,7 @@ Item {
                 status: card.status
                 searching: card.searching
                 consoleName: card.name
+                psnOnly: card.psnOnly
                 onTriggered: card.triggerPrimary()
                 onCancelRequested: card.cancelWakeRequested()
             }
@@ -256,6 +264,7 @@ Item {
             status: card.status
             searching: card.searching
             consoleName: card.name
+            psnOnly: card.psnOnly
             onTriggered: card.triggerPrimary()
             onCancelRequested: card.cancelWakeRequested()
         }

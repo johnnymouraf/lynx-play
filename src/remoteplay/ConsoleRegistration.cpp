@@ -2,9 +2,9 @@
 
 #include "core/Text.h"
 #include "remoteplay/ChiakiLogSink.h"
+#include "remoteplay/ChiakiRegisteredHost.h"
 
 #include <algorithm>
-#include <cstring>
 #include <mutex>
 #include <string_view>
 #include <utility>
@@ -26,21 +26,6 @@ constexpr std::string_view kSearchRefused = "refused the registration search";
 constexpr std::string_view kTimedOut = "timed out";
 constexpr std::string_view kConnectFailed = "connect failed";
 constexpr std::string_view kResolveFailed = "getaddrinfo";
-
-PairedConsole toPairedConsole(const ChiakiRegisteredHost& host)
-{
-    PairedConsole paired;
-    std::memcpy(paired.credentials.registKey.data(), host.rp_regist_key, kRegistKeySize);
-    std::memcpy(paired.credentials.rpKey.data(), host.rp_key, kRpKeySize);
-    paired.credentials.rpKeyType = host.rp_key_type;
-    std::memcpy(paired.serverMac.data(), host.server_mac, kMacSize);
-
-    const std::size_t nicknameLength = strnlen(host.server_nickname, sizeof(host.server_nickname));
-    paired.serverNickname.assign(host.server_nickname, nicknameLength);
-    paired.target = static_cast<int>(host.target);
-
-    return paired;
-}
 
 } // namespace
 
@@ -119,7 +104,7 @@ void ConsoleRegistration::State::onEvent(ChiakiRegistEvent* event, void* user)
     switch (event->type)
     {
     case CHIAKI_REGIST_EVENT_TYPE_FINISHED_SUCCESS:
-        state.onDone(toPairedConsole(*event->registered_host));
+        state.onDone(pairedConsoleOf(*event->registered_host));
         return;
     case CHIAKI_REGIST_EVENT_TYPE_FINISHED_FAILED:
         state.onDone(std::unexpected(state.failure()));

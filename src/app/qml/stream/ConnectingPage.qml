@@ -14,6 +14,9 @@ FocusScope {
 
     readonly property bool failed: page.stream.phase === StreamController.Failed
     readonly property bool startingVideo: page.stream.phase === StreamController.StartingVideo
+    readonly property string connectingHeading: page.stream.registering
+                                                ? "Pareando pela internet…"
+                                                : "Conectando…"
 
     function focusAction() {
         if (page.failed) {
@@ -126,7 +129,7 @@ FocusScope {
 
                     AppText {
                         Layout.alignment: Qt.AlignHCenter
-                        text: page.failed ? page.stream.failureHeading : "Conectando…"
+                        text: page.failed ? page.stream.failureHeading : page.connectingHeading
                         textStyle: "display"
                         Accessible.role: Accessible.Heading
                         Accessible.name: text

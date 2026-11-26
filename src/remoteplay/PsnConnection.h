@@ -27,13 +27,15 @@ struct PsnTarget
     AccountId accountId{};
 };
 
-// The steps of a PSN connection, in the order they run.
+// The steps of a PSN connection, in the order they run. A registration over
+// the PSN stops after `Registering`: the data channel never opens.
 enum class ConnectionStage
 {
     SigningIn,
     CreatingSession,
     StartingSession,
     PunchingControl,
+    Registering,
     PunchingData,
     Connecting,
 };

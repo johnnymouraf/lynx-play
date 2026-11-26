@@ -5,7 +5,10 @@
 #include "remoteplay/ConsoleDiscovery.h"
 #include "remoteplay/ConsoleWake.h"
 #include "remoteplay/HostAddress.h"
+#include "remoteplay/PsnPairing.h"
 #include "remoteplay/PsnPolicy.h"
+
+#include <QPointer>
 
 #include <algorithm>
 #include <utility>
@@ -24,11 +27,35 @@ using remoteplay::ConsoleEntry;
 using remoteplay::DiscoveredHost;
 using remoteplay::HostAddressError;
 using remoteplay::HostState;
+using remoteplay::PsnDevice;
 using remoteplay::SavedConsole;
 
 constexpr auto kSearchDuration = std::chrono::seconds(6);
 constexpr auto kClockInterval = std::chrono::seconds(30);
 constexpr auto kWakeTimeout = std::chrono::seconds(45);
+
+// The card key of a PS5 the PSN lists and nothing here is paired with. It is
+// the device's place in that list: the DUID stays out, since logs print keys.
+QString psnCardKey(std::size_t index)
+{
+    return u"psn:%1"_s.arg(index);
+}
+
+ConsoleRow psnRow(std::size_t index, const PsnDevice& device)
+{
+    return ConsoleRow{
+        .key = psnCardKey(index),
+        .name = fromUtf8(device.name),
+        .address = {},
+        .status = u"unpaired"_s,
+        .activity = u"Na sua conta PSN"_s,
+        .saved = false,
+        .paired = false,
+        .psnReachable = true,
+        .searching = false,
+        .psnOnly = true,
+    };
+}
 
 std::string_view stateName(HostState state)
 {
@@ -408,14 +435,114 @@ bool ConsolesController::playOverInternet(const QString& key)
     return startInternet(key, false);
 }
 
+void ConsolesController::pairOverInternet(const QString& key)
+{
+    const PsnDevice* device = findUnpairedPsn(key);
+
+    if (device == nullptr)
+    {
+        spdlog::warn("Cannot pair {}: the PSN doesn't list it as unpaired",
+                     key.toStdString());
+        return;
+    }
+
+    const std::string token = psnLogin_.validAccessToken();
+    const std::optional<remoteplay::AccountId> psnAccount = psnAccountId();
+
+    if (token.empty() || !psnAccount)
+    {
+        spdlog::warn("Cannot pair {} over the internet: no valid PSN sign-in",
+                     key.toStdString());
+        emit notice(u"danger"_s, u"Entre na PSN para parear pela internet"_s,
+                    u"Entre na PSN em Rede e tente de novo."_s);
+        return;
+    }
+
+    spdlog::info("Pairing {} over the internet", key.toStdString());
+    stream_.pairOverInternet(
+        {
+            .key = key,
+            .name = fromUtf8(device->name),
+            .host = {},
+            .ps5 = true,
+            .credentials = std::nullopt,
+            .psn = remoteplay::PsnTarget{
+                .duid = device->duid,
+                .accessToken = token,
+                .accountId = *psnAccount,
+            },
+        },
+        [self = QPointer<ConsolesController>(this), deviceName = device->name,
+         accountId = *psnAccount](const remoteplay::PairedConsole& paired)
+        {
+            if (self)
+            {
+                self->storeRegistration(paired, deviceName, accountId);
+            }
+        });
+}
+
+void ConsolesController::storeRegistration(const remoteplay::PairedConsole& paired,
+                                           const std::string& deviceName,
+                                           const remoteplay::AccountId& accountId)
+{
+    const std::string hostId = remoteplay::hostIdFromMac(paired.serverMac);
+    const auto saved = std::ranges::find(file_.consoles, hostId, &SavedConsole::hostId);
+
+    if (saved != file_.consoles.end())
+    {
+        *saved = remoteplay::withPsnRegistration(std::move(*saved), paired, deviceName);
+    }
+    else
+    {
+        file_.consoles.push_back(
+            remoteplay::withPsnRegistration(SavedConsole{}, paired, deviceName));
+    }
+
+    file_.accountId = accountId;
+    emit savedAccountIdChanged();
+    saveFile();
+    refreshModel();
+
+    emit notice(u"ready"_s, u"%1 pareado"_s.arg(fromUtf8(deviceName)),
+                u"Ele já aparece na lista de consoles e pode ser jogado pela internet."_s);
+}
+
+std::optional<remoteplay::AccountId> ConsolesController::psnAccountId() const
+{
+    // The sign-in's token lists the devices of its own account, so its ID wins.
+    const auto signedIn = remoteplay::parseAccountId(psnLogin_.accountId().toStdString());
+
+    if (signedIn)
+    {
+        return *signedIn;
+    }
+
+    return file_.accountId;
+}
+
+const PsnDevice* ConsolesController::findUnpairedPsn(const QString& key) const
+{
+    for (std::size_t index = 0; index < unpairedPsn_.size(); ++index)
+    {
+        if (psnCardKey(index) == key)
+        {
+            return &unpairedPsn_[index];
+        }
+    }
+
+    return nullptr;
+}
+
 std::optional<remoteplay::PsnTarget> ConsolesController::psnTargetFor(const QString& key)
 {
     const SavedConsole* console = findSaved(key);
     const std::optional<std::string> duid = psnDuid(key);
     std::string token = psnLogin_.validAccessToken();
 
-    if (console == nullptr || !console->credentials || !duid || token.empty() ||
-        !file_.accountId)
+    const std::optional<remoteplay::AccountId> accountId = psnAccountId();
+
+    if (console == nullptr || !console->credentials || !duid || token.empty() || !accountId)
     {
         return std::nullopt;
     }
@@ -423,7 +550,7 @@ std::optional<remoteplay::PsnTarget> ConsolesController::psnTargetFor(const QStr
     return remoteplay::PsnTarget{
         .duid = *duid,
         .accessToken = std::move(token),
-        .accountId = *file_.accountId,
+        .accountId = *accountId,
     };
 }
 
@@ -681,6 +808,7 @@ void ConsolesController::refreshModel()
 
     syncManualHosts();
     psnMatches_ = remoteplay::matchPsnDevices(psnDevices_, file_.consoles);
+    unpairedPsn_ = remoteplay::unpairedPsnDevices(psnDevices_, file_.consoles, discovered_);
 
     const QDateTime now = QDateTime::currentDateTime();
     std::vector<ConsoleRow> rows;
@@ -689,6 +817,11 @@ void ConsolesController::refreshModel()
     for (const ConsoleEntry& entry : entries_)
     {
         rows.push_back(rowFor(entry, now));
+    }
+
+    for (std::size_t index = 0; index < unpairedPsn_.size(); ++index)
+    {
+        rows.push_back(psnRow(index, unpairedPsn_[index]));
     }
 
     model_.setRows(std::move(rows));

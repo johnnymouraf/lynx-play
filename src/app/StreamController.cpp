@@ -119,6 +119,8 @@ QString stageText(remoteplay::ConnectionStage stage)
         return u"Iniciando sessão no console"_s;
     case ConnectionStage::PunchingControl:
         return u"Abrindo caminho (controle)"_s;
+    case ConnectionStage::Registering:
+        return u"Registrando este PC no console"_s;
     case ConnectionStage::PunchingData:
         return u"Abrindo caminho (vídeo)"_s;
     case ConnectionStage::Connecting:
@@ -179,6 +181,29 @@ FailureText droppedText(int retries)
     return {u"A conexão pela internet caiu"_s,
             u"Não foi possível reconectar depois de %1 tentativas. "
             u"Confira a rede e tente de novo."_s.arg(remoteplay::kMaxPsnRetries)};
+}
+
+// The heading of a session that couldn't connect, or couldn't pair.
+QString connectFailedHeading(bool registering)
+{
+    if (registering)
+    {
+        return u"Não foi possível parear"_s;
+    }
+
+    return u"Não foi possível conectar"_s;
+}
+
+// A registration says what it was doing: "conectar" would mislead.
+FailureText registrationText(const std::optional<remoteplay::PsnFailure>& failure)
+{
+    if (failure && failure->kind != remoteplay::PsnFailureKind::Unknown)
+    {
+        return textFor(*failure);
+    }
+
+    return {u"Algo deu errado no pareamento pela internet"_s,
+            u"Tente de novo. "_s + logsHint()};
 }
 
 // A session that ended over the PSN gets its own wording where the local
@@ -385,7 +410,24 @@ void StreamController::play(Target target)
 #endif
     target_ = std::move(target);
     psnRetries_ = 0;
+    registering_ = false;
+    onPaired_ = nullptr;
     startSession();
+}
+
+void StreamController::pairOverInternet(Target target, PairedHandler onPaired)
+{
+    spdlog::info("Pairing over the PSN started on {}", target.key.toStdString());
+    target_ = std::move(target);
+    psnRetries_ = 0;
+    registering_ = true;
+    onPaired_ = std::move(onPaired);
+    startSession();
+}
+
+bool StreamController::registering() const
+{
+    return registering_;
 }
 
 void StreamController::cancel()
@@ -403,6 +445,8 @@ void StreamController::cancel()
 
     stop();
     psnRetries_ = 0;
+    registering_ = false;
+    onPaired_ = nullptr;
     setPhase(Phase::Idle);
 }
 
@@ -423,9 +467,10 @@ void StreamController::startSession()
     connectionStage_.reset();
     psnFailure_.reset();
     sessionConnected_ = false;
+    registered_ = false;
     setPhase(Phase::Connecting);
 
-    if (!target.credentials)
+    if (!registering_ && !target.credentials)
     {
         spdlog::warn("Cannot play on {}: it isn't paired", target.key.toStdString());
         const FailureText text = notPairedText();
@@ -473,13 +518,14 @@ void StreamController::startSession()
     const remoteplay::SessionRequest request{
         .host = target.host,
         .ps5 = target.ps5,
-        .credentials = *target.credentials,
+        .credentials = target.credentials.value_or(remoteplay::Credentials{}),
         .video = settings_.video(),
         .audio = settings_.audio(),
         .gamepads = input_.gamepads(),
         .keyboardMouse = keyboardMouse_.get(),
         .metrics = metrics_,
         .psn = target.psn,
+        .autoRegist = registering_,
     };
     auto makeDecoder = [&gpu, frameMailbox = *mailbox, metrics = metrics_](
                            core::VideoCodec codec, bool hdr) -> media::VideoDecoderResult
@@ -525,6 +571,8 @@ remoteplay::StreamSession::Events StreamController::eventsFor(std::uint64_t sess
         { post([this, session, stage] { onStage(session, stage); }); },
         .onPsnFailed = [this, session](remoteplay::PsnFailure failure)
         { post([this, session, failure = std::move(failure)] { onPsnFailed(session, failure); }); },
+        .onRegistered = [this, session](remoteplay::PairedConsole paired)
+        { post([this, session, paired = std::move(paired)] { onRegistered(session, paired); }); },
         .onEnded = [this, session](SessionEnd end, const std::string&)
         { post([this, session, end] { onEnded(session, end); }); },
         .onMicrophoneMuted = [this, session](bool muted)
@@ -591,6 +639,22 @@ void StreamController::onPsnFailed(std::uint64_t session, remoteplay::PsnFailure
     }
 
     psnFailure_ = std::move(failure);
+}
+
+void StreamController::onRegistered(std::uint64_t session,
+                                    const remoteplay::PairedConsole& paired)
+{
+    if (session != sessionNumber_)
+    {
+        return;
+    }
+
+    registered_ = true;
+
+    if (onPaired_)
+    {
+        onPaired_(paired);
+    }
 }
 
 #if defined(_WIN32)
@@ -737,6 +801,20 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
     const bool overPsn = overInternet();
     stop();
 
+    if (registering_)
+    {
+        // The console accepted the pairing; the session quits right after.
+        if (registered_)
+        {
+            setPhase(Phase::Idle);
+            return;
+        }
+
+        const FailureText text = registrationText(psnFailure_);
+        fail(text.title, text.message);
+        return;
+    }
+
     const bool recovering = sessionConnected_ || psnRetries_ > 0;
 
     if (overPsn && shouldRetryPsn(end, kindOf(psnFailure_), recovering, psnRetries_))
@@ -852,7 +930,7 @@ void StreamController::stop()
 void StreamController::fail(const QString& title, const QString& message)
 {
     const bool wasStreaming = phase_ == Phase::Streaming;
-    failureHeading_ = wasStreaming ? u"A transmissão parou"_s : u"Não foi possível conectar"_s;
+    failureHeading_ = wasStreaming ? u"A transmissão parou"_s : connectFailedHeading(registering_);
     failureTitle_ = title;
     failureMessage_ = message;
     phase_ = Phase::Failed;

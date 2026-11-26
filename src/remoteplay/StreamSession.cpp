@@ -9,6 +9,7 @@
 #include "input/KeyboardMouse.h"
 #include "media/VideoDecoding.h"
 #include "remoteplay/ChiakiLogSink.h"
+#include "remoteplay/ChiakiRegisteredHost.h"
 
 #include <algorithm>
 #include <array>
@@ -198,6 +199,9 @@ struct StreamSession::State
 
     bool overPsn = false;
     PsnTarget psn;
+    bool autoRegist = false;
+    // Set by chiaki's REGIST event: the console registered with this PC.
+    bool registered = false;
     // The log chiaki's holepunch writes to; it would print addresses and the
     // device identifier, so nothing of it is kept.
     ChiakiLog holepunchLog{};
@@ -477,6 +481,13 @@ void StreamSession::State::connectOverPsn(ChiakiConnectInfo info, const DuidByte
 
     info.holepunch_session = holepunch;
     std::ranges::copy(psn.accountId, info.psn_account_id);
+
+    // chiaki's session registers over the control channel just opened, then
+    // quits; it never punches the data channel.
+    if (autoRegist)
+    {
+        enterStage(ConnectionStage::Registering);
+    }
 
     if (const auto result = startChiaki(info); !result)
     {
@@ -821,6 +832,17 @@ void StreamSession::State::handle(const ChiakiEvent& event)
         chiaki_session_stop(&session);
         return;
 
+    case CHIAKI_EVENT_REGIST:
+        registered = true;
+        spdlog::info("Console registered over the PSN");
+
+        if (events.onRegistered)
+        {
+            events.onRegistered(pairedConsoleOf(event.host));
+        }
+
+        return;
+
     case CHIAKI_EVENT_HOLEPUNCH:
         enterStage(event.data_holepunch.finished ? ConnectionStage::Connecting
                                                  : ConnectionStage::PunchingData);
@@ -828,6 +850,18 @@ void StreamSession::State::handle(const ChiakiEvent& event)
 
     case CHIAKI_EVENT_QUIT:
     {
+        // chiaki quits without a REGIST when the registration failed, or when
+        // the console didn't answer within its own wait, which it reports as a
+        // stop.
+        if (autoRegist && !registered)
+        {
+            const bool timedOut = event.quit.reason == CHIAKI_QUIT_REASON_STOPPED;
+            reportPsnFailure({.stage = ConnectionStage::Registering,
+                              .kind = timedOut ? PsnFailureKind::Timeout : PsnFailureKind::Unknown,
+                              .detail = chiaki_quit_reason_string(event.quit.reason)});
+            return;
+        }
+
         if (overPsn && stage.load() == ConnectionStage::PunchingData &&
             event.quit.reason != CHIAKI_QUIT_REASON_STOPPED)
         {
@@ -898,8 +932,14 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
 
         state->overPsn = true;
         state->psn = *request.psn;
+        state->autoRegist = request.autoRegist;
         state->logSink.setRedacted(true);
         chiaki_log_init(&state->holepunchLog, 0, discardChiakiLog, nullptr);
+    }
+
+    if (request.autoRegist && !duid)
+    {
+        return std::unexpected("registering a console needs the PSN");
     }
 
     const VideoProfile profile = videoProfileFor(request.video, request.ps5, request.psn.has_value());
@@ -940,6 +980,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     ChiakiConnectInfo info{};
     info.ps5 = request.ps5;
     info.host = state->host.c_str();
+    info.auto_regist = request.autoRegist;
     std::memcpy(info.regist_key, request.credentials.registKey.data(), sizeof(info.regist_key));
     std::memcpy(info.morning, request.credentials.rpKey.data(), sizeof(info.morning));
     info.video_profile = chiakiProfileOf(profile);

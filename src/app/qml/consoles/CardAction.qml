@@ -13,17 +13,32 @@ Item {
     // network, then plays over the internet.
     property bool overInternet: false
     property string consoleName
+    // A PS5 the PSN lists that nothing here is paired with: its button pairs it
+    // over the internet.
+    property bool psnOnly: false
     property real wakeProgress: 0
 
     readonly property var buttons: ({
         ready: { label: "Jogar", icon: "play", variant: "primary" },
         standby: { label: "Ligar e jogar", icon: "power", variant: "primary" },
         unpaired: { label: "Parear", icon: "link-2", variant: "secondary" },
+        psn: { label: "Parear pela internet", icon: "network", variant: "secondary" },
         offline: { label: "Procurar de novo", icon: "refresh-cw", variant: "secondary" },
         waking: { label: "", icon: "", variant: "secondary" }
     })
     readonly property bool internetOffered: action.overInternet && action.status === "offline"
-    readonly property var button: action.buttons[action.internetOffered ? "ready" : action.status]
+    readonly property string buttonKey: {
+        if (action.internetOffered) {
+            return "ready";
+        }
+
+        if (action.psnOnly && action.status === "unpaired") {
+            return "psn";
+        }
+
+        return action.status;
+    }
+    readonly property var button: action.buttons[action.buttonKey]
     readonly property bool waking: action.status === "waking"
 
     signal triggered

@@ -4,6 +4,7 @@
 #include "core/StreamMetrics.h"
 #include "media/VideoDecoding.h"
 #include "remoteplay/Console.h"
+#include "remoteplay/ConsoleRegistration.h"
 #include "remoteplay/PsnConnection.h"
 
 #include <cstdint>
@@ -82,6 +83,9 @@ struct SessionRequest
     // `host`; the holepunch runs on the session's own thread, after `start`
     // returns.
     std::optional<PsnTarget> psn;
+    // With `psn`: registers this PC with the console instead of streaming, with
+    // no PIN; `Events::onRegistered` gets the pairing and the session ends.
+    bool autoRegist = false;
 };
 
 // A Remote Play session with a paired console, through chiaki-lib, its video
@@ -98,6 +102,8 @@ public:
         std::function<void(ConnectionStage stage)> onStage;
         // A PSN connection failed; `onEnded` follows with SessionEnd::PsnFailed.
         std::function<void(PsnFailure failure)> onPsnFailed;
+        // A registration over the PSN succeeded; `onEnded` follows.
+        std::function<void(PairedConsole paired)> onRegistered;
         std::function<void(SessionEnd end, std::string detail)> onEnded;
         // The microphone changed state on its own (it was lost, or could not
         // open); the interface keeps its toggle in sync.

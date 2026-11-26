@@ -337,6 +337,7 @@ FocusScope {
                             onWakeRequested: page.consoles.wake(consoleCard.key)
                             onCancelWakeRequested: page.consoles.cancelWake(consoleCard.key)
                             onPairRequested: pairingDialog.openFor(consoleCard.key, consoleCard.name)
+                            onPairOverInternetRequested: page.consoles.pairOverInternet(consoleCard.key)
                             onRefreshRequested: page.consoles.refresh(consoleCard.key)
                             onMenuRequested: anchor => cardMenu.openFor(consoleCard, anchor)
                         }
@@ -364,6 +365,7 @@ FocusScope {
         property bool consoleSaved
         property bool consolePaired
         property bool consoleInternet
+        property bool consolePsnOnly
 
         function openFor(card, anchor) {
             cardMenu.consoleKey = card.key;
@@ -371,6 +373,7 @@ FocusScope {
             cardMenu.consoleSaved = card.saved;
             cardMenu.consolePaired = card.paired;
             cardMenu.consoleInternet = card.internetOffered;
+            cardMenu.consolePsnOnly = card.psnOnly;
             cardMenu.parent = anchor;
             cardMenu.x = anchor.width - cardMenu.width;
             cardMenu.y = anchor.height + Theme.space1;
@@ -386,8 +389,18 @@ FocusScope {
         }
 
         MenuRow {
+            text: "Parear pela internet"
+            iconName: "network"
+            visible: cardMenu.consolePsnOnly
+            height: visible ? implicitHeight : 0
+            onTriggered: page.consoles.pairOverInternet(cardMenu.consoleKey)
+        }
+
+        MenuRow {
             text: "Parear"
             iconName: "link-2"
+            visible: !cardMenu.consolePsnOnly
+            height: visible ? implicitHeight : 0
             enabled: !cardMenu.consolePaired
             onTriggered: pairingDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
         }
@@ -395,6 +408,8 @@ FocusScope {
         MenuRow {
             text: "Renomear"
             iconName: "pencil"
+            visible: !cardMenu.consolePsnOnly
+            height: visible ? implicitHeight : 0
             onTriggered: renameDialog.openFor(cardMenu.consoleKey, cardMenu.consoleName)
         }
 
