@@ -60,3 +60,13 @@ TEST_CASE("videoProfileFor turns each resolution into its 16:9 size")
     CHECK(mediumProfile.width == 1280);
     CHECK(mediumProfile.height == 720);
 }
+
+TEST_CASE("videoProfileFor uses the internet bitrate only for a PSN session")
+{
+    core::VideoSettings settings;
+    settings.bitrateKbps = 40000;
+    settings.internetBitrateKbps = 12000;
+
+    CHECK(videoProfileFor(settings, true, false).bitrateKbps == 40000);
+    CHECK(videoProfileFor(settings, true, true).bitrateKbps == 12000);
+}

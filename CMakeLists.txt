@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(MFPlay
-    VERSION 1.0.12
+    VERSION 1.0.13
     DESCRIPTION "Remote Play client for the PS5 with NVIDIA RTX enhancements"
     LANGUAGES C CXX)
 

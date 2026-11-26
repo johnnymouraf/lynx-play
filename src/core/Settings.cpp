@@ -190,6 +190,18 @@ std::optional<WindowSize> windowSizeAt(const Json& video)
     return WindowSize{.width = static_cast<int>(*width), .height = static_cast<int>(*height)};
 }
 
+std::optional<std::uint32_t> bitrateAt(const Json& object, const std::string& key)
+{
+    const auto bitrate = integerAt(object, key);
+
+    if (!bitrate || *bitrate < kMinBitrateKbps || *bitrate > kMaxBitrateKbps)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<std::uint32_t>(*bitrate);
+}
+
 VideoSettings readVideo(const Json& video)
 {
     VideoSettings settings;
@@ -214,14 +226,9 @@ VideoSettings readVideo(const Json& video)
         settings.framesPerSecond = static_cast<int>(*framesPerSecond);
     }
 
-    const auto bitrate = integerAt(video, "bitrateKbps");
-    const bool bitrateInRange =
-        bitrate && *bitrate >= kMinBitrateKbps && *bitrate <= kMaxBitrateKbps;
-
-    if (bitrateInRange)
-    {
-        settings.bitrateKbps = static_cast<std::uint32_t>(*bitrate);
-    }
+    settings.bitrateKbps = bitrateAt(video, "bitrateKbps").value_or(settings.bitrateKbps);
+    settings.internetBitrateKbps =
+        bitrateAt(video, "internetBitrateKbps").value_or(settings.internetBitrateKbps);
 
     return settings;
 }
@@ -598,6 +605,7 @@ void writeSettings(const Settings& settings, std::ostream& output)
              {"fps", video.framesPerSecond},
              {"codec", nameOf(kCodecNames, video.codec)},
              {"bitrateKbps", video.bitrateKbps},
+             {"internetBitrateKbps", video.internetBitrateKbps},
              {"presentMode", nameOf(kPresentModeNames, video.presentMode)},
              {"hdr", nameOf(kHdrNames, video.hdr)},
              {"windowMode", nameOf(kWindowModeNames, video.windowMode)},

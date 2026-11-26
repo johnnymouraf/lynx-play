@@ -132,7 +132,7 @@ ChiakiConnectVideoProfile chiakiProfileOf(const VideoProfile& profile)
 
 } // namespace
 
-VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5)
+VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5, bool overInternet)
 {
     const auto size =
         std::ranges::find(kResolutionSizes, settings.resolution, &ResolutionSize::resolution);
@@ -145,7 +145,7 @@ VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5)
         .width = chosen.width,
         .height = chosen.height,
         .framesPerSecond = static_cast<std::uint32_t>(settings.framesPerSecond),
-        .bitrateKbps = settings.bitrateKbps,
+        .bitrateKbps = overInternet ? settings.internetBitrateKbps : settings.bitrateKbps,
         .codec = settings.codec,
         .hdr = hdr,
     };
@@ -903,7 +903,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
         chiaki_log_init(&state->holepunchLog, 0, discardChiakiLog, nullptr);
     }
 
-    const VideoProfile profile = videoProfileFor(request.video, request.ps5);
+    const VideoProfile profile = videoProfileFor(request.video, request.ps5, request.psn.has_value());
     auto decoder = media::VideoDecoder::create(gpu, profile.codec, std::move(mailbox),
                                                request.metrics, profile.hdr);
 

@@ -26,6 +26,7 @@ TEST_CASE("Settings survive a write and a read")
         .framesPerSecond = 30,
         .codec = VideoCodec::H264,
         .bitrateKbps = 12000,
+        .internetBitrateKbps = 9000,
         .presentMode = PresentMode::LowestLatency,
         .hdr = HdrMode::RtxVideoHdr,
         .windowMode = WindowMode::Windowed,
@@ -105,6 +106,7 @@ TEST_CASE("The defaults ask for 1080p60 H.265 at the top bitrate with VSync and 
     CHECK(defaults.video.framesPerSecond == 60);
     CHECK(defaults.video.codec == VideoCodec::H265);
     CHECK(defaults.video.bitrateKbps == kMaxBitrateKbps);
+    CHECK(defaults.video.internetBitrateKbps == 15000);
     CHECK(defaults.video.presentMode == PresentMode::VSync);
     CHECK(defaults.video.hdr == HdrMode::Auto);
     CHECK(defaults.video.windowMode == WindowMode::Fullscreen);
@@ -177,6 +179,7 @@ TEST_CASE("Settings keep their defaults for missing or invalid values")
             "fps": 45,
             "codec": "h265",
             "bitrateKbps": 900000,
+            "internetBitrateKbps": 100,
             "presentMode": true,
             "hdr": "hdr10",
             "windowMode": "maximized",

@@ -156,6 +156,7 @@ enum class FrameGenerationMode
 
 inline constexpr std::uint32_t kMinBitrateKbps = 2000;
 inline constexpr std::uint32_t kMaxBitrateKbps = 80000;
+inline constexpr std::uint32_t kDefaultInternetBitrateKbps = 15000;
 
 // What the PS5 is asked to stream and how it is shown.
 struct VideoSettings
@@ -165,6 +166,8 @@ struct VideoSettings
     int framesPerSecond = 60;
     VideoCodec codec = VideoCodec::H265;
     std::uint32_t bitrateKbps = kMaxBitrateKbps;
+    // The bitrate of sessions that reach the console through the PSN.
+    std::uint32_t internetBitrateKbps = kDefaultInternetBitrateKbps;
     PresentMode presentMode = PresentMode::VSync;
     HdrMode hdr = HdrMode::Auto;
     // The stream window's presentation; the video profile above is what the

@@ -33,6 +33,8 @@ class SettingsController : public QObject
         int framesPerSecond READ framesPerSecond WRITE setFramesPerSecond NOTIFY videoChanged)
     Q_PROPERTY(QString codec READ codec WRITE setCodec NOTIFY videoChanged)
     Q_PROPERTY(int bitrateMbps READ bitrateMbps WRITE setBitrateMbps NOTIFY videoChanged)
+    Q_PROPERTY(int internetBitrateMbps READ internetBitrateMbps WRITE setInternetBitrateMbps NOTIFY
+                   videoChanged)
     Q_PROPERTY(bool lowestLatency READ lowestLatency WRITE setLowestLatency NOTIFY videoChanged)
     Q_PROPERTY(QString hdr READ hdr WRITE setHdr NOTIFY videoChanged)
     Q_PROPERTY(QString hdrDescription READ hdrDescription NOTIFY videoChanged)
@@ -109,6 +111,8 @@ public:
 
     [[nodiscard]] int bitrateMbps() const;
     void setBitrateMbps(int megabits);
+    [[nodiscard]] int internetBitrateMbps() const;
+    void setInternetBitrateMbps(int megabits);
 
     [[nodiscard]] bool lowestLatency() const;
     void setLowestLatency(bool lowest);

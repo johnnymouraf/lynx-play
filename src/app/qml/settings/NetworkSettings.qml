@@ -77,9 +77,7 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Bitrate pela internet"
-        description: "Usado fora de casa. Baixe se a imagem travar. Chega com o jogo pela internet."
-        enabled: false
-        opacity: 0.5
+        description: "Usado fora de casa. Baixe se a imagem travar."
 
         Row {
             spacing: Theme.space3
@@ -89,15 +87,16 @@ ColumnLayout {
                 from: section.settings.minBitrateMbps
                 to: section.settings.maxBitrateMbps
                 stepSize: 1
-                enabled: false
-                value: Math.min(15, section.settings.maxBitrateMbps)
+                snapMode: T.Slider.SnapAlways
+                value: section.settings.internetBitrateMbps
                 Accessible.name: "Bitrate pela internet"
+                onMoved: section.settings.internetBitrateMbps = Math.round(value)
             }
 
             AppText {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 76
-                text: "15 Mbps"
+                text: `${section.settings.internetBitrateMbps} Mbps`
                 textStyle: "monoMedium"
                 horizontalAlignment: Text.AlignRight
             }

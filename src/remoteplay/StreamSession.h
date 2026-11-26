@@ -61,7 +61,9 @@ struct VideoProfile
     bool operator==(const VideoProfile&) const = default;
 };
 
-[[nodiscard]] VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5 = true);
+// `overInternet` picks the internet bitrate instead of the local network's.
+[[nodiscard]] VideoProfile videoProfileFor(const core::VideoSettings& settings, bool ps5 = true,
+                                           bool overInternet = false);
 
 struct SessionRequest
 {

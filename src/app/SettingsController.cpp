@@ -353,6 +353,20 @@ void SettingsController::setBitrateMbps(int megabits)
     apply(video);
 }
 
+int SettingsController::internetBitrateMbps() const
+{
+    return static_cast<int>(settings_.video.internetBitrateKbps) / kKbpsPerMbps;
+}
+
+void SettingsController::setInternetBitrateMbps(int megabits)
+{
+    const int clamped = std::clamp(megabits, minBitrateMbps(), maxBitrateMbps());
+
+    core::VideoSettings video = settings_.video;
+    video.internetBitrateKbps = static_cast<std::uint32_t>(clamped * kKbpsPerMbps);
+    apply(video);
+}
+
 bool SettingsController::lowestLatency() const
 {
     return settings_.video.presentMode == PresentMode::LowestLatency;
