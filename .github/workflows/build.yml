@@ -155,6 +155,9 @@ jobs:
     env:
       # The workflow-level value is the Windows path; this job's is POSIX.
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+      # The SHA-256 of the fixed signing certificate, the key every release is
+      # signed with so updates install over the previous version.
+      ANDROID_CERTIFICATE_SHA256: "97:AF:28:23:80:8F:96:B6:39:C4:64:13:9D:06:A2:63:28:78:64:09:A9:34:FA:DE:81:F4:72:86:9D:95:85:00"
     defaults:
       run:
         shell: bash
@@ -277,11 +280,67 @@ jobs:
 
           echo "path=${apks[0]}" >> "$GITHUB_OUTPUT"
 
+      # Fork pull requests get no secrets, so their APK stays unsigned and is
+      # never released. Every other run must sign with the fixed key.
+      - name: Check the signing secrets
+        id: signing
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "::notice::No signing secrets for this pull request; the APK stays unsigned."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::The signing secrets are missing; the APK would not update the installed app."
+            exit 1
+          fi
+
+      - name: Sign the APK
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          APK: ${{ steps.apk.outputs.path }}
+        run: |
+          keystore="$RUNNER_TEMP/mfplay-release.p12"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+
+          apksigner="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          mkdir -p dist/android
+          "$apksigner" sign \
+            --ks "$keystore" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEYSTORE_PASSWORD \
+            --out dist/android/mfplay.apk \
+            "$APK"
+
+          digest=$("$apksigner" verify --print-certs dist/android/mfplay.apk |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          expected=$(printf '%s' "$ANDROID_CERTIFICATE_SHA256" | tr -d ':' | tr 'A-F' 'a-f')
+          actual=$(printf '%s' "$digest" | tr -d ':' | tr 'A-F' 'a-f')
+
+          if [[ -z "$actual" || "$actual" != "$expected" ]]; then
+            echo "::error::The APK is signed with a certificate other than the fixed one."
+            exit 1
+          fi
+
+      - name: Keep the unsigned APK
+        if: steps.signing.outputs.enabled != 'true'
+        run: |
+          mkdir -p dist/android
+          cp "${{ steps.apk.outputs.path }}" dist/android/mfplay.apk
+
       - name: Upload the APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mfplay-android-arm64
-          path: ${{ steps.apk.outputs.path }}
+          path: dist/android/mfplay.apk
           if-no-files-found: error
           retention-days: 1
 
@@ -292,7 +351,7 @@ jobs:
   # published.
   release:
     name: Release
-    needs: windows
+    needs: [windows, android]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: windows-2025
     permissions:
@@ -312,6 +371,12 @@ jobs:
           name: mfplay-windows-x64
           path: dist/mfplay
 
+      - name: Download the Android package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: mfplay-android-arm64
+          path: dist/android
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -325,11 +390,14 @@ jobs:
             exit 0
           }
           Compress-Archive -Path dist/mfplay/* -DestinationPath mfplay-windows-x64.zip
+          $apk = "mfplay-$version-android-arm64.apk"
+          Copy-Item dist/android/mfplay.apk $apk
           gh release create $tag `
             --title "MFPlay $version" `
             --notes "Portable build of master at ``${{ github.sha }}``." `
             --latest `
-            mfplay-windows-x64.zip
+            mfplay-windows-x64.zip `
+            $apk
           # Keep the newest twelve releases; older assets would pile up.
           $old = gh release list --limit 100 --json tagName --jq ".[12:][] | .tagName"
           foreach ($name in $old) {
