@@ -91,6 +91,7 @@ ConsolesController::ConsolesController(bool remotePlayReady,
       model_(this),
       pairing_(*this, psnLogin, this),
       stream_(stream),
+      psnLogin_(psnLogin),
       store_(std::move(store)),
       remotePlayReady_(remotePlayReady)
 {
@@ -100,6 +101,10 @@ ConsolesController::ConsolesController(bool remotePlayReady,
     }
 
     connect(&stream_, &StreamController::streamStarted, this, &ConsolesController::markPlayed);
+    connect(&psnLogin_, &PsnLoginClient::accessTokenChanged, this,
+            &ConsolesController::refreshPsnDevices);
+    connect(&psnClient_, &PsnDevicesClient::devicesListed, this,
+            &ConsolesController::onPsnDevicesListed);
 
     clockTimer_.setInterval(kClockInterval);
     connect(&clockTimer_, &QTimer::timeout, this, &ConsolesController::refreshModel);
@@ -111,6 +116,7 @@ ConsolesController::ConsolesController(bool remotePlayReady,
     }
 
     refreshModel();
+    refreshPsnDevices();
 }
 
 ConsolesController::~ConsolesController()
@@ -489,6 +495,33 @@ void ConsolesController::logChanges(const std::vector<DiscoveredHost>& hosts) co
     }
 }
 
+void ConsolesController::refreshPsnDevices()
+{
+    psnClient_.refresh(psnLogin_.validAccessToken());
+}
+
+void ConsolesController::onPsnDevicesListed(std::vector<remoteplay::PsnDevice> devices)
+{
+    psnDevices_ = std::move(devices);
+    refreshModel();
+
+    spdlog::info("PSN lists {} PS5, {} match a saved console", psnDevices_.size(),
+                 psnMatches_.size());
+}
+
+std::optional<std::string> ConsolesController::psnDuid(const QString& key) const
+{
+    const std::string wanted = key.toStdString();
+    const auto match = std::ranges::find(psnMatches_, wanted, &remoteplay::PsnMatch::consoleKey);
+
+    if (match == psnMatches_.end())
+    {
+        return std::nullopt;
+    }
+
+    return match->duid;
+}
+
 void ConsolesController::refreshModel()
 {
     auto merged = remoteplay::mergeConsoles(std::move(file_.consoles), discovered_, Clock::now());
@@ -501,6 +534,7 @@ void ConsolesController::refreshModel()
     }
 
     syncManualHosts();
+    psnMatches_ = remoteplay::matchPsnDevices(psnDevices_, file_.consoles);
 
     const QDateTime now = QDateTime::currentDateTime();
     std::vector<ConsoleRow> rows;
@@ -533,6 +567,7 @@ ConsoleRow ConsolesController::rowFor(const ConsoleEntry& entry, const QDateTime
         .activity = consoleActivity(facts, now),
         .saved = facts.saved != nullptr,
         .paired = facts.saved != nullptr && facts.saved->credentials.has_value(),
+        .psnReachable = psnDuid(fromUtf8(entry.key)).has_value(),
         .searching = isSearching && facts.discovered == nullptr,
     };
 }

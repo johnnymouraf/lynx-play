@@ -384,6 +384,9 @@ struct PsnSettings
     bool signedIn = false;
     // When the stored access token expires, in seconds since the epoch.
     std::optional<std::int64_t> tokenExpiry;
+    // This PC's identifier for PSN; generated once and kept, because the PSN
+    // ties its tokens to it. Empty until generated.
+    std::string clientDuid;
 
     bool operator==(const PsnSettings&) const = default;
 };

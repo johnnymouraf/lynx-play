@@ -224,6 +224,10 @@ public:
     // Records a PSN sign-in; settings.json keeps only its state and expiry.
     void recordPsnSignIn(std::optional<std::int64_t> tokenExpiry);
 
+    // This PC's PSN identifier: generated and saved the first time, the same
+    // afterwards. Empty when it can't be generated.
+    [[nodiscard]] std::string clientDuid();
+
 signals:
     void videoChanged();
     void audioChanged();

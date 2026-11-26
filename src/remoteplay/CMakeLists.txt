@@ -9,6 +9,8 @@ add_library(mfplay_remoteplay STATIC
     ChiakiLogSink.h
     ChiakiRuntime.cpp
     ChiakiRuntime.h
+    ClientDuid.cpp
+    ClientDuid.h
     Console.h
     ConsoleDiscovery.cpp
     ConsoleDiscovery.h
@@ -25,6 +27,8 @@ add_library(mfplay_remoteplay STATIC
     HostAddress.h
     Pin.cpp
     Pin.h
+    PsnDevices.cpp
+    PsnDevices.h
     PsnLogin.cpp
     PsnLogin.h
     PsnTokenStore.cpp

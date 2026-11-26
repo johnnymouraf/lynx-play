@@ -101,6 +101,8 @@ PsnLoginClient::PsnLoginClient(SettingsController& settings,
       store_(std::move(store)),
       network_(std::make_unique<QNetworkAccessManager>(this))
 {
+    settings_.clientDuid();
+
     if (!store_)
     {
         return;
@@ -140,6 +142,13 @@ QString PsnLoginClient::failureTitle() const
 QString PsnLoginClient::failureMessage() const
 {
     return failureText(failure_).message;
+}
+
+std::string PsnLoginClient::validAccessToken() const
+{
+    const bool valid = stored_.expiry && remoteplay::Clock::now() < *stored_.expiry;
+
+    return valid ? stored_.accessToken : std::string();
 }
 
 QString PsnLoginClient::accountId() const
@@ -418,6 +427,7 @@ void PsnLoginClient::onRefreshedToken(std::string_view body)
     settings_.recordPsnSignIn(secondsOf(*stored_.expiry));
     spdlog::info("PSN token refreshed; the access token expires at {}",
                  formatExpiry(*stored_.expiry).toStdString());
+    emit accessTokenChanged();
 }
 
 void PsnLoginClient::onUserIdReply(QNetworkReply* reply, std::uint64_t attempt)
@@ -501,6 +511,7 @@ void PsnLoginClient::succeed(const remoteplay::AccountId& accountId)
     spdlog::info("PSN sign-in completed; the access token expires at {}",
                  expiryText_.toStdString());
     setState(State::Succeeded);
+    emit accessTokenChanged();
 }
 
 void PsnLoginClient::fail(Failure failure)

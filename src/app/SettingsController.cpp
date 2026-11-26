@@ -1,6 +1,7 @@
 #include "app/SettingsController.h"
 
 #include "audio/Devices.h"
+#include "remoteplay/ClientDuid.h"
 #include "core/KeyboardBindings.h"
 
 #include <algorithm>
@@ -1025,7 +1026,7 @@ void SettingsController::setInvertMouseY(bool invert)
 
 void SettingsController::recordPsnSignIn(std::optional<std::int64_t> tokenExpiry)
 {
-    core::PsnSettings psn;
+    core::PsnSettings psn = settings_.psn;
     psn.signedIn = true;
     psn.tokenExpiry = tokenExpiry;
 
@@ -1037,6 +1038,27 @@ void SettingsController::recordPsnSignIn(std::optional<std::int64_t> tokenExpiry
     settings_.psn = psn;
     spdlog::info("PSN sign-in saved with its token expiry");
     save();
+}
+
+std::string SettingsController::clientDuid()
+{
+    const auto duid = remoteplay::resolveClientDuid(settings_.psn.clientDuid,
+                                                    remoteplay::generateClientDuid);
+
+    if (!duid)
+    {
+        spdlog::error("The PSN client identifier is unavailable: {}", duid.error());
+        return {};
+    }
+
+    if (duid->generated)
+    {
+        settings_.psn.clientDuid = duid->value;
+        spdlog::info("A PSN client identifier was generated and saved");
+        save();
+    }
+
+    return duid->value;
 }
 
 void SettingsController::setKeyboardBinding(const QString& control, const QString& binding)

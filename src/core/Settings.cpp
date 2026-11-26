@@ -370,6 +370,7 @@ PsnSettings readPsn(const Json& psn)
 
     settings.signedIn = booleanAt(psn, "signedIn", settings.signedIn);
     settings.tokenExpiry = integerAt(psn, "tokenExpiry");
+    settings.clientDuid = stringAt(psn, "clientDuid", settings.clientDuid);
 
     return settings;
 }
@@ -582,6 +583,11 @@ void writeSettings(const Settings& settings, std::ostream& output)
     if (psn.tokenExpiry)
     {
         psnEntry["tokenExpiry"] = *psn.tokenExpiry;
+    }
+
+    if (!psn.clientDuid.empty())
+    {
+        psnEntry["clientDuid"] = psn.clientDuid;
     }
 
     const Json root{

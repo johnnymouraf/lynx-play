@@ -74,6 +74,9 @@ public:
     // When the access token expires, in the dialog's format.
     [[nodiscard]] QString expiryText() const;
 
+    // The access token while it hasn't expired; empty otherwise.
+    [[nodiscard]] std::string validAccessToken() const;
+
     // Opens the authorize page in the default browser.
     Q_INVOKABLE void start();
     // Takes the URL the browser landed on and exchanges its code.
@@ -82,6 +85,8 @@ public:
 
 signals:
     void stateChanged();
+    // A usable access token came from a sign-in or a refresh.
+    void accessTokenChanged();
 
 private:
     void refreshStoredTokens();

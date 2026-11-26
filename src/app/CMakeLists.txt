@@ -27,6 +27,8 @@ qt_add_executable(mfplay WIN32
     OverlayInput.h
     PairingController.cpp
     PairingController.h
+    PsnDevicesClient.cpp
+    PsnDevicesClient.h
     PsnLoginClient.cpp
     PsnLoginClient.h
     QtLogBridge.cpp

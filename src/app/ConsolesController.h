@@ -2,6 +2,7 @@
 
 #include "app/ConsoleListModel.h"
 #include "app/PairingController.h"
+#include "app/PsnDevicesClient.h"
 #include "remoteplay/Console.h"
 #include "remoteplay/ConsoleMerge.h"
 #include "remoteplay/ConsoleRegistration.h"
@@ -72,6 +73,9 @@ public:
         int target = 0;
     };
     [[nodiscard]] std::optional<PairingTarget> pairingTarget(const QString& key) const;
+    // The PSN device identifier of a paired console the account's PS5 list
+    // includes; kept in memory only.
+    [[nodiscard]] std::optional<std::string> psnDuid(const QString& key) const;
     // Saves what pairing gave and returns the console's card key from now on.
     QString storePairing(const QString& key, const remoteplay::PairedConsole& paired,
                          const remoteplay::AccountId& accountId);
@@ -111,6 +115,8 @@ private:
     void onHostsDiscovered(std::vector<remoteplay::DiscoveredHost> hosts);
     void logChanges(const std::vector<remoteplay::DiscoveredHost>& hosts) const;
     void refreshModel();
+    void refreshPsnDevices();
+    void onPsnDevicesListed(std::vector<remoteplay::PsnDevice> devices);
     [[nodiscard]] ConsoleRow rowFor(const remoteplay::ConsoleEntry& entry,
                                     const QDateTime& now) const;
     void syncManualHosts();
@@ -136,12 +142,16 @@ private:
     ConsoleListModel model_;
     PairingController pairing_;
     StreamController& stream_;
+    PsnLoginClient& psnLogin_;
     std::optional<remoteplay::ConsoleStore> store_;
     remoteplay::ConsoleFile file_;
     std::unique_ptr<remoteplay::ConsoleDiscovery> discovery_;
     std::vector<remoteplay::DiscoveredHost> discovered_;
     std::vector<remoteplay::ConsoleEntry> entries_;
     std::vector<std::string> queriedHosts_;
+    PsnDevicesClient psnClient_{this};
+    std::vector<remoteplay::PsnDevice> psnDevices_;
+    std::vector<remoteplay::PsnMatch> psnMatches_;
     // The consoles being searched for or turned on, with the timer that ends
     // the wait.
     std::map<std::string, std::uint64_t> searching_;

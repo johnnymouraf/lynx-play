@@ -48,6 +48,7 @@ TEST_CASE("Settings survive a write and a read")
     settings.keyboardMouse.enabled = false;
     settings.psn.signedIn = true;
     settings.psn.tokenExpiry = 1'792'000'000;
+    settings.psn.clientDuid = "fake-client-duid";
     settings.interfaceSettings.consoleView = ConsoleView::List;
     std::ostringstream output;
 

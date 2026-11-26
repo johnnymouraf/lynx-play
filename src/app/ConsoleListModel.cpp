@@ -41,6 +41,8 @@ QVariant ConsoleListModel::data(const QModelIndex& index, int role) const
         return row.saved;
     case PairedRole:
         return row.paired;
+    case PsnReachableRole:
+        return row.psnReachable;
     case SearchingRole:
         return row.searching;
     default:
@@ -58,6 +60,7 @@ QHash<int, QByteArray> ConsoleListModel::roleNames() const
         {ActivityRole, "activity"},
         {SavedRole, "saved"},
         {PairedRole, "paired"},
+        {PsnReachableRole, "psnReachable"},
         {SearchingRole, "searching"},
     };
 }

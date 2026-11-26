@@ -16,12 +16,14 @@ add_executable(mfplay_tests
     media/FilePlayerTests.cpp
     remoteplay/AccountIdTests.cpp
     remoteplay/ChiakiRuntimeTests.cpp
+    remoteplay/ClientDuidTests.cpp
     remoteplay/ConsoleMergeTests.cpp
     remoteplay/ConsoleStoreTests.cpp
     remoteplay/ConsoleWakeTests.cpp
     remoteplay/HostAddressTests.cpp
     remoteplay/PairingFailureTests.cpp
     remoteplay/PinTests.cpp
+    remoteplay/PsnDevicesTests.cpp
     remoteplay/PsnLoginTests.cpp
     remoteplay/PsnTokenStoreTests.cpp
     remoteplay/StreamSessionTests.cpp

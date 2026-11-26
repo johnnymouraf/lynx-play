@@ -21,6 +21,9 @@ struct ConsoleRow
     QString activity;
     bool saved = false;
     bool paired = false;
+    // The PSN lists this paired console, so it can be reached over the
+    // internet.
+    bool psnReachable = false;
     // A direct query of its address is in progress.
     bool searching = false;
 
@@ -49,6 +52,7 @@ public:
         ActivityRole,
         SavedRole,
         PairedRole,
+        PsnReachableRole,
         SearchingRole,
     };
 
