@@ -10,6 +10,7 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
 - [Phases](#phases)
 - [Decisions later phases depend on](#decisions-later-phases-depend-on)
 - [Current: 4.1 PSN connection](#current-41-psn-connection)
+- [Current: 5.1 Platform split and the Android build](#current-51-platform-split-and-the-android-build)
 - [Auto mode](#auto-mode)
   - [Shared by every step](#shared-by-every-step)
   - [Decisions to review](#decisions-to-review)
@@ -103,6 +104,25 @@ DLSS Frame Generation, Reflex + Boost) on the owner's RTX 4060 Laptop GPU.
   - [ ] **4.4 Manual address**: VPN (Tailscale/ZeroTier) or port forwarding,
         with the internet bitrate.
 
+- [ ] **5. Android**: the same app on Android phones, tablets and Android TV,
+      from the same repository, built and signed in CI. Built before 4.2–4.4.
+  - [ ] **5.1 Platform split and the Android build**: Windows-only modules
+        compiled only on Windows, an arm64 APK built and signed in CI, opening
+        on the Consoles page.
+  - [ ] **5.2 Consoles on Android**: secrets in the Android Keystore, app
+        paths, LAN discovery (multicast lock), wake, pairing and the PSN login.
+  - [ ] **5.3 Streaming on Android**: MediaCodec decoding straight into a
+        Surface under the QML window, audio and microphone through SDL3, LAN
+        and PSN sessions.
+  - [ ] **5.4 Controller and the stream overlay**: Bluetooth controllers
+        (DualSense) through SDL3, the Menu rápido and statistics in QML over
+        the video, the back button.
+  - [ ] **5.5 Phone, tablet and TV layouts**: compact phone layout, tablet,
+        Android TV (leanback launcher, banner, D-pad focus everywhere).
+    - Ask at its start whether to draw the phone and TV layouts in Drafia
+      first.
+  - [ ] **5.6 Touch gamepad**: an on-screen DualSense for phones and tablets.
+
 Out of scope for now: capture card input (planned for the future).
 
 ## Decisions later phases depend on
@@ -151,6 +171,16 @@ Out of scope for now: capture card input (planned for the future).
   curl from vcpkg; the PSN login's OAuth scope already covers Remote Play
   sessions. PSN devices match saved consoles by the console's reported name
   (`SavedConsole::hostName`), as chiaki-ng matches them by nickname.
+- Android: platform-specific code is split at build time (CMake), never
+  disabled at run time; RTX, D3D12, NVAPI, NGX, DPAPI and the Win32 window
+  exist only on Windows, and the interface hides what the platform lacks.
+  Video decodes through MediaCodec straight into a Surface (no shader stage);
+  the in-stream overlay is QML over the video. arm64-v8a only. The APK is
+  signed in CI with one fixed key kept in GitHub secrets, so updates install
+  over the old version. The owner installs and tests the APK by hand.
+- Phase 5 is built by Haiku subagents at xhigh effort, one per delivery, on
+  `auto/<step>`; CI runs once at the end of each milestone, not after every
+  delivery.
 - Phase 4 is built by Sonnet subagents at low effort, one per delivery, on
   `auto/<step>`; the orchestrator reviews each diff and fast-forwards
   `master` once CI is green.
@@ -166,6 +196,40 @@ the stream plays at the internet bitrate. Allow `mfplay.exe` through the
 Windows firewall (public networks too) before the test. If the holes don't
 open, the first thing to try is chiaki-ng's port guessing
 (`chiaki_holepunch_session_force_port_guessing`), left off for now.
+
+## Current: 5.1 Platform split and the Android build
+
+**Goal:** the same repository builds Windows as today and an arm64 Android APK
+signed in CI, which installs and opens on the Consoles page; no streaming yet.
+
+**Guardrails:** the shared ones below; Windows behavior unchanged; the
+keystore and its password stay in GitHub secrets (`ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`), never in the repository or
+logs; one CI round at the end; bump the version.
+
+**Success criteria:**
+
+1. The Windows job is green with its tests, and the app runs here as before.
+2. The Android job is green and uploads `mfplay-android-arm64`; CI's
+   `apksigner verify --print-certs` shows the fixed certificate (SHA-256
+   `97:AF:28:23:80:8F:96:B6:39:C4:64:13:9D:06:A2:63:28:78:64:09:A9:34:FA:DE:81:F4:72:86:9D:95:85:00`).
+3. The D3D12 renderer, NVAPI, NGX, the D3D12VA decoder, `WindowFrame` and DPAPI
+   compile only on Windows; Android builds `core`, `input`, `audio`,
+   `remoteplay` and the QML app.
+4. The interface hides what the platform lacks: the RTX page and the window
+   mode.
+5. The release job attaches the APK next to the Windows package.
+6. The APK installs on the owner's phone and opens on the Consoles page with no
+   RTX page (owner checks).
+
+**Deliveries:**
+
+1. The CMake platform split, Windows untouched.
+2. The `arm64-android` vcpkg triplet, Qt for Android and a CI job building the
+   APK.
+3. Signing with the secrets' key and the APK in the release.
+4. The Android manifest (package `io.github.johnnymouraf.mfplay`, network and
+   multicast permissions, icon) and the interface hiding Windows-only parts.
 
 ## Auto mode
 
