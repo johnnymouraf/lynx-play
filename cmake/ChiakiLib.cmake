@@ -40,9 +40,13 @@ set(CHIAKI_LIB_ENABLE_OPUS ON CACHE BOOL "" FORCE)
 
 # A cross build (Android) searches programs inside the target sysroot, where
 # vcpkg's host protoc isn't; chiaki-ng's find_program keeps a preset PROTOC.
+file(GLOB host_protoc_dirs LIST_DIRECTORIES true
+    "${VCPKG_INSTALLED_DIR}/*/tools/protobuf"
+    "${CMAKE_BINARY_DIR}/vcpkg_installed/*/tools/protobuf")
 find_program(PROTOC protoc
-    HINTS "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/protobuf"
+    HINTS ${host_protoc_dirs}
     NO_CMAKE_FIND_ROOT_PATH)
+message(STATUS "protoc: ${PROTOC}")
 
 add_subdirectory("${CHIAKI_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/chiaki-ng" EXCLUDE_FROM_ALL)
 
