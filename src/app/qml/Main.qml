@@ -94,9 +94,11 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        TitleBar {
+        // The caption bar is Windows only: its WindowFrame draws and snaps the frame.
+        Loader {
             Layout.fillWidth: true
-            appWindow: window
+            active: window.controller.platform === "windows"
+            source: "controls/TitleBar.qml"
         }
 
         Item {

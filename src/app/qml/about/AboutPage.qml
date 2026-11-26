@@ -18,7 +18,7 @@ Item {
 
     readonly property var chips: [
         { label: `Versão ${page.controller.version}` },
-        { label: "Windows x64" },
+        { label: page.controller.platform === "windows" ? "Windows x64" : "Android arm64" },
         { label: "AGPL-3.0" }
     ]
     readonly property int cardColumns: {

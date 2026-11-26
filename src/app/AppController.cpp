@@ -81,6 +81,17 @@ QString AppController::gpuName() const
     return state_.gpuName;
 }
 
+QString AppController::platform() const
+{
+#if defined(_WIN32)
+    return u"windows"_s;
+#elif defined(__ANDROID__)
+    return u"android"_s;
+#else
+    return u"other"_s;
+#endif
+}
+
 QUrl AppController::licensesUrl() const
 {
     return QUrl::fromLocalFile(QCoreApplication::applicationDirPath() + u"/licenses"_s);

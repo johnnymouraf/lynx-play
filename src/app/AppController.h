@@ -40,6 +40,7 @@ class AppController : public QObject
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(bool remotePlayReady READ remotePlayReady CONSTANT)
     Q_PROPERTY(QString gpuName READ gpuName CONSTANT)
+    Q_PROPERTY(QString platform READ platform CONSTANT)
     Q_PROPERTY(QUrl licensesUrl READ licensesUrl CONSTANT)
     Q_PROPERTY(QUrl logsUrl READ logsUrl CONSTANT)
 
@@ -50,6 +51,8 @@ public:
     [[nodiscard]] QString version() const;
     [[nodiscard]] bool remotePlayReady() const;
     [[nodiscard]] QString gpuName() const;
+    // "windows" or "android": what the interface may offer on this platform.
+    [[nodiscard]] QString platform() const;
     // The third-party licenses shipped next to the executable.
     [[nodiscard]] QUrl licensesUrl() const;
     [[nodiscard]] QUrl logsUrl() const;

@@ -45,7 +45,7 @@ if(WIN32)
     target_compile_definitions(mfplay_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
     target_link_libraries(mfplay_core PRIVATE shell32 ole32 avrt)
 else()
-    target_sources(mfplay_core PRIVATE PathsAndroid.cpp)
+    target_sources(mfplay_core PRIVATE PathsAndroid.cpp PathsAndroid.h)
 
     # spdlog's Android sink writes to logcat through liblog.
     if(ANDROID)

@@ -23,6 +23,9 @@
 #include "core/Latency.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
+#else
+#include "core/PathsAndroid.h"
+#include <QStandardPaths>
 #endif
 
 #include <QCommandLineOption>
@@ -210,6 +213,11 @@ std::optional<CommandLine> parseCommandLine(const QGuiApplication& application)
 
 int main(int argc, char* argv[])
 {
+#if !defined(_WIN32)
+    // Core has no Qt, so the application layer gives it the app's private folder.
+    mfplay::core::setPrivateDataDir(
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdString());
+#endif
     startLogging();
     mfplay::core::installTerminateLogging();
     mfplay::app::installQtLogBridge();

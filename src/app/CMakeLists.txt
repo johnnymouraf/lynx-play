@@ -56,6 +56,7 @@ if(ANDROID)
         "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
     set_target_properties(mfplay PROPERTIES
         QT_ANDROID_PACKAGE_SOURCE_DIR "${PROJECT_SOURCE_DIR}/android"
+        QT_ANDROID_MIN_SDK_VERSION 28
         QT_ANDROID_TARGET_SDK_VERSION 36
         QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
         QT_ANDROID_VERSION_CODE "${androidVersionCode}")
@@ -128,7 +129,6 @@ qt_add_qml_module(mfplay
         qml/controls/StatusCount.qml
         qml/controls/StatusTag.qml
         qml/controls/ThinScrollBar.qml
-        qml/controls/TitleBar.qml
         qml/controls/Toast.qml
         qml/controls/Toggle.qml
         qml/controls/ValueSlider.qml
@@ -202,6 +202,12 @@ qt_add_qml_module(mfplay
         assets/images/app-icon.svg
         assets/images/console-glyph.svg
         assets/images/console-render.png)
+
+# The Windows caption bar is a WindowFrame, a type only the Windows build has,
+# so its file joins the module on Windows alone.
+if(WIN32)
+    qt_target_qml_sources(mfplay QML_FILES qml/controls/TitleBar.qml)
+endif()
 
 # Qt's generated type registration includes AppController.h by file name.
 target_include_directories(mfplay PRIVATE

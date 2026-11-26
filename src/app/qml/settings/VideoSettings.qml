@@ -7,6 +7,8 @@ ColumnLayout {
     id: section
 
     required property SettingsController settings
+    // The window mode and size rows exist only on Windows.
+    property bool windowOptions: false
 
     spacing: Theme.space2
 
@@ -19,6 +21,7 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Modo da janela"
+        visible: section.windowOptions
         description: "Tela cheia sem bordas no monitor do MFPlay, ou uma janela ajustável. F11 alterna durante a transmissão."
 
         SegmentedControl {
@@ -35,6 +38,7 @@ ColumnLayout {
     SettingRow {
         Layout.fillWidth: true
         label: "Tamanho da janela"
+        visible: section.windowOptions
         description: section.settings.windowMode === "fullscreen"
             ? `Tela cheia. O último tamanho de janela foi ${section.settings.windowSizeText}.`
             : `Tamanho atual: ${section.settings.windowSizeText}. Arraste a borda da janela para ajustar.`

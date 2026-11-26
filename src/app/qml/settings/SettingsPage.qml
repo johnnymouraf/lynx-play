@@ -19,6 +19,8 @@ Item {
     property string section: "controls"
     // The sections the StackLayout below holds, in order.
     readonly property var sectionIds: ["controls", "video", "rtx", "audio", "network"]
+    // The RTX page and the window options exist only on Windows.
+    readonly property bool windowsPlatform: page.controller.platform === "windows"
 
     onSectionChanged: scroller.contentY = 0
 
@@ -72,6 +74,7 @@ Item {
                         Layout.fillWidth: true
                         text: "RTX"
                         iconName: "sparkles"
+                        visible: page.windowsPlatform
                         selected: page.section === "rtx"
                         onClicked: page.section = "rtx"
                     }
@@ -127,6 +130,7 @@ Item {
 
                 VideoSettings {
                     settings: page.settings
+                    windowOptions: page.windowsPlatform
                 }
 
                 RtxSettings {

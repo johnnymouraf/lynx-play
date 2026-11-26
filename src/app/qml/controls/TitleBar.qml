@@ -10,7 +10,7 @@ import MFPlay
 Item {
     id: bar
 
-    required property Window appWindow
+    readonly property Window appWindow: Window.window
 
     readonly property bool maximized: bar.appWindow.visibility === Window.Maximized
 
