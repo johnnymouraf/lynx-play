@@ -32,6 +32,8 @@ add_library(mfplay_remoteplay STATIC
     PsnDevices.h
     PsnLogin.cpp
     PsnLogin.h
+    PsnPolicy.cpp
+    PsnPolicy.h
     PsnTokenStore.cpp
     PsnTokenStore.h
     SecretProtector.h
