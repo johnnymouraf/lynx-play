@@ -2,6 +2,7 @@
 
 #include "core/StreamMetrics.h"
 #include "core/VideoCodec.h"
+#include "media/VideoDecoding.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 
@@ -17,7 +18,7 @@ namespace mfplay::media
 // Decodes H.264 or H.265 on the GPU with FFmpeg's D3D12VA, straight into
 // textures on the renderer's device, and publishes each picture to a mailbox.
 // It never falls back to decoding on the CPU. One thread feeds it.
-class VideoDecoder
+class VideoDecoder : public VideoDecoding
 {
 public:
     // `hdrExpected` is the session's HDR request: when the bitstream leaves
@@ -38,7 +39,7 @@ public:
     // picture it completes once the GPU has finished it. An error means corrupt
     // data or a failing decoder; decoding recovers at the next keyframe.
     [[nodiscard]] std::expected<void, std::string> decode(
-        std::span<const std::uint8_t> accessUnit);
+        std::span<const std::uint8_t> accessUnit) override;
 
 private:
     struct Context;

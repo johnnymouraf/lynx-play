@@ -51,6 +51,16 @@ SecretResult refuse(std::span<const std::uint8_t>)
     return std::unexpected(std::string("refused"));
 }
 
+SecretResult passThrough(std::span<const std::uint8_t> bytes)
+{
+    return SecretBytes(bytes.begin(), bytes.end());
+}
+
+SecretProtector passThroughProtector()
+{
+    return SecretProtector{.protect = passThrough, .unprotect = passThrough};
+}
+
 SecretProtector refusingProtector()
 {
     return SecretProtector{.protect = refuse, .unprotect = refuse};
@@ -59,7 +69,7 @@ SecretProtector refusingProtector()
 bool canRead(const std::string& text)
 {
     std::istringstream stream(text);
-    return readConsoleFile(stream, dpapiProtector()).has_value();
+    return readConsoleFile(stream, passThroughProtector()).has_value();
 }
 
 } // namespace
@@ -67,7 +77,7 @@ bool canRead(const std::string& text)
 TEST_CASE("The console store gives back every console it saved")
 {
     const ConsoleFile file = sampleFile();
-    const SecretProtector protector = dpapiProtector();
+    const SecretProtector protector = passThroughProtector();
     std::stringstream stream;
 
     REQUIRE(writeConsoleFile(file, stream, protector));
@@ -82,7 +92,7 @@ TEST_CASE("The console store keeps the keys and the account ID encrypted on disk
     const ConsoleFile file = sampleFile();
     std::stringstream stream;
 
-    REQUIRE(writeConsoleFile(file, stream, dpapiProtector()));
+    REQUIRE(writeConsoleFile(file, stream, passThroughProtector()));
     const std::string text = stream.str();
     const Credentials credentials = fakeCredentials();
 
@@ -104,7 +114,7 @@ TEST_CASE("The console store writes nothing when a secret can't be encrypted")
 TEST_CASE("A console whose keys can't be decrypted loads unpaired")
 {
     std::stringstream stream;
-    REQUIRE(writeConsoleFile(sampleFile(), stream, dpapiProtector()));
+    REQUIRE(writeConsoleFile(sampleFile(), stream, passThroughProtector()));
 
     const auto loaded = readConsoleFile(stream, refusingProtector());
 

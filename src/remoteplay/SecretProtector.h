@@ -20,8 +20,9 @@ struct SecretProtector
     std::function<SecretResult(std::span<const std::uint8_t> sealed)> unprotect;
 };
 
-// Windows DPAPI bound to the current user: only this user, on this PC, can
-// decrypt what it encrypts.
-[[nodiscard]] SecretProtector dpapiProtector();
+// The platform's protector: Windows DPAPI, bound to the current user (only
+// this user, on this PC, can decrypt what it encrypts). Other platforms refuse
+// until their keystore is wired in.
+[[nodiscard]] SecretProtector platformSecretProtector();
 
 } // namespace mfplay::remoteplay

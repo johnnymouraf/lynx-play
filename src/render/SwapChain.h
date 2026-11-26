@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "core/Windows.h"
 #include "render/GpuDevice.h"
 #include "render/Layout.h"
@@ -14,13 +15,7 @@
 namespace mfplay::render
 {
 
-enum class PresentTiming
-{
-    // Waits for the display's refresh.
-    VSync,
-    // Shows the frame as soon as it is ready, tearing when the display allows.
-    Immediate,
-};
+using core::PresentTiming;
 
 // A flip-model swap chain that holds few queued frames (one by default): the
 // renderer waits on it before drawing, so every frame shows the newest content.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "core/Windows.h"
 
 #include <cstdint>
@@ -14,35 +15,8 @@ struct NVSDK_NGX_Parameter;
 namespace mfplay::render
 {
 
-// Why DLSS Super Resolution can't run on this machine.
-enum class DlssUnavailable
-{
-    None,
-    // The stream renders on a GPU that is not NVIDIA.
-    NoNvidiaGpu,
-    // The flow engine, DLSS's source of motion vectors, is off or failed.
-    NoOpticalFlow,
-    // DLSS needs Ada or newer; the mission scopes it there.
-    GpuTooOld,
-    // The GPU architecture couldn't be read from the driver.
-    ArchitectureUnknown,
-    // The driver's NGX core, nvngx.dll, is missing from System32.
-    NoNgxCore,
-    // The NGX runtime, nvngx_dlss.dll, is missing from the app's folder.
-    NoDlssRuntime,
-    // NVSDK_NGX_D3D12_Init refused the device or the project id.
-    InitFailed,
-    // The feature couldn't be created for the picture; VSR draws instead.
-    FeatureFailed,
-};
-
-struct DlssAvailability
-{
-    bool available = false;
-    DlssUnavailable reason = DlssUnavailable::NoNvidiaGpu;
-    // For the log; English, like every other log line.
-    std::string detail;
-};
+using core::DlssUnavailable;
+using core::DlssAvailability;
 
 // The NVAPI architecture id of Ada (AD100); newer chips have larger ids.
 inline constexpr std::uint32_t kAdaArchitecture = 0x00000190;

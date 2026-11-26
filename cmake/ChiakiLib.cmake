@@ -42,7 +42,9 @@ add_subdirectory("${CHIAKI_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/chiaki-ng" EXCLUDE_
 
 # gf-complete calls __cpuidex without including <intrin.h> on MSVC-compatible
 # compilers; chiaki-ng patches the source in its own CI, we force the include.
-target_compile_options(gf_complete PRIVATE /FIintrin.h)
+if(WIN32)
+    target_compile_options(gf_complete PRIVATE /FIintrin.h)
+endif()
 
 # vcpkg's static miniupnpc headers default to dllimport unless told otherwise.
 target_compile_definitions(chiaki-lib PRIVATE MINIUPNP_STATICLIB)
@@ -50,7 +52,9 @@ target_compile_definitions(chiaki-lib PRIVATE MINIUPNP_STATICLIB)
 # Static libevent and OpenSSL need these Windows libraries, which their
 # pkg-config files only list as private. chiaki-lib uses the plain
 # target_link_libraries signature, so this call must use it too.
-target_link_libraries(chiaki-lib shell32 advapi32 user32 crypt32 bcrypt iphlpapi ws2_32)
+if(WIN32)
+    target_link_libraries(chiaki-lib shell32 advapi32 user32 crypt32 bcrypt iphlpapi ws2_32)
+endif()
 
 # Keep chiaki's headers out of our strict warnings.
 set_target_properties(chiaki-lib PROPERTIES SYSTEM TRUE)

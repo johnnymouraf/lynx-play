@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 namespace mfplay::core
 {
 
@@ -12,5 +14,22 @@ enum class ReflexMode
     // On plus the driver's highest GPU clocks; raises a laptop's power use.
     Boost,
 };
+
+[[nodiscard]] constexpr std::string_view reflexModeName(ReflexMode mode)
+{
+    switch (mode)
+    {
+    case ReflexMode::Off:
+        return "off";
+
+    case ReflexMode::On:
+        return "on";
+
+    case ReflexMode::Boost:
+        return "boost";
+    }
+
+    return "off";
+}
 
 } // namespace mfplay::core

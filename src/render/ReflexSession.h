@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ReflexMode.h"
+#include "core/RtxCapabilities.h"
 
 #include <array>
 #include <chrono>
@@ -14,21 +15,8 @@
 namespace mfplay::render
 {
 
-enum class ReflexUnavailable
-{
-    None,
-    NoNvidiaGpu,
-    NoDriver,
-    DriverFailed,
-};
-
-struct ReflexAvailability
-{
-    bool available = false;
-    ReflexUnavailable reason = ReflexUnavailable::NoNvidiaGpu;
-    // For the log; English, like every other log line.
-    std::string detail;
-};
+using core::ReflexUnavailable;
+using core::ReflexAvailability;
 
 // The markers NvAPI tracks for the latency report, in the order a frame sends
 // them.
@@ -94,7 +82,7 @@ private:
     std::size_t next_ = 0;
 };
 
-[[nodiscard]] std::string_view reflexModeName(core::ReflexMode mode);
+using core::reflexModeName;
 
 // NVIDIA Reflex through the driver's nvapi64.dll: sleep mode, the per-frame
 // sleep and latency markers, and the driver's latency report. Everything

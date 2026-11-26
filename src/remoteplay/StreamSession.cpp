@@ -7,7 +7,7 @@
 #include "input/DualSenseEffects.h"
 #include "input/GamepadManager.h"
 #include "input/KeyboardMouse.h"
-#include "media/VideoDecoder.h"
+#include "media/VideoDecoding.h"
 #include "remoteplay/ChiakiLogSink.h"
 
 #include <algorithm>
@@ -156,7 +156,7 @@ struct StreamSession::State
     Events events;
     std::string host;
     ChiakiLogSink logSink;
-    std::unique_ptr<media::VideoDecoder> decoder;
+    std::unique_ptr<media::VideoDecoding> decoder;
     std::shared_ptr<core::StreamMetrics> metrics;
     input::GamepadManager* gamepads = nullptr;
     input::KeyboardMouseInput* keyboardMouse = nullptr;
@@ -875,8 +875,7 @@ SessionEnd StreamSession::State::endOf(ChiakiQuitReason reason) const
 }
 
 std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
-    const render::GpuDevice& gpu, std::shared_ptr<render::FrameMailbox> mailbox,
-    const SessionRequest& request, Events events)
+    media::VideoDecoderFactory makeDecoder, const SessionRequest& request, Events events)
 {
     auto state = std::make_unique<State>();
     state->events = std::move(events);
@@ -904,8 +903,7 @@ std::expected<std::unique_ptr<StreamSession>, std::string> StreamSession::start(
     }
 
     const VideoProfile profile = videoProfileFor(request.video, request.ps5, request.psn.has_value());
-    auto decoder = media::VideoDecoder::create(gpu, profile.codec, std::move(mailbox),
-                                               request.metrics, profile.hdr);
+    auto decoder = makeDecoder(profile.codec, profile.hdr);
 
     if (!decoder)
     {

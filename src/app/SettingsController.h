@@ -1,13 +1,7 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "core/Settings.h"
-#include "render/FrameGeneration.h"
-#include "render/Hdr.h"
-#include "render/NgxHost.h"
-#include "render/OpticalFlow.h"
-#include "render/ReflexSession.h"
-#include "render/SwapChain.h"
-#include "render/VideoSuperResolution.h"
 
 #include <QObject>
 #include <QString>
@@ -95,7 +89,7 @@ public:
     [[nodiscard]] const core::ControllerSettings& controller() const;
     [[nodiscard]] const core::OverlaySettings& overlay() const;
     [[nodiscard]] const core::KeyboardMouseSettings& keyboardMouse() const;
-    [[nodiscard]] render::PresentTiming presentTiming() const;
+    [[nodiscard]] core::PresentTiming presentTiming() const;
 
     // The lines of the resolution asked of the PS5: 360, 540, 720 or 1080.
     [[nodiscard]] int resolution() const;
@@ -255,13 +249,13 @@ private:
 
     std::optional<core::SettingsStore> store_;
     core::Settings settings_;
-    render::ReflexAvailability reflexAvailability_;
-    render::VsrAvailability videoSuperResolutionAvailability_;
-    render::DlssAvailability dlssAvailability_;
-    render::OpticalFlowAvailability opticalFlowAvailability_;
-    render::FrameGenerationAvailability frameGenerationAvailability_;
-    render::HdrDisplayState hdrDisplay_;
-    render::RtxHdrAvailability rtxHdrAvailability_;
+    core::ReflexAvailability reflexAvailability_;
+    core::VsrAvailability videoSuperResolutionAvailability_;
+    core::DlssAvailability dlssAvailability_;
+    core::OpticalFlowAvailability opticalFlowAvailability_;
+    core::FrameGenerationAvailability frameGenerationAvailability_;
+    core::HdrDisplayState hdrDisplay_;
+    core::RtxHdrAvailability rtxHdrAvailability_;
     QStringList outputDevices_;
     QStringList microphoneDevices_;
     bool devicesLogged_ = false;

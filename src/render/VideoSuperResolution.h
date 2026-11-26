@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "core/Windows.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
@@ -20,33 +21,9 @@
 namespace mfplay::render
 {
 
-// Why RTX Video Super Resolution can't run here, for the RTX screen.
-enum class VsrUnavailable
-{
-    None,
-    NoNvidiaGpu,
-    NoD3D11,
-    FormatUnsupported,
-    ProcessorFailed,
-    ExtensionRejected,
-};
-
-struct VsrAvailability
-{
-    bool available = false;
-    VsrUnavailable reason = VsrUnavailable::NoNvidiaGpu;
-    // For the log; English, like every other log line.
-    std::string detail;
-};
-
-// Whether RTX Video HDR's extension is accepted on the stream's adapter. The
-// NVIDIA App's own toggle and the display's HDR state are separate.
-struct RtxHdrAvailability
-{
-    bool available = false;
-    // For the log; English, like every other log line.
-    std::string detail;
-};
+using core::VsrUnavailable;
+using core::VsrAvailability;
+using core::RtxHdrAvailability;
 
 // The picture the video processor is built for: the source size, format and
 // colour space, and the size and colour space it writes.

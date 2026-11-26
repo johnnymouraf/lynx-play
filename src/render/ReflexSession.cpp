@@ -172,21 +172,6 @@ double microsecondsBetween(NvU64 end, NvU64 begin)
 
 } // namespace
 
-std::string_view reflexModeName(core::ReflexMode mode)
-{
-    switch (mode)
-    {
-    case core::ReflexMode::Off:
-        return "off";
-    case core::ReflexMode::On:
-        return "on";
-    case core::ReflexMode::Boost:
-        return "boost";
-    }
-
-    return "off";
-}
-
 bool SleepStallDetector::observe(std::uint32_t sleepUs, std::uint32_t gpuWorkUs)
 {
     const std::uint32_t threshold = std::max(gpuWorkUs, kFloorUs);

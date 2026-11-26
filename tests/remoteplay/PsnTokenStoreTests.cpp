@@ -27,6 +27,16 @@ SecretResult refuse(std::span<const std::uint8_t>)
     return std::unexpected(std::string("refused"));
 }
 
+SecretResult passThrough(std::span<const std::uint8_t> bytes)
+{
+    return SecretBytes(bytes.begin(), bytes.end());
+}
+
+SecretProtector passThroughProtector()
+{
+    return SecretProtector{.protect = passThrough, .unprotect = passThrough};
+}
+
 SecretProtector refusingProtector()
 {
     return SecretProtector{.protect = refuse, .unprotect = refuse};
@@ -42,7 +52,7 @@ std::span<const std::uint8_t> bytesOf(std::string_view text)
 TEST_CASE("The token store gives back the tokens it saved")
 {
     const PsnTokens tokens = fakeTokens();
-    const SecretProtector protector = dpapiProtector();
+    const SecretProtector protector = passThroughProtector();
     std::stringstream stream;
 
     REQUIRE(writePsnTokens(tokens, stream, protector));
@@ -57,7 +67,7 @@ TEST_CASE("The token store keeps the tokens and the expiry encrypted on disk")
     const PsnTokens tokens = fakeTokens();
     std::stringstream stream;
 
-    REQUIRE(writePsnTokens(tokens, stream, dpapiProtector()));
+    REQUIRE(writePsnTokens(tokens, stream, passThroughProtector()));
     const std::string text = stream.str();
 
     CHECK(text.find("\"accessToken\"") != std::string::npos);
@@ -78,14 +88,14 @@ TEST_CASE("The token store writes nothing when a token can't be encrypted")
 TEST_CASE("The token store refuses a file it can't decrypt")
 {
     std::stringstream stream;
-    REQUIRE(writePsnTokens(fakeTokens(), stream, dpapiProtector()));
+    REQUIRE(writePsnTokens(fakeTokens(), stream, passThroughProtector()));
 
     CHECK_FALSE(readPsnTokens(stream, refusingProtector()));
 }
 
 TEST_CASE("The token store rejects a corrupt, foreign or incomplete file")
 {
-    const SecretProtector protector = dpapiProtector();
+    const SecretProtector protector = passThroughProtector();
 
     for (const std::string& text :
          {std::string("not json"), std::string(R"({"version":2})"),
@@ -100,7 +110,7 @@ TEST_CASE("The token store keeps the sign-in without an expiry")
 {
     PsnTokens tokens = fakeTokens();
     tokens.expiry = std::nullopt;
-    const SecretProtector protector = dpapiProtector();
+    const SecretProtector protector = passThroughProtector();
     std::stringstream stream;
 
     REQUIRE(writePsnTokens(tokens, stream, protector));

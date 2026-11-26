@@ -3,6 +3,16 @@
 #include "audio/Devices.h"
 #include "remoteplay/ClientDuid.h"
 #include "core/KeyboardBindings.h"
+#include "core/ReflexMode.h"
+
+#if defined(_WIN32)
+#include "render/FrameGeneration.h"
+#include "render/Hdr.h"
+#include "render/NgxHost.h"
+#include "render/OpticalFlow.h"
+#include "render/ReflexSession.h"
+#include "render/VideoSuperResolution.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -10,7 +20,9 @@
 #include <utility>
 #include <vector>
 
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 #include <spdlog/spdlog.h>
 
@@ -53,6 +65,7 @@ std::string_view presentModeName(PresentMode mode)
     return mode == PresentMode::LowestLatency ? "lowest latency" : "VSync";
 }
 
+#if defined(_WIN32)
 std::uint16_t virtualKeyOf(int key)
 {
     if (key >= Qt::Key_A && key <= Qt::Key_Z)
@@ -155,6 +168,7 @@ std::uint16_t virtualKeyOf(int key)
         return 0;
     }
 }
+#endif
 
 } // namespace
 
@@ -174,6 +188,7 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
         save();
     }
 
+#if defined(_WIN32)
     reflexAvailability_ = render::ReflexSession::probe();
 
     if (reflexAvailability_.available)
@@ -245,6 +260,7 @@ SettingsController::SettingsController(std::optional<core::SettingsStore> store,
     {
         spdlog::info("RTX Video HDR is unavailable: {}", rtxHdrAvailability_.detail);
     }
+#endif
 
     spdlog::info("HDR setting: {} (RTX Video HDR {})", core::hdrModeName(settings_.video.hdr),
                  hdrRtxAvailable() ? "available on this display" : "unavailable on this display");
@@ -280,10 +296,10 @@ const core::OverlaySettings& SettingsController::overlay() const
     return settings_.overlay;
 }
 
-render::PresentTiming SettingsController::presentTiming() const
+core::PresentTiming SettingsController::presentTiming() const
 {
     const bool lowest = settings_.video.presentMode == PresentMode::LowestLatency;
-    return lowest ? render::PresentTiming::Immediate : render::PresentTiming::VSync;
+    return lowest ? core::PresentTiming::Immediate : core::PresentTiming::VSync;
 }
 
 int SettingsController::resolution() const
@@ -706,13 +722,13 @@ QString SettingsController::reflexUnavailableReason() const
 {
     switch (reflexAvailability_.reason)
     {
-    case render::ReflexUnavailable::NoNvidiaGpu:
+    case core::ReflexUnavailable::NoNvidiaGpu:
         return u"A GPU usada para o vídeo não é NVIDIA."_s;
-    case render::ReflexUnavailable::NoDriver:
+    case core::ReflexUnavailable::NoDriver:
         return u"O driver NVIDIA não está instalado."_s;
-    case render::ReflexUnavailable::DriverFailed:
+    case core::ReflexUnavailable::DriverFailed:
         return u"O driver NVIDIA não respondeu ao NVAPI."_s;
-    case render::ReflexUnavailable::None:
+    case core::ReflexUnavailable::None:
         break;
     }
 
@@ -762,17 +778,17 @@ QString SettingsController::videoSuperResolutionUnavailableReason() const
 {
     switch (videoSuperResolutionAvailability_.reason)
     {
-    case render::VsrUnavailable::NoNvidiaGpu:
+    case core::VsrUnavailable::NoNvidiaGpu:
         return u"A GPU usada para o vídeo não é NVIDIA."_s;
-    case render::VsrUnavailable::NoD3D11:
+    case core::VsrUnavailable::NoD3D11:
         return u"O driver de vídeo não expôs a interface D3D11 necessária."_s;
-    case render::VsrUnavailable::FormatUnsupported:
+    case core::VsrUnavailable::FormatUnsupported:
         return u"O driver não converte o vídeo NV12 para RGB."_s;
-    case render::VsrUnavailable::ProcessorFailed:
+    case core::VsrUnavailable::ProcessorFailed:
         return u"O driver não criou o processador de vídeo."_s;
-    case render::VsrUnavailable::ExtensionRejected:
+    case core::VsrUnavailable::ExtensionRejected:
         return u"O driver não aceitou a extensão do RTX Video Super Resolution."_s;
-    case render::VsrUnavailable::None:
+    case core::VsrUnavailable::None:
         break;
     }
 
@@ -799,23 +815,23 @@ QString SettingsController::dlssUnavailableReason() const
 
     switch (dlssAvailability_.reason)
     {
-    case render::DlssUnavailable::NoNvidiaGpu:
+    case core::DlssUnavailable::NoNvidiaGpu:
         return u"A GPU usada para o vídeo não é NVIDIA."_s;
-    case render::DlssUnavailable::NoOpticalFlow:
+    case core::DlssUnavailable::NoOpticalFlow:
         return u"O Optical Flow está indisponível."_s;
-    case render::DlssUnavailable::GpuTooOld:
+    case core::DlssUnavailable::GpuTooOld:
         return u"O DLSS Super Resolution requer uma GPU Ada ou mais nova."_s;
-    case render::DlssUnavailable::ArchitectureUnknown:
+    case core::DlssUnavailable::ArchitectureUnknown:
         return u"Não foi possível identificar a arquitetura da GPU."_s;
-    case render::DlssUnavailable::NoNgxCore:
+    case core::DlssUnavailable::NoNgxCore:
         return u"O driver NVIDIA não trouxe o NGX (nvngx.dll)."_s;
-    case render::DlssUnavailable::NoDlssRuntime:
+    case core::DlssUnavailable::NoDlssRuntime:
         return u"O nvngx_dlss.dll não está na pasta do app."_s;
-    case render::DlssUnavailable::InitFailed:
+    case core::DlssUnavailable::InitFailed:
         return u"O NGX não inicializou com a GPU da transmissão."_s;
-    case render::DlssUnavailable::FeatureFailed:
+    case core::DlssUnavailable::FeatureFailed:
         return u"O DLSS não criou o recurso para esta imagem."_s;
-    case render::DlssUnavailable::None:
+    case core::DlssUnavailable::None:
         break;
     }
 
@@ -843,21 +859,21 @@ QString SettingsController::opticalFlowUnavailableReason() const
 {
     switch (opticalFlowAvailability_.reason)
     {
-    case render::OpticalFlowUnavailable::NoNvidiaGpu:
+    case core::OpticalFlowUnavailable::NoNvidiaGpu:
         return u"A GPU usada para o vídeo não é NVIDIA."_s;
-    case render::OpticalFlowUnavailable::NoDriver:
+    case core::OpticalFlowUnavailable::NoDriver:
         return u"O driver NVIDIA não traz o nvofapi64.dll."_s;
-    case render::OpticalFlowUnavailable::DriverTooOld:
+    case core::OpticalFlowUnavailable::DriverTooOld:
         return u"O driver NVIDIA é anterior ao Optical Flow 5.0."_s;
-    case render::OpticalFlowUnavailable::DriverFailed:
+    case core::OpticalFlowUnavailable::DriverFailed:
         return u"O driver NVIDIA recusou o Optical Flow."_s;
-    case render::OpticalFlowUnavailable::FormatUnsupported:
+    case core::OpticalFlowUnavailable::FormatUnsupported:
         return u"O driver não aceita o fluxo óptico no formato do vídeo."_s;
-    case render::OpticalFlowUnavailable::SizeUnsupported:
+    case core::OpticalFlowUnavailable::SizeUnsupported:
         return u"A resolução do vídeo excede o limite do Optical Flow."_s;
-    case render::OpticalFlowUnavailable::SessionFailed:
+    case core::OpticalFlowUnavailable::SessionFailed:
         return u"O fluxo óptico parou nesta transmissão."_s;
-    case render::OpticalFlowUnavailable::None:
+    case core::OpticalFlowUnavailable::None:
         break;
     }
 
@@ -915,21 +931,21 @@ QString SettingsController::frameGenerationUnavailableReason() const
     {
         switch (frameGenerationAvailability_.reason)
         {
-        case render::FrameGenerationUnavailable::NoNvidiaGpu:
+        case core::FrameGenerationUnavailable::NoNvidiaGpu:
             return u"A GPU usada para o vídeo não é NVIDIA."_s;
-        case render::FrameGenerationUnavailable::RuntimeMissing:
+        case core::FrameGenerationUnavailable::RuntimeMissing:
             return u"O runtime do DLSS Frame Generation (nvngx_dlssg.dll) não está instalado."_s;
-        case render::FrameGenerationUnavailable::HagsOff:
+        case core::FrameGenerationUnavailable::HagsOff:
             return u"A GPU agendada por hardware do Windows está desligada (Configurações › "
                    u"Sistema › Tela › Gráficos › Alterar configuração de gráficos padrão)."_s;
-        case render::FrameGenerationUnavailable::DriverTooOld:
+        case core::FrameGenerationUnavailable::DriverTooOld:
             return u"O driver NVIDIA é anterior ao mínimo exigido pelo DLSS Frame Generation."_s;
-        case render::FrameGenerationUnavailable::NotAvailable:
+        case core::FrameGenerationUnavailable::NotAvailable:
             return u"Esta GPU não suporta DLSS Frame Generation (requer uma RTX 40 ou mais "
                    u"nova)."_s;
-        case render::FrameGenerationUnavailable::DriverFailed:
+        case core::FrameGenerationUnavailable::DriverFailed:
             return u"O driver NVIDIA recusou o NGX."_s;
-        case render::FrameGenerationUnavailable::None:
+        case core::FrameGenerationUnavailable::None:
             break;
         }
     }
@@ -1100,8 +1116,9 @@ void SettingsController::setKeyboardBinding(const QString& control, const QStrin
         settings_.keyboardMouse, static_cast<core::KeyboardControl>(index), binding.toStdString()));
 }
 
-QString SettingsController::bindingNameForKey(int qtKey) const
+QString SettingsController::bindingNameForKey([[maybe_unused]] int qtKey) const
 {
+#if defined(_WIN32)
     const std::uint16_t virtualKey = virtualKeyOf(qtKey);
 
     if (virtualKey == 0)
@@ -1111,6 +1128,9 @@ QString SettingsController::bindingNameForKey(int qtKey) const
 
     return QString::fromStdString(core::keyboardBindingName(
         {.kind = core::KeyboardBindingKind::Key, .code = virtualKey}));
+#else
+    return {};
+#endif
 }
 
 QString SettingsController::bindingLabel(const QString& binding) const
@@ -1313,7 +1333,7 @@ void SettingsController::applyRtx(const core::RtxSettings& requested)
 
     settings_.rtx = rtx;
     spdlog::info("RTX settings: Reflex {}, upscaling {}, optical flow {}, frame generation {}",
-                 render::reflexModeName(rtx.reflex), core::upscalingName(rtx.upscaling),
+                 core::reflexModeName(rtx.reflex), core::upscalingName(rtx.upscaling),
                  rtx.opticalFlow ? "on" : "off",
                  core::frameGenerationName(rtx.frameGeneration));
     emit rtxChanged();

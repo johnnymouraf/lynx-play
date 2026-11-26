@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "render/FrameSchedule.h"
 #include "render/Layout.h"
 #include "render/NgxHost.h"
@@ -14,34 +15,8 @@
 namespace mfplay::render
 {
 
-// Why DLSS Frame Generation can't run here, for the RTX screen.
-enum class FrameGenerationUnavailable
-{
-    None,
-    // The stream renders on a GPU that is not NVIDIA.
-    NoNvidiaGpu,
-    // The build has no NGX SDK, or nvngx_dlssg.dll isn't next to the app.
-    RuntimeMissing,
-    // Windows' hardware GPU scheduling (HwSchMode = 2) is off.
-    HagsOff,
-    // The driver is older than the runtime's minimum.
-    DriverTooOld,
-    // Below Ada, where the runtime doesn't offer the feature.
-    NotAvailable,
-    // The driver refused NGX or the runtime failed.
-    DriverFailed,
-};
-
-struct FrameGenerationAvailability
-{
-    bool available = false;
-    FrameGenerationUnavailable reason = FrameGenerationUnavailable::NoNvidiaGpu;
-    // For the log; English, like every other log line.
-    std::string detail;
-    bool hagsOn = false;
-    // 1 on Ada (2x only), 5 on Blackwell (6x).
-    std::uint32_t multiFrameCountMax = 0;
-};
+using core::FrameGenerationUnavailable;
+using core::FrameGenerationAvailability;
 
 // DLSS Frame Generation through NGX: the feature and the two pictures it
 // writes, at the swap chain's size and format. The real picture is the

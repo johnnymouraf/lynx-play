@@ -1,17 +1,21 @@
 #include "core/TerminateLogging.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <format>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <typeinfo>
 
 #include <spdlog/spdlog.h>
 
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 namespace mfplay::core
 {
@@ -19,9 +23,11 @@ namespace mfplay::core
 namespace
 {
 
-constexpr WORD kMaxFrames = 64;
-
 std::terminate_handler previousHandler = nullptr;
+
+#if defined(_WIN32)
+
+constexpr WORD kMaxFrames = 64;
 
 // The file name of the module that holds `address`, with the address's offset
 // into it: enough to name a frame without a symbol server. Fixed buffers keep
@@ -72,9 +78,31 @@ void logStack()
     }
 }
 
+#else
+
+void logStack() {}
+
+#endif
+
+#if defined(_WIN32)
+
+DWORD currentThreadId()
+{
+    return GetCurrentThreadId();
+}
+
+#else
+
+std::size_t currentThreadId()
+{
+    return std::hash<std::thread::id>{}(std::this_thread::get_id());
+}
+
+#endif
+
 void logActiveException(const char* context)
 {
-    const DWORD thread = GetCurrentThreadId();
+    const auto thread = currentThreadId();
     const std::exception_ptr exception = std::current_exception();
 
     if (exception == nullptr)

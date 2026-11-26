@@ -2,11 +2,14 @@
 
 #include "remoteplay/Console.h"
 #include "remoteplay/StreamSession.h"
+
+#include "core/StreamMetrics.h"
+
+#if defined(_WIN32)
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 #include "render/StreamWindow.h"
-
-#include "core/StreamMetrics.h"
+#endif
 
 #include <QObject>
 #include <QString>
@@ -18,7 +21,9 @@
 #include <optional>
 #include <string>
 
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 namespace mfplay::input
 {
@@ -109,11 +114,15 @@ signals:
 private:
     void startSession();
     void onConnected(std::uint64_t session);
+#if defined(_WIN32)
     void onFirstPicture(std::uint64_t session);
+#endif
     void onEnded(std::uint64_t session, remoteplay::SessionEnd end);
     void onStage(std::uint64_t session, remoteplay::ConnectionStage stage);
     void onPsnFailed(std::uint64_t session, remoteplay::PsnFailure failure);
+#if defined(_WIN32)
     void onWindowClosed(std::uint64_t session, render::CloseReason reason);
+#endif
     [[nodiscard]] remoteplay::StreamSession::Events eventsFor(std::uint64_t session);
     // Runs `work` on the interface thread; chiaki calls in from its own.
     void post(std::function<void()> work);
@@ -124,8 +133,10 @@ private:
     SettingsController& settings_;
     InputController& input_;
     std::optional<Target> target_;
+#if defined(_WIN32)
     // The main window, whose monitor the stream window opens on.
     HWND mainWindow_ = nullptr;
+#endif
     Phase phase_ = Phase::Idle;
     QString failureHeading_;
     QString failureTitle_;
@@ -134,12 +145,16 @@ private:
     std::optional<remoteplay::PsnFailure> psnFailure_;
     // Counts sessions, so events of one already stopped are ignored.
     std::uint64_t sessionNumber_ = 0;
+#if defined(_WIN32)
     std::optional<render::GpuDevice> gpu_;
     std::shared_ptr<render::FrameMailbox> mailbox_;
+#endif
     std::shared_ptr<core::StreamMetrics> metrics_;
     std::shared_ptr<input::KeyboardMouseInput> keyboardMouse_;
     std::unique_ptr<remoteplay::StreamSession> session_;
+#if defined(_WIN32)
     std::unique_ptr<render::StreamWindow> window_;
+#endif
 };
 
 } // namespace mfplay::app

@@ -1,12 +1,17 @@
 #include "app/StreamController.h"
 
-#include "app/Fonts.h"
 #include "app/InputController.h"
-#include "app/OverlayInput.h"
 #include "app/SettingsController.h"
+#include "core/ReflexMode.h"
 #include "input/GamepadManager.h"
 #include "input/KeyboardMouse.h"
+
+#if defined(_WIN32)
+#include "app/Fonts.h"
+#include "app/OverlayInput.h"
+#include "media/VideoDecoder.h"
 #include "render/ReflexSession.h"
+#endif
 
 #include <QGuiApplication>
 #include <QWindow>
@@ -155,6 +160,7 @@ FailureText textFor(SessionEnd end)
     return {u"Não foi possível conectar"_s, logsHint()};
 }
 
+#if defined(_WIN32)
 HWND focusedWindow()
 {
     const QWindow* window = QGuiApplication::focusWindow();
@@ -166,6 +172,7 @@ HWND focusedWindow()
 
     return reinterpret_cast<HWND>(window->winId());
 }
+#endif
 
 } // namespace
 
@@ -173,6 +180,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                                    QObject* parent)
     : QObject(parent), settings_(settings), input_(input)
 {
+#if defined(_WIN32)
     connect(&settings_, &SettingsController::rtxChanged, this,
             [this]
             {
@@ -195,6 +203,7 @@ StreamController::StreamController(SettingsController& settings, InputController
                                                settings_.video().windowSize);
                 }
             });
+#endif
 
     connect(&settings_, &SettingsController::audioChanged, this,
             [this]
@@ -285,7 +294,9 @@ std::optional<remoteplay::PsnFailure> StreamController::psnFailure() const
 void StreamController::play(Target target)
 {
     spdlog::info("Play requested on {}", target.key.toStdString());
+#if defined(_WIN32)
     mainWindow_ = focusedWindow();
+#endif
     target_ = std::move(target);
     startSession();
 }
@@ -318,7 +329,7 @@ void StreamController::retry()
 void StreamController::startSession()
 {
     stop();
-    const std::uint64_t session = ++sessionNumber_;
+    [[maybe_unused]] const std::uint64_t session = ++sessionNumber_;
     const Target& target = *target_;
     connectionStage_.reset();
     psnFailure_.reset();
@@ -332,6 +343,7 @@ void StreamController::startSession()
         return;
     }
 
+#if defined(_WIN32)
     auto gpu = render::createGpuDevice();
 
     if (!gpu)
@@ -366,7 +378,21 @@ void StreamController::startSession()
         .metrics = metrics_,
         .psn = target.psn,
     };
-    auto started = remoteplay::StreamSession::start(*gpu, *mailbox, request, eventsFor(session));
+    auto makeDecoder = [&gpu, frameMailbox = *mailbox, metrics = metrics_](
+                           core::VideoCodec codec, bool hdr) -> media::VideoDecoderResult
+    {
+        auto decoder = media::VideoDecoder::create(*gpu, codec, frameMailbox, metrics, hdr);
+
+        if (!decoder)
+        {
+            return std::unexpected(decoder.error());
+        }
+
+        return std::move(*decoder);
+    };
+
+    auto started = remoteplay::StreamSession::start(std::move(makeDecoder), request,
+                                                    eventsFor(session));
 
     if (!started)
     {
@@ -379,13 +405,19 @@ void StreamController::startSession()
     gpu_ = std::move(*gpu);
     mailbox_ = std::move(*mailbox);
     session_ = std::move(*started);
+#else
+    spdlog::error("Cannot play: streaming is not supported on this platform yet");
+    fail(u"Transmissão indisponível"_s, u"A transmissão ainda não é suportada neste sistema."_s);
+#endif
 }
 
 remoteplay::StreamSession::Events StreamController::eventsFor(std::uint64_t session)
 {
     return {
         .onConnected = [this, session] { post([this, session] { onConnected(session); }); },
+#if defined(_WIN32)
         .onFirstPicture = [this, session] { post([this, session] { onFirstPicture(session); }); },
+#endif
         .onStage = [this, session](remoteplay::ConnectionStage stage)
         { post([this, session, stage] { onStage(session, stage); }); },
         .onPsnFailed = [this, session](remoteplay::PsnFailure failure)
@@ -456,6 +488,7 @@ void StreamController::onPsnFailed(std::uint64_t session, remoteplay::PsnFailure
     psnFailure_ = std::move(failure);
 }
 
+#if defined(_WIN32)
 void StreamController::onFirstPicture(std::uint64_t session)
 {
     if (session != sessionNumber_)
@@ -469,7 +502,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
     const render::OverlayActions overlayActions{
         .reflexChanged = [this](core::ReflexMode mode)
         {
-            const QString name = QString::fromLatin1(render::reflexModeName(mode));
+            const QString name = QString::fromLatin1(core::reflexModeName(mode));
             post([this, name] { settings_.setReflex(name); });
         },
         .upscalingChanged = [this](core::Upscaling upscaling)
@@ -587,6 +620,7 @@ void StreamController::onFirstPicture(std::uint64_t session)
     setPhase(Phase::Streaming);
     emit streamStarted(target_->key);
 }
+#endif
 
 void StreamController::onEnded(std::uint64_t session, SessionEnd end)
 {
@@ -609,6 +643,7 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
     fail(text.title, text.message);
 }
 
+#if defined(_WIN32)
 void StreamController::onWindowClosed(std::uint64_t session, render::CloseReason reason)
 {
     if (session != sessionNumber_)
@@ -628,6 +663,7 @@ void StreamController::onWindowClosed(std::uint64_t session, render::CloseReason
 
     setPhase(Phase::Idle);
 }
+#endif
 
 // The window goes first, then the session: closing the session joins chiaki's
 // threads, after which nothing feeds the decoder.
@@ -646,12 +682,18 @@ void StreamController::stop()
         keyboardMouse_->releaseAll();
     }
 
+#if defined(_WIN32)
     window_.reset();
+#endif
     session_.reset();
+#if defined(_WIN32)
     mailbox_.reset();
+#endif
     metrics_.reset();
     keyboardMouse_.reset();
+#if defined(_WIN32)
     gpu_.reset();
+#endif
 }
 
 void StreamController::fail(const QString& title, const QString& message)

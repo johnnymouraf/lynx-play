@@ -22,7 +22,6 @@ add_library(mfplay_remoteplay STATIC
     ConsoleStore.h
     ConsoleWake.cpp
     ConsoleWake.h
-    Dpapi.cpp
     HostAddress.cpp
     HostAddress.h
     Pin.cpp
@@ -40,8 +39,18 @@ add_library(mfplay_remoteplay STATIC
     StreamSession.h)
 add_library(MFPlay::remoteplay ALIAS mfplay_remoteplay)
 
+if(WIN32)
+    target_sources(mfplay_remoteplay PRIVATE Dpapi.cpp)
+else()
+    target_sources(mfplay_remoteplay PRIVATE SecretProtectorAndroid.cpp)
+endif()
+
 target_link_libraries(mfplay_remoteplay
-    PUBLIC MFPlay::core MFPlay::render chiaki-lib
-    PRIVATE MFPlay::audio MFPlay::input MFPlay::media nlohmann_json::nlohmann_json
-            crypt32 iphlpapi ws2_32)
+    PUBLIC MFPlay::core MFPlay::media chiaki-lib
+    PRIVATE MFPlay::audio MFPlay::input nlohmann_json::nlohmann_json)
+
+if(WIN32)
+    target_link_libraries(mfplay_remoteplay PRIVATE crypt32 iphlpapi ws2_32)
+endif()
+
 mfplay_set_warnings(mfplay_remoteplay)

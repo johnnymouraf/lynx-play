@@ -2,10 +2,16 @@
 
 #include "remoteplay/ChiakiLogSink.h"
 
+#if defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
 #include <iphlpapi.h>
+#else
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -27,9 +33,11 @@ namespace
 constexpr std::uint64_t kPingIntervalMs = 1000;
 constexpr std::uint64_t kDropAfterMissedPings = 3;
 constexpr std::size_t kMaxBroadcastHosts = 16;
+#if defined(_WIN32)
 constexpr ULONG kInitialAdapterBufferSize = 16 * 1024;
 constexpr int kAdapterQueryAttempts = 3;
 constexpr std::uint8_t kMaxBroadcastPrefixLength = 30;
+#endif
 
 std::string text(const char* value)
 {
@@ -81,6 +89,8 @@ DiscoveredHost toDiscoveredHost(ChiakiDiscoveryHost& host, const std::string& qu
 
     return result;
 }
+
+#if defined(_WIN32)
 
 std::vector<std::byte> queryAdapters()
 {
@@ -169,6 +179,15 @@ std::vector<sockaddr_storage> broadcastAddresses()
 
     return addresses;
 }
+
+#else
+
+std::vector<sockaddr_storage> broadcastAddresses()
+{
+    return {};
+}
+
+#endif
 
 } // namespace
 

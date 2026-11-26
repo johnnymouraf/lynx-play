@@ -9,11 +9,13 @@
 #include <memory>
 #include <string>
 
+#if defined(_WIN32)
 namespace mfplay::render
 {
 class StreamWindow;
 class TestPatternSource;
 }
+#endif
 
 namespace mfplay::app
 {
@@ -57,13 +59,17 @@ public:
     Q_INVOKABLE bool openVideoTest();
 
 private:
+#if defined(_WIN32)
     [[nodiscard]] std::expected<void, std::string> startVideoTest();
     void closeVideoTest();
+#endif
 
     StartupState state_;
     SettingsController& settings_;
+#if defined(_WIN32)
     std::unique_ptr<render::TestPatternSource> videoTestSource_;
     std::unique_ptr<render::StreamWindow> videoTestWindow_;
+#endif
 };
 
 } // namespace mfplay::app

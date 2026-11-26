@@ -16,15 +16,11 @@ qt_add_executable(mfplay WIN32
     ConsolePresentation.h
     ConsolesController.cpp
     ConsolesController.h
-    FilePlayback.cpp
     FilePlayback.h
-    Fonts.cpp
-    Fonts.h
     IconProvider.cpp
     IconProvider.h
     InputController.cpp
     InputController.h
-    OverlayInput.h
     PairingController.cpp
     PairingController.h
     PsnDevicesClient.cpp
@@ -37,10 +33,20 @@ qt_add_executable(mfplay WIN32
     SettingsController.h
     StreamController.cpp
     StreamController.h
-    WindowFrame.cpp
-    WindowFrame.h
-    main.cpp
-    mfplay.rc)
+    main.cpp)
+
+# The Win32 frame, the stream window's overlay and the file playback need
+# Direct3D 12 and the renderer, so they are built only for Windows.
+if(WIN32)
+    target_sources(mfplay PRIVATE
+        FilePlayback.cpp
+        Fonts.cpp
+        Fonts.h
+        OverlayInput.h
+        WindowFrame.cpp
+        WindowFrame.h
+        mfplay.rc)
+endif()
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
@@ -194,48 +200,49 @@ target_link_libraries(mfplay PRIVATE
     MFPlay::input
     MFPlay::media
     MFPlay::remoteplay
-    MFPlay::render
     Qt6::Gui
     Qt6::Network
     Qt6::Qml
     Qt6::Quick
-    Qt6::Svg
-    dwmapi
-    shell32
-    user32)
+    Qt6::Svg)
 mfplay_set_warnings(mfplay)
 
 install(TARGETS mfplay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES ${mfplay_licenses} DESTINATION licenses)
-install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
-        DESTINATION licenses RENAME NVAPI-License.txt)
-install(FILES assets/NGX-Notices.txt DESTINATION licenses RENAME NGX-Notices.txt)
 
-# NVIDIA's DLSS runtimes ship next to the executable, with their license; the
-# loader imports nvsdk_ngx_d.lib and finds the DLLs in the application folder.
-if(EXISTS "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll")
-    install(FILES
-            "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll"
-            "${MFPLAY_NGX_ROOT}/bin/nvngx_dlssg.dll"
-            DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(FILES "${MFPLAY_NGX_ROOT}/LICENSE.txt"
-            DESTINATION licenses RENAME NGX-License.txt)
+if(WIN32)
+    target_link_libraries(mfplay PRIVATE MFPlay::render dwmapi shell32 user32)
+
+    install(FILES "${PROJECT_SOURCE_DIR}/third_party/nvapi/License.txt"
+            DESTINATION licenses RENAME NVAPI-License.txt)
+    install(FILES assets/NGX-Notices.txt DESTINATION licenses RENAME NGX-Notices.txt)
+
+    # NVIDIA's DLSS runtimes ship next to the executable, with their license; the
+    # loader imports nvsdk_ngx_d.lib and finds the DLLs in the application folder.
+    if(EXISTS "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll")
+        install(FILES
+                "${MFPLAY_NGX_ROOT}/bin/nvngx_dlss.dll"
+                "${MFPLAY_NGX_ROOT}/bin/nvngx_dlssg.dll"
+                DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(FILES "${MFPLAY_NGX_ROOT}/LICENSE.txt"
+                DESTINATION licenses RENAME NGX-License.txt)
+    endif()
+
+    # Dear ImGui is static inside the executable; its notice ships with it.
+    find_file(MFPLAY_IMGUI_COPYRIGHT NAMES copyright
+        PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/imgui"
+        NO_DEFAULT_PATH)
+    if(MFPLAY_IMGUI_COPYRIGHT)
+        install(FILES "${MFPLAY_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
+    endif()
+
+    # The software OpenGL fallback is 20 MB and Qt Quick uses Direct3D here.
+    # The MSVC runtime DLLs come with the Qt deployment, so the redistributable
+    # installer is not shipped.
+    qt_generate_deploy_qml_app_script(
+        TARGET mfplay
+        OUTPUT_SCRIPT deploy_script
+        NO_TRANSLATIONS
+        DEPLOY_TOOL_OPTIONS --no-opengl-sw)
+    install(SCRIPT "${deploy_script}")
 endif()
-
-# Dear ImGui is static inside the executable; its notice ships with it.
-find_file(MFPLAY_IMGUI_COPYRIGHT NAMES copyright
-    PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/imgui"
-    NO_DEFAULT_PATH)
-if(MFPLAY_IMGUI_COPYRIGHT)
-    install(FILES "${MFPLAY_IMGUI_COPYRIGHT}" DESTINATION licenses RENAME ImGui-License.txt)
-endif()
-
-# The software OpenGL fallback is 20 MB and Qt Quick uses Direct3D here.
-# The MSVC runtime DLLs come with the Qt deployment, so the redistributable
-# installer is not shipped.
-qt_generate_deploy_qml_app_script(
-    TARGET mfplay
-    OUTPUT_SCRIPT deploy_script
-    NO_TRANSLATIONS
-    DEPLOY_TOOL_OPTIONS --no-opengl-sw)
-install(SCRIPT "${deploy_script}")

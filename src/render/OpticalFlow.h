@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "render/Layout.h"
 
 #include <array>
@@ -17,40 +18,15 @@
 namespace mfplay::render
 {
 
+using core::OpticalFlowUnavailable;
+using core::OpticalFlowAvailability;
+
 // The grid NVIDIA's optical flow engine uses: one vector per 4x4 picture
 // pixels. Grid 1 and 2 exist on Ampere and newer; 4 is the cheapest and the
 // one every supported GPU takes.
 inline constexpr std::uint32_t kFlowGridSize = 4;
 // NvOF stores flow vectors as S10.5 fixed point: five fractional bits.
 inline constexpr float kFlowFixedPointScale = 32.0F;
-
-// Why optical flow can't run here, for the RTX screen.
-enum class OpticalFlowUnavailable
-{
-    None,
-    // The stream renders on a GPU that is not NVIDIA.
-    NoNvidiaGpu,
-    // nvofapi64.dll is missing from System32.
-    NoDriver,
-    // The driver's runtime is older than API 5.0.
-    DriverTooOld,
-    // The driver refused the D3D12 instance, formats or capabilities.
-    DriverFailed,
-    // The driver doesn't accept BGRA8 input or the grid output formats.
-    FormatUnsupported,
-    // The picture is larger than the engine's caps.
-    SizeUnsupported,
-    // A session that worked stopped responding.
-    SessionFailed,
-};
-
-struct OpticalFlowAvailability
-{
-    bool available = false;
-    OpticalFlowUnavailable reason = OpticalFlowUnavailable::NoNvidiaGpu;
-    // For the log; English, like every other log line.
-    std::string detail;
-};
 
 // One motion vector in pixels, current picture to previous picture.
 struct FlowVector

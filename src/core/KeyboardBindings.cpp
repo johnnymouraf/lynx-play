@@ -10,6 +10,49 @@ namespace mfplay::core
 namespace
 {
 
+// Windows virtual-key codes, the values the binding names stand for.
+constexpr std::uint16_t kVkBack = 0x08;
+constexpr std::uint16_t kVkTab = 0x09;
+constexpr std::uint16_t kVkReturn = 0x0D;
+constexpr std::uint16_t kVkShift = 0x10;
+constexpr std::uint16_t kVkControl = 0x11;
+constexpr std::uint16_t kVkMenu = 0x12;
+constexpr std::uint16_t kVkEscape = 0x1B;
+constexpr std::uint16_t kVkSpace = 0x20;
+constexpr std::uint16_t kVkPrior = 0x21;
+constexpr std::uint16_t kVkNext = 0x22;
+constexpr std::uint16_t kVkEnd = 0x23;
+constexpr std::uint16_t kVkHome = 0x24;
+constexpr std::uint16_t kVkLeft = 0x25;
+constexpr std::uint16_t kVkUp = 0x26;
+constexpr std::uint16_t kVkRight = 0x27;
+constexpr std::uint16_t kVkDown = 0x28;
+constexpr std::uint16_t kVkInsert = 0x2D;
+constexpr std::uint16_t kVkDelete = 0x2E;
+constexpr std::uint16_t kVkF1 = 0x70;
+constexpr std::uint16_t kVkF2 = 0x71;
+constexpr std::uint16_t kVkF3 = 0x72;
+constexpr std::uint16_t kVkF4 = 0x73;
+constexpr std::uint16_t kVkF5 = 0x74;
+constexpr std::uint16_t kVkF6 = 0x75;
+constexpr std::uint16_t kVkF7 = 0x76;
+constexpr std::uint16_t kVkF8 = 0x77;
+constexpr std::uint16_t kVkF9 = 0x78;
+constexpr std::uint16_t kVkF10 = 0x79;
+constexpr std::uint16_t kVkF11 = 0x7A;
+constexpr std::uint16_t kVkF12 = 0x7B;
+constexpr std::uint16_t kVkOem1 = 0xBA;
+constexpr std::uint16_t kVkOemPlus = 0xBB;
+constexpr std::uint16_t kVkOemComma = 0xBC;
+constexpr std::uint16_t kVkOemMinus = 0xBD;
+constexpr std::uint16_t kVkOemPeriod = 0xBE;
+constexpr std::uint16_t kVkOem2 = 0xBF;
+constexpr std::uint16_t kVkOem3 = 0xC0;
+constexpr std::uint16_t kVkOem4 = 0xDB;
+constexpr std::uint16_t kVkOem5 = 0xDC;
+constexpr std::uint16_t kVkOem6 = 0xDD;
+constexpr std::uint16_t kVkOem7 = 0xDE;
+
 using NamedBinding = std::pair<std::string_view, KeyboardBinding>;
 
 constexpr KeyboardBinding key(std::uint16_t code)
@@ -64,47 +107,47 @@ constexpr std::array<NamedBinding, 81> kBindings{{
     {"7", key('7')},
     {"8", key('8')},
     {"9", key('9')},
-    {"Space", key(VK_SPACE)},
-    {"Enter", key(VK_RETURN)},
-    {"Tab", key(VK_TAB)},
-    {"Backspace", key(VK_BACK)},
-    {"Escape", key(VK_ESCAPE)},
-    {"Shift", key(VK_SHIFT)},
-    {"Ctrl", key(VK_CONTROL)},
-    {"Alt", key(VK_MENU)},
-    {"Up", key(VK_UP)},
-    {"Down", key(VK_DOWN)},
-    {"Left", key(VK_LEFT)},
-    {"Right", key(VK_RIGHT)},
-    {"Home", key(VK_HOME)},
-    {"End", key(VK_END)},
-    {"PageUp", key(VK_PRIOR)},
-    {"PageDown", key(VK_NEXT)},
-    {"Insert", key(VK_INSERT)},
-    {"Delete", key(VK_DELETE)},
-    {"Semicolon", key(VK_OEM_1)},
-    {"Plus", key(VK_OEM_PLUS)},
-    {"Comma", key(VK_OEM_COMMA)},
-    {"Minus", key(VK_OEM_MINUS)},
-    {"Period", key(VK_OEM_PERIOD)},
-    {"Slash", key(VK_OEM_2)},
-    {"Backtick", key(VK_OEM_3)},
-    {"LeftBracket", key(VK_OEM_4)},
-    {"Backslash", key(VK_OEM_5)},
-    {"RightBracket", key(VK_OEM_6)},
-    {"Quote", key(VK_OEM_7)},
-    {"F1", key(VK_F1)},
-    {"F2", key(VK_F2)},
-    {"F3", key(VK_F3)},
-    {"F4", key(VK_F4)},
-    {"F5", key(VK_F5)},
-    {"F6", key(VK_F6)},
-    {"F7", key(VK_F7)},
-    {"F8", key(VK_F8)},
-    {"F9", key(VK_F9)},
-    {"F10", key(VK_F10)},
-    {"F11", key(VK_F11)},
-    {"F12", key(VK_F12)},
+    {"Space", key(kVkSpace)},
+    {"Enter", key(kVkReturn)},
+    {"Tab", key(kVkTab)},
+    {"Backspace", key(kVkBack)},
+    {"Escape", key(kVkEscape)},
+    {"Shift", key(kVkShift)},
+    {"Ctrl", key(kVkControl)},
+    {"Alt", key(kVkMenu)},
+    {"Up", key(kVkUp)},
+    {"Down", key(kVkDown)},
+    {"Left", key(kVkLeft)},
+    {"Right", key(kVkRight)},
+    {"Home", key(kVkHome)},
+    {"End", key(kVkEnd)},
+    {"PageUp", key(kVkPrior)},
+    {"PageDown", key(kVkNext)},
+    {"Insert", key(kVkInsert)},
+    {"Delete", key(kVkDelete)},
+    {"Semicolon", key(kVkOem1)},
+    {"Plus", key(kVkOemPlus)},
+    {"Comma", key(kVkOemComma)},
+    {"Minus", key(kVkOemMinus)},
+    {"Period", key(kVkOemPeriod)},
+    {"Slash", key(kVkOem2)},
+    {"Backtick", key(kVkOem3)},
+    {"LeftBracket", key(kVkOem4)},
+    {"Backslash", key(kVkOem5)},
+    {"RightBracket", key(kVkOem6)},
+    {"Quote", key(kVkOem7)},
+    {"F1", key(kVkF1)},
+    {"F2", key(kVkF2)},
+    {"F3", key(kVkF3)},
+    {"F4", key(kVkF4)},
+    {"F5", key(kVkF5)},
+    {"F6", key(kVkF6)},
+    {"F7", key(kVkF7)},
+    {"F8", key(kVkF8)},
+    {"F9", key(kVkF9)},
+    {"F10", key(kVkF10)},
+    {"F11", key(kVkF11)},
+    {"F12", key(kVkF12)},
     {"Mouse", mouseMotion()},
     {"MouseLeft", mouseButton(kMouseLeft)},
     {"MouseRight", mouseButton(kMouseRight)},

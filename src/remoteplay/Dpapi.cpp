@@ -88,7 +88,7 @@ SecretResult unprotectWithDpapi(std::span<const std::uint8_t> sealed)
 
 } // namespace
 
-SecretProtector dpapiProtector()
+SecretProtector platformSecretProtector()
 {
     return SecretProtector{
         .protect = protectWithDpapi,

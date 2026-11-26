@@ -7,10 +7,10 @@
 namespace mfplay::core
 {
 
-// %LOCALAPPDATA%\MFPlay: logs and caches that belong to this machine.
+// Windows: %LOCALAPPDATA%\MFPlay, for logs and caches that belong to this machine.
 [[nodiscard]] std::expected<std::filesystem::path, std::string> localDataDir();
 
-// %APPDATA%\MFPlay: what the user keeps, such as the paired consoles.
+// Windows: %APPDATA%\MFPlay, for what the user keeps, such as the paired consoles.
 [[nodiscard]] std::expected<std::filesystem::path, std::string> roamingDataDir();
 
 } // namespace mfplay::core

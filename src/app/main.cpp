@@ -1,7 +1,6 @@
 #include "app/AppController.h"
 #include "app/ConsolesController.h"
 #include "app/FilePlayback.h"
-#include "app/Fonts.h"
 #include "app/IconProvider.h"
 #include "app/InputController.h"
 #include "app/PsnLoginClient.h"
@@ -12,15 +11,19 @@
 #include "input/Sdl.h"
 #include "app/Version.h"
 #include "core/Log.h"
-#include "core/Latency.h"
 #include "core/Paths.h"
 #include "core/Settings.h"
 #include "core/TerminateLogging.h"
 #include "remoteplay/ChiakiRuntime.h"
 #include "remoteplay/ConsoleStore.h"
 #include "remoteplay/PsnTokenStore.h"
+
+#if defined(_WIN32)
+#include "app/Fonts.h"
+#include "core/Latency.h"
 #include "render/AdapterSelection.h"
 #include "render/GpuDevice.h"
+#endif
 
 #include <QCommandLineOption>
 #include <QCommandLineParser>
@@ -37,6 +40,7 @@
 
 #include <spdlog/spdlog.h>
 
+#if defined(_WIN32)
 // Hybrid-graphics laptops read these exports to run the process on the
 // discrete GPU.
 extern "C"
@@ -44,6 +48,7 @@ extern "C"
 __declspec(dllexport) unsigned long NvOptimusEnablement = 1;
 __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 }
+#endif
 
 namespace
 {
@@ -102,7 +107,7 @@ std::optional<mfplay::remoteplay::ConsoleStore> openConsoleStore()
     }
 
     return mfplay::remoteplay::ConsoleStore(*dataDir / "consoles.json",
-                                            mfplay::remoteplay::dpapiProtector());
+                                            mfplay::remoteplay::platformSecretProtector());
 }
 
 std::optional<mfplay::core::SettingsStore> openSettingsStore()
@@ -129,11 +134,12 @@ std::optional<mfplay::remoteplay::PsnTokenStore> openPsnTokenStore()
     }
 
     return mfplay::remoteplay::PsnTokenStore(*dataDir / "psn.json",
-                                             mfplay::remoteplay::dpapiProtector());
+                                             mfplay::remoteplay::platformSecretProtector());
 }
 
 QString findStreamGpu()
 {
+#if defined(_WIN32)
     const auto adapters = mfplay::render::listAdapters();
 
     if (!adapters)
@@ -156,6 +162,9 @@ QString findStreamGpu()
     }
 
     return QString::fromStdString(adapters->at(*chosen).name);
+#else
+    return {};
+#endif
 }
 
 // Shows Qt's message and exits on an unknown option; nullopt on a bad rate.
@@ -205,7 +214,9 @@ int main(int argc, char* argv[])
     mfplay::core::installTerminateLogging();
     mfplay::app::installQtLogBridge();
     spdlog::info("MFPlay {} starting", mfplay::app::kVersion);
+#if defined(_WIN32)
     mfplay::core::disableProcessPowerThrottling();
+#endif
 
     QGuiApplication application(argc, argv);
     const auto commandLine = parseCommandLine(application);
@@ -219,11 +230,19 @@ int main(int argc, char* argv[])
 
     if (commandLine->playFile)
     {
+#if defined(_WIN32)
         return mfplay::app::playFile(*commandLine->playFile, commandLine->framesPerSecond,
                                      settings);
+#else
+        constexpr int kExitUnsupportedOption = 2;
+        spdlog::error("--play-file is not supported on this platform yet");
+        return kExitUnsupportedOption;
+#endif
     }
 
+#if defined(_WIN32)
     mfplay::app::loadBundledFonts();
+#endif
 
     mfplay::app::AppController controller(
         {

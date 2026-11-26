@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/RtxCapabilities.h"
 #include "core/Settings.h"
 #include "render/VideoFrame.h"
 
@@ -11,17 +12,7 @@
 namespace mfplay::render
 {
 
-// What the monitor under a window can show, as DisplayConfig reports it.
-struct HdrDisplayState
-{
-    std::string name;
-    bool hdrSupported = false;
-    // HDR is enabled in Windows and the monitor is in its HDR mode.
-    bool hdrActive = false;
-    // Windows' SDR reference white; 200 nits when the system doesn't report
-    // one that tone mapping can use.
-    double sdrWhiteNits = 200.0;
-};
+using core::HdrDisplayState;
 
 // Queries DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2 for the monitor
 // that shows `window` (the primary monitor when it is null). Never fails: a

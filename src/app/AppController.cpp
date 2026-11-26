@@ -1,15 +1,19 @@
 #include "app/AppController.h"
 
-#include "app/Fonts.h"
 #include "app/SettingsController.h"
 #include "app/Version.h"
 #include "core/Paths.h"
+#include "core/ReflexMode.h"
 #include "core/StreamMetrics.h"
+
+#if defined(_WIN32)
+#include "app/Fonts.h"
 #include "render/FrameMailbox.h"
 #include "render/GpuDevice.h"
 #include "render/ReflexSession.h"
 #include "render/StreamWindow.h"
 #include "render/TestPatternSource.h"
+#endif
 
 #include <QCoreApplication>
 
@@ -25,7 +29,9 @@ namespace
 
 using namespace Qt::StringLiterals;
 
+#if defined(_WIN32)
 constexpr auto kVideoTestTitle = L"MFPlay — Teste de vídeo";
+#endif
 
 } // namespace
 
@@ -33,6 +39,7 @@ AppController::AppController(StartupState state, SettingsController& settings,
                              QObject* parent)
     : QObject(parent), state_(std::move(state)), settings_(settings)
 {
+#if defined(_WIN32)
     connect(&settings_, &SettingsController::rtxChanged, this,
             [this]
             {
@@ -54,6 +61,7 @@ AppController::AppController(StartupState state, SettingsController& settings,
                                                         settings_.video().windowSize);
                 }
             });
+#endif
 }
 
 AppController::~AppController() = default;
@@ -92,6 +100,7 @@ QUrl AppController::logsUrl() const
 
 bool AppController::openVideoTest()
 {
+#if defined(_WIN32)
     if (videoTestWindow_ != nullptr && videoTestWindow_->isOpen())
     {
         videoTestWindow_->bringToFront();
@@ -107,8 +116,12 @@ bool AppController::openVideoTest()
     }
 
     return true;
+#else
+    return false;
+#endif
 }
 
+#if defined(_WIN32)
 std::expected<void, std::string> AppController::startVideoTest()
 {
     const auto gpu = render::createGpuDevice();
@@ -170,7 +183,7 @@ std::expected<void, std::string> AppController::startVideoTest()
                                                          .reflexChanged = [this](core::ReflexMode mode)
                                                          {
                                                              settings_.setReflex(QString::fromLatin1(
-                                                                 render::reflexModeName(mode)));
+                                                                 core::reflexModeName(mode)));
                                                          },
                                                          .lowestLatencyChanged =
                                                              [this](bool lowest)
@@ -242,5 +255,6 @@ void AppController::closeVideoTest()
     videoTestWindow_.reset();
     videoTestSource_.reset();
 }
+#endif
 
 } // namespace mfplay::app

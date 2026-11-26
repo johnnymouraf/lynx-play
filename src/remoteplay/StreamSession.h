@@ -2,10 +2,9 @@
 
 #include "core/Settings.h"
 #include "core/StreamMetrics.h"
+#include "media/VideoDecoding.h"
 #include "remoteplay/Console.h"
 #include "remoteplay/PsnConnection.h"
-#include "render/FrameMailbox.h"
-#include "render/GpuDevice.h"
 
 #include <cstdint>
 #include <expected>
@@ -86,7 +85,7 @@ struct SessionRequest
 };
 
 // A Remote Play session with a paired console, through chiaki-lib, its video
-// decoded on the GPU into a mailbox.
+// decoded by the decoder that `start` opens.
 class StreamSession
 {
 public:
@@ -108,8 +107,7 @@ public:
     };
 
     [[nodiscard]] static std::expected<std::unique_ptr<StreamSession>, std::string> start(
-        const render::GpuDevice& gpu, std::shared_ptr<render::FrameMailbox> mailbox,
-        const SessionRequest& request, Events events);
+        media::VideoDecoderFactory makeDecoder, const SessionRequest& request, Events events);
 
     StreamSession(const StreamSession&) = delete;
     StreamSession& operator=(const StreamSession&) = delete;
