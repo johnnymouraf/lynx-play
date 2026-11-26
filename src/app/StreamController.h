@@ -41,6 +41,8 @@ class StreamController : public QObject
 
     Q_PROPERTY(Phase phase READ phase NOTIFY changed)
     Q_PROPERTY(QString consoleName READ consoleName NOTIFY changed)
+    Q_PROPERTY(bool overInternet READ overInternet NOTIFY changed)
+    Q_PROPERTY(QString connectionStageText READ connectionStageText NOTIFY changed)
     Q_PROPERTY(QString failureHeading READ failureHeading NOTIFY changed)
     Q_PROPERTY(QString failureTitle READ failureTitle NOTIFY changed)
     Q_PROPERTY(QString failureMessage READ failureMessage NOTIFY changed)
@@ -76,6 +78,11 @@ public:
 
     [[nodiscard]] Phase phase() const;
     [[nodiscard]] QString consoleName() const;
+    // Whether the connection goes through the PSN instead of the local network.
+    [[nodiscard]] bool overInternet() const;
+    // What the PSN connection is doing now, for the connecting screen; empty
+    // on the local network.
+    [[nodiscard]] QString connectionStageText() const;
     [[nodiscard]] QString failureHeading() const;
     [[nodiscard]] QString failureTitle() const;
     [[nodiscard]] QString failureMessage() const;

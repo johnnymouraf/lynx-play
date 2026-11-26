@@ -332,7 +332,9 @@ FocusScope {
                             height: page.cardHeight
                             listMode: page.listMode
                             focused: cardsArea.activeFocus && consoleCard.index === page.currentIndex
+                            psnSignedIn: page.consoles.psnSignedIn
                             onPlayRequested: page.consoles.play(consoleCard.key)
+                            onPlayOverInternetRequested: page.consoles.playOverInternet(consoleCard.key)
                             onWakeRequested: page.consoles.wake(consoleCard.key)
                             onCancelWakeRequested: page.consoles.cancelWake(consoleCard.key)
                             onPairRequested: pairingDialog.openFor(consoleCard.key, consoleCard.name)
@@ -362,16 +364,26 @@ FocusScope {
         property string consoleName
         property bool consoleSaved
         property bool consolePaired
+        property bool consoleInternet
 
         function openFor(card, anchor) {
             cardMenu.consoleKey = card.key;
             cardMenu.consoleName = card.name;
             cardMenu.consoleSaved = card.saved;
             cardMenu.consolePaired = card.paired;
+            cardMenu.consoleInternet = card.internetOffered;
             cardMenu.parent = anchor;
             cardMenu.x = anchor.width - cardMenu.width;
             cardMenu.y = anchor.height + Theme.space1;
             cardMenu.open();
+        }
+
+        MenuRow {
+            text: "Jogar pela internet"
+            iconName: "network"
+            visible: cardMenu.consoleInternet
+            height: visible ? implicitHeight : 0
+            onTriggered: page.consoles.playOverInternet(cardMenu.consoleKey)
         }
 
         MenuRow {

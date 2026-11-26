@@ -9,6 +9,8 @@ Item {
 
     property string status: "offline"
     property bool searching: false
+    // An offline console the PSN reaches offers playing over the internet.
+    property bool overInternet: false
     property string consoleName
     property real wakeProgress: 0
 
@@ -17,9 +19,11 @@ Item {
         standby: { label: "Ligar e jogar", icon: "power", variant: "primary" },
         unpaired: { label: "Parear", icon: "link-2", variant: "secondary" },
         offline: { label: "Procurar de novo", icon: "refresh-cw", variant: "secondary" },
-        waking: { label: "", icon: "", variant: "secondary" }
+        waking: { label: "", icon: "", variant: "secondary" },
+        internet: { label: "Jogar pela internet", icon: "network", variant: "primary" }
     })
-    readonly property var button: action.buttons[action.status]
+    readonly property var button: action.buttons[action.internetOffered ? "internet" : action.status]
+    readonly property bool internetOffered: action.overInternet && action.status === "offline"
     readonly property bool waking: action.status === "waking"
 
     signal triggered
@@ -53,10 +57,10 @@ Item {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         visible: !action.waking
-        enabled: !action.searching
+        enabled: !action.searching || action.internetOffered
         variant: action.button.variant
-        iconName: action.searching ? "loader-circle" : action.button.icon
-        text: action.searching ? "Procurando…" : action.button.label
+        iconName: action.searching && !action.internetOffered ? "loader-circle" : action.button.icon
+        text: action.searching && !action.internetOffered ? "Procurando…" : action.button.label
         focusPolicy: Qt.NoFocus
         Accessible.description: action.consoleName
         onClicked: action.triggered()

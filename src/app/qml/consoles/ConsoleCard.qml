@@ -17,11 +17,18 @@ Item {
     required property string activity
     required property bool saved
     required property bool paired
+    required property bool psnReachable
     required property bool searching
     property bool listMode: false
     property bool focused: false
+    property bool psnSignedIn: false
+
+    readonly property bool lanMissing: card.status === "offline" && card.paired
+    readonly property bool internetOffered: card.lanMissing && card.psnReachable
+    readonly property bool signInHint: card.lanMissing && !card.psnReachable && !card.psnSignedIn
 
     signal playRequested
+    signal playOverInternetRequested
     signal wakeRequested
     signal pairRequested
     signal refreshRequested
@@ -40,6 +47,11 @@ Item {
             card.pairRequested();
             break;
         case "offline":
+            if (card.internetOffered) {
+                card.playOverInternetRequested();
+                break;
+            }
+
             card.refreshRequested();
             break;
         }
@@ -86,6 +98,13 @@ Item {
 
     component ConsoleName: AppText {
         textStyle: "dialogTitle"
+    }
+
+    component SignInHint: AppText {
+        textStyle: "detail"
+        color: Theme.textMuted
+        elide: Text.ElideRight
+        text: "Entre na PSN em Rede para jogar pela internet"
     }
 
     component ConsoleAddress: AppText {
@@ -147,12 +166,19 @@ Item {
 
             ConsoleAddress {
                 Layout.fillWidth: true
+                visible: !card.signInHint
                 text: card.address
+            }
+
+            SignInHint {
+                Layout.fillWidth: true
+                visible: card.signInHint
             }
 
             CardAction {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Theme.sizeControl
+                overInternet: card.internetOffered
                 status: card.status
                 searching: card.searching
                 consoleName: card.name
@@ -209,9 +235,16 @@ Item {
                 AppText {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignVCenter
+                    visible: !card.signInHint
                     text: card.activity
                     textStyle: "detail"
                     color: Theme.textSubtle
+                }
+
+                SignInHint {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: card.signInHint
                 }
             }
         }
@@ -220,6 +253,7 @@ Item {
             Layout.preferredWidth: 220
             Layout.preferredHeight: Theme.sizeControlLg
             Layout.alignment: Qt.AlignVCenter
+            overInternet: card.internetOffered
             status: card.status
             searching: card.searching
             consoleName: card.name

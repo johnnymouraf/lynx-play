@@ -80,14 +80,14 @@ FocusScope {
 
                     Icon {
                         anchors.verticalCenter: parent.verticalCenter
-                        name: "house-wifi"
+                        name: page.stream.overInternet ? "globe" : "house-wifi"
                         size: 16
                         color: Theme.textMuted
                     }
 
                     AppText {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Rede local"
+                        text: page.stream.overInternet ? "Internet" : "Rede local"
                         textStyle: "caption"
                         color: Theme.textMuted
                     }
@@ -152,8 +152,17 @@ FocusScope {
                         }
                     }
 
+                    AppText {
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: page.stream.overInternet
+                        text: page.stream.connectionStageText
+                        textStyle: "bodyMedium"
+                        color: Theme.textMuted
+                    }
+
                     Row {
                         Layout.alignment: Qt.AlignHCenter
+                        visible: !page.stream.overInternet
                         spacing: Theme.space6
 
                         ConnectionStep {

@@ -103,6 +103,8 @@ ConsolesController::ConsolesController(bool remotePlayReady,
     connect(&stream_, &StreamController::streamStarted, this, &ConsolesController::markPlayed);
     connect(&psnLogin_, &PsnLoginClient::accessTokenChanged, this,
             &ConsolesController::refreshPsnDevices);
+    connect(&psnLogin_, &PsnLoginClient::accessTokenChanged, this,
+            &ConsolesController::psnSignedInChanged);
     connect(&psnClient_, &PsnDevicesClient::devicesListed, this,
             &ConsolesController::onPsnDevicesListed);
 
@@ -305,6 +307,11 @@ void ConsolesController::play(const QString& key)
     }
 
     stream_.play(std::move(target));
+}
+
+bool ConsolesController::psnSignedIn() const
+{
+    return !psnLogin_.validAccessToken().empty();
 }
 
 bool ConsolesController::playOverInternet(const QString& key)

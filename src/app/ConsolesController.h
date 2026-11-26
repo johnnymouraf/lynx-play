@@ -42,6 +42,7 @@ class ConsolesController : public QObject
     Q_PROPERTY(ConsoleListModel* model READ model CONSTANT)
     Q_PROPERTY(DiscoveryStatus discoveryStatus READ discoveryStatus NOTIFY discoveryStatusChanged)
     Q_PROPERTY(PairingController* pairing READ pairing CONSTANT)
+    Q_PROPERTY(bool psnSignedIn READ psnSignedIn NOTIFY psnSignedInChanged)
     Q_PROPERTY(QString savedAccountId READ savedAccountId NOTIFY savedAccountIdChanged)
 
 public:
@@ -63,6 +64,9 @@ public:
     [[nodiscard]] ConsoleListModel* model();
     [[nodiscard]] DiscoveryStatus discoveryStatus() const;
     [[nodiscard]] PairingController* pairing();
+    // Whether a valid PSN sign-in is on hand, which playing over the internet
+    // needs.
+    [[nodiscard]] bool psnSignedIn() const;
     // The account ID last used to pair, in Base64, to offer it again.
     [[nodiscard]] QString savedAccountId() const;
 
@@ -108,6 +112,7 @@ public:
 signals:
     void discoveryStatusChanged();
     void savedAccountIdChanged();
+    void psnSignedInChanged();
     // A message for a toast; `tone` is info, ready, standby or danger.
     void notice(const QString& tone, const QString& title, const QString& message);
 

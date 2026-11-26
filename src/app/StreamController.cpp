@@ -58,6 +58,62 @@ FailureText renderFailedText()
     return {u"O vídeo parou"_s, u"A GPU deixou de responder. "_s + logsHint()};
 }
 
+FailureText textFor(const remoteplay::PsnFailure& failure)
+{
+    using remoteplay::PsnFailureKind;
+
+    switch (failure.kind)
+    {
+    case PsnFailureKind::Timeout:
+        return {u"O console não respondeu"_s,
+                u"O PS5 não atendeu a tempo. Confira se ele está ligado ou em repouso, com "
+                u"a Reprodução remota ativada, e tente de novo."_s};
+    case PsnFailureKind::ConsoleOffline:
+        return {u"O console está indisponível"_s,
+                u"O PS5 precisa estar ligado, ou em repouso com acesso à internet e a "
+                u"Reprodução remota ativada."_s};
+    case PsnFailureKind::Network:
+        return {u"A rede bloqueou a conexão"_s,
+                u"Esta rede não deixa a conexão direta com o PS5 passar. Tente outra rede, "
+                u"como o ponto de acesso do celular."_s};
+    case PsnFailureKind::Rejected:
+        return {u"A PSN recusou o login"_s,
+                u"O login expirou ou foi recusado. Entre na PSN de novo em Rede."_s};
+    case PsnFailureKind::InvalidDevice:
+        return {u"A PSN não reconhece este console"_s,
+                u"O PS5 não está na lista da sua conta. Confira se ele usa a mesma conta da "
+                u"PSN."_s};
+    case PsnFailureKind::Canceled:
+    case PsnFailureKind::Unknown:
+        break;
+    }
+
+    return {u"Não foi possível conectar pela internet"_s, logsHint()};
+}
+
+QString stageText(remoteplay::ConnectionStage stage)
+{
+    using remoteplay::ConnectionStage;
+
+    switch (stage)
+    {
+    case ConnectionStage::SigningIn:
+        return u"Entrando na PSN"_s;
+    case ConnectionStage::CreatingSession:
+        return u"Criando sessão"_s;
+    case ConnectionStage::StartingSession:
+        return u"Iniciando sessão no console"_s;
+    case ConnectionStage::PunchingControl:
+        return u"Abrindo caminho (controle)"_s;
+    case ConnectionStage::PunchingData:
+        return u"Abrindo caminho (vídeo)"_s;
+    case ConnectionStage::Connecting:
+        return u"Conectando"_s;
+    }
+
+    return {};
+}
+
 FailureText textFor(SessionEnd end)
 {
     switch (end)
@@ -184,6 +240,21 @@ StreamController::Phase StreamController::phase() const
 QString StreamController::consoleName() const
 {
     return target_ ? target_->name : QString();
+}
+
+bool StreamController::overInternet() const
+{
+    return target_ && target_->psn;
+}
+
+QString StreamController::connectionStageText() const
+{
+    if (!connectionStage_)
+    {
+        return overInternet() ? stageText(remoteplay::ConnectionStage::SigningIn) : QString();
+    }
+
+    return stageText(*connectionStage_);
 }
 
 QString StreamController::failureHeading() const
@@ -533,7 +604,8 @@ void StreamController::onEnded(std::uint64_t session, SessionEnd end)
         return;
     }
 
-    const FailureText text = textFor(end);
+    const FailureText text = end == SessionEnd::PsnFailed && psnFailure_ ? textFor(*psnFailure_)
+                                                                          : textFor(end);
     fail(text.title, text.message);
 }
 
