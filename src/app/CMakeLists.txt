@@ -48,6 +48,19 @@ if(WIN32)
         mfplay.rc)
 endif()
 
+# Android: the package template (manifest, icon) and the version the APK
+# reports. The version code is MAJOR * 10000 + MINOR * 100 + PATCH, so every
+# release installs over the one before it.
+if(ANDROID)
+    math(EXPR androidVersionCode
+        "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
+    set_target_properties(mfplay PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${PROJECT_SOURCE_DIR}/android"
+        QT_ANDROID_TARGET_SDK_VERSION 36
+        QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        QT_ANDROID_VERSION_CODE "${androidVersionCode}")
+endif()
+
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 set(mfplay_fonts

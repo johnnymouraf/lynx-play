@@ -3,7 +3,12 @@
 #include <memory>
 #include <vector>
 
+#if defined(_WIN32)
 #include <spdlog/sinks/msvc_sink.h>
+#elif defined(__ANDROID__)
+#include <spdlog/sinks/android_sink.h>
+#endif
+
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -35,7 +40,11 @@ std::expected<void, std::string> initLogging(const std::filesystem::path& direct
         std::vector<spdlog::sink_ptr> sinks{
             std::make_shared<spdlog::sinks::rotating_file_sink_mt>(file, kMaxLogFileBytes,
                                                                    kMaxRotatedFiles),
+#if defined(_WIN32)
             std::make_shared<spdlog::sinks::msvc_sink_mt>(),
+#elif defined(__ANDROID__)
+            std::make_shared<spdlog::sinks::android_sink_mt>("MFPlay"),
+#endif
         };
 
         auto logger = std::make_shared<spdlog::logger>("mfplay", sinks.begin(), sinks.end());

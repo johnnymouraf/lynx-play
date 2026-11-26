@@ -1,0 +1,12 @@
+set(VCPKG_TARGET_ARCHITECTURE arm64)
+set(VCPKG_LIBRARY_LINKAGE static)
+set(VCPKG_BUILD_TYPE release)
+
+set(VCPKG_CMAKE_SYSTEM_NAME Android)
+set(VCPKG_CMAKE_SYSTEM_VERSION 28)
+set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "$ENV{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake")
+# Qt for Android loads libc++_shared.so, so every library links the same one.
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS
+    -DANDROID_ABI=arm64-v8a
+    -DANDROID_PLATFORM=android-28
+    -DANDROID_STL=c++_shared)

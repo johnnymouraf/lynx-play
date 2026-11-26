@@ -146,6 +146,145 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Qt 6.10 for Android is built with NDK r27c; the runner's SDK provides the
+  # NDK, platform and build tools, installed here only when the image lacks
+  # them. The Qt version matches the Windows job.
+  android:
+    name: Android arm64
+    runs-on: ubuntu-24.04
+    env:
+      # The workflow-level value is the Windows path; this job's is POSIX.
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Fetch chiaki-ng
+        shell: pwsh
+        run: ./scripts/init-chiaki-submodules.ps1
+
+      - name: Set up Java
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.13"
+
+      - name: Install chiaki-ng's protobuf generator dependencies
+        run: python -m pip install --disable-pip-version-check protobuf grpcio-tools
+
+      - name: Set up the Android SDK and NDK
+        run: |
+          sdk="${ANDROID_SDK_ROOT:?the runner has no Android SDK}"
+          manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          ndk="$sdk/ndk/27.2.12479018"
+          packages=()
+
+          [[ -d "$ndk" ]] || packages+=("ndk;27.2.12479018")
+          [[ -d "$sdk/platforms/android-36" ]] || packages+=("platforms;android-36")
+          [[ -d "$sdk/build-tools/36.0.0" ]] || packages+=("build-tools;36.0.0")
+
+          if (( ${#packages[@]} > 0 )); then
+            { for _ in $(seq 100); do echo y; done; } | "$manager" --licenses > /dev/null
+            "$manager" --install "${packages[@]}"
+          fi
+
+          echo "ANDROID_NDK_ROOT=$ndk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+
+      - name: Install Qt for the host
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4
+        with:
+          version: "6.10.3"
+          host: linux
+          target: desktop
+          arch: gcc_64
+          dir: ${{ runner.temp }}/qt-host
+          cache: true
+
+      # The next install replaces QT_ROOT_DIR, so the host's path is kept here.
+      - name: Record the host Qt
+        run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+
+      - name: Install Qt for Android
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4
+        with:
+          version: "6.10.3"
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+          dir: ${{ runner.temp }}/qt-android
+          cache: true
+
+      - name: Set up vcpkg at the manifest baseline
+        run: |
+          baseline=$(jq -r '."builtin-baseline"' vcpkg.json)
+          root="$RUNNER_TEMP/vcpkg"
+          git init --quiet "$root"
+          git -C "$root" fetch --quiet --depth 1 https://github.com/microsoft/vcpkg.git "$baseline"
+          git -C "$root" checkout --quiet FETCH_HEAD
+          "$root/bootstrap-vcpkg.sh" -disableMetrics
+          mkdir -p .vcpkg-cache
+          echo "VCPKG_ROOT=$root" >> "$GITHUB_ENV"
+
+      - name: Restore the vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .vcpkg-cache
+          key: android-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-${{ github.run_id }}
+          restore-keys: |
+            android-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-
+            android-vcpkg-
+
+      - name: Configure
+        run: >
+          cmake --preset android
+          -DPYTHON_EXECUTABLE="${{ steps.python.outputs.python-path }}"
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
+      - name: Save the vcpkg binary cache
+        if: always() && steps.vcpkg-cache.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+
+      # Tests are host tests: they run in the Windows job, not on Android.
+      - name: Build the APK
+        run: cmake --build --preset android --target apk
+
+      - name: Find the APK
+        id: apk
+        run: |
+          mapfile -t apks < <(find build/android -name '*.apk' -not -path '*/intermediates/*')
+
+          if (( ${#apks[@]} != 1 )); then
+            printf 'Expected one APK, found %d:\n' "${#apks[@]}" >&2
+            printf '  %s\n' "${apks[@]}" >&2
+            exit 1
+          fi
+
+          echo "path=${apks[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mfplay-android-arm64
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1
+
 
   # The artifact expires in a day; the release is where the portable build
   # stays. The version comes from CMakeLists.txt, so a delivery that changes
@@ -197,12 +336,12 @@ jobs:
             gh release delete $name --yes --cleanup-tag
           }
 
-  # Artifacts count against the account's storage; keep only the newest two
-  # (one per branch building in parallel; each is tested within minutes of
+  # Artifacts count against the account's storage; keep the newest two of each
+  # name (one per branch building in parallel; each is tested within minutes of
   # finishing).
   purge-artifacts:
     name: Purge old artifacts
-    needs: windows
+    needs: [windows, android]
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -216,9 +355,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $artifacts = (gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" | ConvertFrom-Json).artifacts |
-            Sort-Object created_at -Descending
-          $artifacts | Select-Object -Skip 2 | ForEach-Object {
-            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$($_.id)" | Out-Null
+          $artifacts = (gh api "repos/${{ github.repository }}/actions/artifacts?per_page=100" | ConvertFrom-Json).artifacts
+          foreach ($group in ($artifacts | Group-Object name)) {
+            $group.Group | Sort-Object created_at -Descending | Select-Object -Skip 2 | ForEach-Object {
+              gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$($_.id)" | Out-Null
+            }
           }
 

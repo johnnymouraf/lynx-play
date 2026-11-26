@@ -46,6 +46,11 @@ if(WIN32)
     target_link_libraries(mfplay_core PRIVATE shell32 ole32 avrt)
 else()
     target_sources(mfplay_core PRIVATE PathsAndroid.cpp)
+
+    # spdlog's Android sink writes to logcat through liblog.
+    if(ANDROID)
+        target_link_libraries(mfplay_core PRIVATE log)
+    endif()
 endif()
 
 mfplay_set_warnings(mfplay_core)
