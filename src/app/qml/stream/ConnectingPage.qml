@@ -9,12 +9,20 @@ FocusScope {
     required property StreamController stream
     required property AppController controller
 
+    // The error screen asks to sign in to the PSN again.
+    signal signInRequested
+
     readonly property bool failed: page.stream.phase === StreamController.Failed
     readonly property bool startingVideo: page.stream.phase === StreamController.StartingVideo
 
     function focusAction() {
         if (page.failed) {
-            retryButton.forceActiveFocus(Qt.TabFocusReason);
+            if (page.stream.signInNeeded) {
+                signInButton.forceActiveFocus(Qt.TabFocusReason);
+            } else {
+                retryButton.forceActiveFocus(Qt.TabFocusReason);
+            }
+
             return;
         }
 
@@ -154,6 +162,14 @@ FocusScope {
 
                     AppText {
                         Layout.alignment: Qt.AlignHCenter
+                        visible: page.stream.connectionNote.length > 0
+                        text: page.stream.connectionNote
+                        textStyle: "labelMedium"
+                        color: Theme.text
+                    }
+
+                    AppText {
+                        Layout.alignment: Qt.AlignHCenter
                         visible: page.stream.overInternet
                         text: page.stream.connectionStageText
                         textStyle: "bodyMedium"
@@ -226,10 +242,21 @@ FocusScope {
                     ActionButton {
                         id: retryButton
 
+                        visible: !page.stream.signInNeeded
                         variant: "primary"
                         iconName: "rotate-ccw"
                         text: "Tentar de novo"
                         onClicked: page.stream.retry()
+                    }
+
+                    ActionButton {
+                        id: signInButton
+
+                        visible: page.stream.signInNeeded
+                        variant: "primary"
+                        iconName: "log-in"
+                        text: "Entrar de novo"
+                        onClicked: page.signInRequested()
                     }
                 }
             }

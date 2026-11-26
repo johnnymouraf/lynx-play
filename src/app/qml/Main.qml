@@ -58,6 +58,15 @@ ApplicationWindow {
         return window.input.controllerBatteryLow ? "Bateria baixa" : "Conectado";
     }
 
+    // Leaves the failed connection for Configurações › Rede and starts the
+    // PSN sign-in there, as its "Entrar na PSN" button does.
+    function signInAgain() {
+        window.stream.cancel();
+        window.section = "settings";
+        settingsPage.section = "network";
+        window.consoles.pairing.psnLogin.start();
+    }
+
     Component.onCompleted: consolesPage.focusFirstControl()
 
     Connections {
@@ -196,6 +205,7 @@ ApplicationWindow {
                 visible: window.connecting
                 stream: window.stream
                 controller: window.controller
+                onSignInRequested: window.signInAgain()
             }
 
             Loader {
